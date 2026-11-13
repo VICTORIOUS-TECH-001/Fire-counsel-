@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="FIRE COUNSEL — an offline-first law-student learning and examination platform.">
+  <title>FIRE COUNSEL — Ignite Your Legal Intelligence</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#dashboard" aria-label="FIRE COUNSEL home">
+        <span class="brand-mark">F<span>§</span></span>
+        <span class="brand-copy"><strong>FIRE COUNSEL</strong><small>LEGAL LEARNING</small></span>
+      </a>
+      <div class="workspace-label">WORKSPACE</div>
+      <nav class="main-nav" aria-label="Main navigation">
+        <a class="nav-link active" href="#dashboard" data-page="dashboard"><span class="nav-icon">⌂</span> Dashboard</a>
+        <a class="nav-link" href="#subjects" data-page="subjects"><span class="nav-icon">▤</span> My subjects</a>
+        <a class="nav-link" href="#library" data-page="library"><span class="nav-icon">▣</span> Study library</a>
+        <a class="nav-link" href="#memory" data-page="memory"><span class="nav-icon">✳</span> Memory laboratory</a>
+        <a class="nav-link" href="#exams" data-page="exams"><span class="nav-icon">◷</span> Exam practice</a>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="offline-card">
+          <span class="status-dot"></span>
+          <div><strong id="connection-label">Ready to study</strong><small id="connection-detail">Checking connection…</small></div>
+        </div>
+        <button class="profile-button" id="profile-button" type="button">
+          <span class="avatar">LS</span><span><strong>Law Student</strong><small>Personal workspace</small></span><span class="more">···</span>
+        </button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <button class="icon-button mobile-menu" id="menu-toggle" aria-label="Open navigation">☰</button>
+        <div class="breadcrumb"><span>Workspace</span><b>/</b><strong id="page-breadcrumb">Dashboard</strong></div>
+        <div class="top-actions">
+          <span class="local-chip"><span class="status-dot"></span> Local mode</span>
+          <button class="icon-button" id="install-button" type="button" hidden aria-label="Install app" title="Install app">↓</button>
+          <button class="help-button" id="help-button" type="button">Help & guide <span>↗</span></button>
+        </div>
+      </header>
+
+      <section class="page active-page" id="dashboard-page">
+        <div class="welcome-row">
+          <div>
+            <div class="eyebrow"><span class="eyebrow-line"></span> YOUR LEGAL LEARNING SPACE</div>
+            <h1>Make every study session <em>count.</em></h1>
+            <p class="lead">A focused workspace for understanding law, mastering authorities and preparing with confidence.</p>
+          </div>
+          <div class="date-pill"><span>✦</span><span id="today-label">Your study day</span></div>
+        </div>
+
+        <div class="hero-panel">
+          <div class="hero-content">
+            <div class="hero-kicker">THE FIRE COUNSEL METHOD</div>
+            <h2>Understand the law.<br><span>Remember the details.</span></h2>
+            <p>Build knowledge through active recall, deliberate practice and clear legal reasoning.</p>
+            <button class="primary-button" type="button" data-go="subjects">Explore your subjects <span>→</span></button>
+          </div>
+          <div class="hero-art" aria-hidden="true">
+            <div class="orb orb-one"></div><div class="orb orb-two"></div>
+            <div class="law-seal"><span>§</span><small>LEX<br>VERITAS</small></div>
+            <div class="orbit orbit-a"></div><div class="orbit orbit-b"></div>
+            <div class="floating-tag tag-one">CASE LAW <b>01</b></div>
+            <div class="floating-tag tag-two">RATIO DECIDENDI</div>
+          </div>
+        </div>
+
+        <div class="section-heading">
+          <div><span class="section-overline">YOUR OVERVIEW</span><h2>Study at a glance</h2></div>
+          <span class="muted-note">Saved on this device</span>
+        </div>
+        <div class="stats-grid">
+          <article class="stat-card"><div class="stat-icon violet">▤</div><div><span>Subjects</span><strong id="stat-subjects">6</strong><small>Ready to explore</small></div></article>
+          <article class="stat-card"><div class="stat-icon cyan">▣</div><div><span>Study materials</span><strong id="stat-materials">0</strong><small>Saved locally</small></div></article>
+          <article class="stat-card"><div class="stat-icon amber">✳</div><div><span>Recall cards</span><strong id="stat-cards">0</strong><small>In your memory bank</small></div></article>
+          <article class="stat-card"><div class="stat-icon green">◷</div><div><span>Study sessions</span><strong id="stat-sessions">0</strong><small>Tracked on this device</small></div></article>
+        </div>
+
+        <div class="content-grid">
+          <section class="panel subjects-panel">
+            <div class="panel-heading"><div><span class="section-overline">YOUR CURRICULUM</span><h2>Explore subjects</h2></div><a href="#subjects" class="text-link">View all <span>→</span></a></div>
+            <div class="subject-grid" id="dashboard-subjects"></div>
+          </section>
+          <aside class="panel quick-panel">
+            <div class="panel-heading"><div><span class="section-overline">QUICK ACCESS</span><h2>Study tools</h2></div></div>
+            <button class="tool-row" data-go="library"><span class="tool-icon blue">▣</span><span><strong>Document library</strong><small>Keep your materials together</small></span><b>→</b></button>
+            <button class="tool-row" data-go="memory"><span class="tool-icon pink">✳</span><span><strong>Memory laboratory</strong><small>Practise active recall</small></span><b>→</b></button>
+            <button class="tool-row" data-go="exams"><span class="tool-icon gold">◷</span><span><strong>Exam practice</strong><small>Prepare under timed conditions</small></span><b>→</b></button>
+            <div class="tip-box"><span>✦</span><div><strong>Study tip</strong><p>Try recalling a rule before looking at your notes. Retrieval practice strengthens long-term learning.</p></div></div>
+          </aside>
+        </div>
+        <footer class="page-footer"><span>FIRE COUNSEL <b>•</b> Stage 1 foundation</span><span>Built for curious legal minds.</span></footer>
+      </section>
+
+      <section class="page" id="subjects-page">
+        <div class="page-title-row"><div><div class="eyebrow">YOUR CURRICULUM</div><h1>My subjects</h1><p class="lead">Organise your legal studies across jurisdictions and areas of law.</p></div><button class="primary-button" id="add-subject-button">＋ Add subject</button></div>
+        <div class="subject-grid all-subjects" id="all-subjects"></div>
+      </section>
+
+      <section class="page" id="library-page">
+        <div class="page-title-row"><div><div class="eyebrow">YOUR MATERIALS</div><h1>Study library</h1><p class="lead">A local-first home for lecture notes, textbooks and revision documents.</p></div><label class="primary-button upload-button">＋ Add document<input id="file-input" type="file" accept=".pdf,.txt,.md" multiple hidden></label></div>
+        <div class="notice"><span>ⓘ</span><div><strong>Stage 1 library</strong><p>Files are listed and stored in this browser's local database. PDF text extraction, OCR and AI document chat arrive in Stage 3. Large files may use significant device storage.</p></div></div>
+        <div class="panel library-panel"><div class="library-toolbar"><strong>Your documents</strong><span id="library-count">0 files</span></div><div id="document-list" class="document-list"><div class="empty-state"><span>▤</span><strong>Your library is ready</strong><p>Add a PDF, text file or Markdown note to start building your personal collection.</p></div></div></div>
+      </section>
+
+      <section class="page" id="memory-page">
+        <div class="eyebrow">ACTIVE RECALL</div><h1>Memory laboratory</h1><p class="lead">Create simple recall cards now. Advanced AI-generated case cards and spaced repetition are planned for a later stage.</p>
+        <div class="memory-layout">
+          <div class="panel create-card-panel"><div class="panel-heading"><div><span class="section-overline">BUILD YOUR MEMORY BANK</span><h2>Create a recall card</h2></div></div>
+            <form id="memory-form" class="stack-form"><label>Question or prompt<input id="card-front" required maxlength="240" placeholder="e.g. What is the rule in Carlill v Carbolic Smoke Ball Co?"></label><label>Answer or explanation<textarea id="card-back" required rows="5" maxlength="2000" placeholder="Write the principle, rule or explanation…"></textarea></label><label>Subject<select id="card-subject"></select></label><button class="primary-button" type="submit">Save recall card <span>→</span></button></form>
+          </div>
+          <div class="panel recall-panel"><div class="panel-heading"><div><span class="section-overline">TEST YOURSELF</span><h2>Recall practice</h2></div><span class="count-pill" id="memory-count">0 cards</span></div><div id="recall-area" class="recall-area"><div class="empty-state"><span>✳</span><strong>Your memory bank is empty</strong><p>Create a card to begin practising active recall.</p></div></div></div>
+        </div>
+      </section>
+
+      <section class="page" id="exams-page">
+        <div class="eyebrow">DELIBERATE PRACTICE</div><h1>Exam practice</h1><p class="lead">A quiet place to plan timed practice. The AI examiner and automatic marking arrive in Stage 5.</p>
+        <div class="exam-grid"><div class="panel exam-start"><div class="exam-symbol">◷</div><span class="section-overline">PRACTICE SESSION</span><h2>Train under exam conditions.</h2><p>Set a study timer, choose a subject and work through a question from your own materials.</p><label>Session length<select id="timer-duration"><option value="15">15 minutes</option><option value="25" selected>25 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option></select></label><button class="primary-button" id="timer-start">Start focus session <span>→</span></button></div>
+          <div class="panel timer-panel"><span class="section-overline">FOCUS CLOCK</span><div class="timer-display" id="timer-display">25:00</div><p id="timer-status">Ready when you are.</p><div class="timer-actions"><button class="secondary-button" id="timer-pause" disabled>Pause</button><button class="quiet-button" id="timer-reset">Reset</button></div></div></div>
+      </section>
+
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </main>
+  </div>
+  <div class="modal-backdrop" id="modal-backdrop" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><button class="modal-close" id="modal-close" aria-label="Close">×</button><span class="section-overline">FIRE COUNSEL</span><h2 id="modal-title">A little more detail</h2><div id="modal-body"></div><div class="modal-actions"><button class="secondary-button" id="modal-cancel">Cancel</button><button class="primary-button" id="modal-confirm">Continue</button></div></div></div>
+  <script src="./app.js" defer></script>
+</body>
+</html>

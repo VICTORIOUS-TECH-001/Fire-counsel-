@@ -1,0 +1,23 @@
+{
+  "name": "FIRE COUNSEL \u2014 Legal Learning & Exam Preparation",
+  "short_name": "Fire Counsel",
+  "description": "An offline-first law-student learning and examination platform for Nigeria, England and other common-law jurisdictions.",
+  "start_url": "./index.html#dashboard",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0b1020",
+  "theme_color": "#0b1020",
+  "icons": [
+    {
+      "src": "./assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": [
+    "education",
+    "productivity"
+  ]
+}
