@@ -31,7 +31,7 @@
 <div class="sidebar-spacer"></div>
 <div class="local-card"><div class="local-card-top"><span class="local-icon">⌂</span><span>Local study vault</span></div><p>Personal files, flashcards and practice stay on this device.</p></div>
 <div class="offline-card"><span class="status-dot" id="connection-dot"></span><div><strong id="connection-label">Ready to study</strong><small id="connection-detail">Checking connection&hellip;</small></div></div>
-<div class="profile"><span class="avatar">FC</span><span class="profile-info"><strong>Student workspace</strong><small id="profile-role">Local-first account</small></span><a aria-label="Sign in to FIRE COUNSEL" class="icon-button profile-more" href="./auth.html?next=study.html">↗</a></div>
+<div class="profile"><span class="avatar">FC</span><span class="profile-info"><strong>Student workspace</strong><small id="profile-role">Local-first account</small></span><button aria-label="Profile options" class="icon-button profile-more" data-toast="Account registration will be connected after access rules are approved." type="button">&middot;&middot;&middot;</button></div>
 </aside>
 <div class="scrim" id="scrim"></div>
 <main class="main" id="main-content">
@@ -74,7 +74,6 @@
 </section>
 <section aria-label="FIRE COUNSEL AI study studio" class="page ai-chat-page" id="ai-chat-page">
 <div class="page-heading ai-page-heading"><div><div class="eyebrow">FIRE COUNSEL AI &middot; YOUR STUDY STUDIO</div><h1>Make law click.</h1><p>A bright, focused space for clearer explanations, case recall and confident practice.</p></div><span class="ai-status-pill ai-studio-pill"><i></i> STUDY STUDIO</span></div>
-<section class="research-search-card" aria-labelledby="research-search-title"><div><span class="eyebrow">NEON · VERIFIED SOURCE SEARCH</span><h2 id="research-search-title">Search trusted legal materials.</h2><p>Search approved course material text, verified cases, statutes and exact archived questions. This search stays on FIRE COUNSEL servers; AI generation is disabled until provider terms and student-data authorization are reviewed.</p></div><form id="research-search-form"><label for="research-query">Topic or legal question</label><div class="research-search-controls"><input id="research-query" type="search" maxlength="500" placeholder="e.g. offer and acceptance in contract formation" required><button class="button primary" id="research-search-button" type="submit">Search Neon</button></div></form><p class="research-search-status" id="research-search-status" role="status" aria-live="polite">Sign in to search published, verified sources.</p><div class="research-search-results" id="research-search-results"></div></section>
 <div class="ai-studio">
 <section class="ai-studio-hero" aria-label="FIRE COUNSEL AI introduction">
   <div class="ai-studio-copy"><span class="ai-studio-kicker"><span>✦</span> FIRE COUNSEL AI</span><h2>Turn questions<br>into <em>understanding.</em></h2><p>Choose a course, start with a study task, and build stronger legal reasoning step by step.</p><label class="ai-studio-course" for="chat-course-select"><span>YOUR CURRENT COURSE</span><select aria-label="Select course for AI study tools" id="chat-course-select"></select></label><div class="ai-studio-tags"><span>Course-first</span><span>Clear sources</span><span>Your pace</span></div></div>
@@ -102,7 +101,6 @@
 <div class="page-heading"><div><div class="eyebrow">YOUR PERSONAL MATERIALS</div><h1>Study library</h1><p>A local-first shelf for documents you choose to keep on this device.</p></div><div class="heading-actions"><label class="button primary upload-button">＋ Add a local file<input accept=".pdf,.txt,.md" hidden="" id="file-input" multiple="" type="file"/></label></div></div>
 <div class="notice"><span>⌂</span><div><strong>Files are saved only in this browser</strong><p>These personal files are not uploaded to Neon or an AI service. Admin-managed course materials will use a separate, authenticated upload flow after storage and privacy checks.</p></div></div>
 <div class="card library-panel"><div class="library-toolbar"><strong>My local documents</strong><span id="library-count">0 files</span></div><div class="document-list" id="document-list"><div class="empty-state"><span>▤</span><strong>Your library is ready</strong><p>Add a PDF, text file or Markdown note to keep a local copy for your own study.</p></div></div></div>
-<div class="card library-panel server-materials-panel" id="server-materials-panel"><div class="library-toolbar"><strong>Approved course materials</strong><button class="button soft small" id="refresh-server-materials" type="button">Refresh</button></div><p id="server-materials-status" class="server-materials-status" role="status" aria-live="polite">Sign in to load materials approved for your courses.</p><div class="server-material-list" id="server-material-list"></div></div>
 </section>
 <section aria-label="Case flashcards" class="page" id="memory-page">
 <div class="page-heading"><div><div class="eyebrow">ACTIVE RECALL &middot; ON THIS DEVICE</div><h1>Case flashcards</h1><p>Create personal recall cards from your case notes. Your cards remain in this browser&rsquo;s IndexedDB.</p></div></div>
@@ -134,8 +132,6 @@
 
 
 <script defer="" src="./app.js"></script>
-<script type="module" src="./study-materials.mjs"></script>
-<script type="module" src="./research-search.mjs"></script>
 
 </body>
 </html>

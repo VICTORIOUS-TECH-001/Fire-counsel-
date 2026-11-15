@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#10121b"><meta name="robots" content="noindex,nofollow">
-  <meta name="description" content="FIRE COUNSEL admin studio with Firebase-verified Neon content tools; live database access requires server configuration.">
+  <meta name="description" content="FIRE COUNSEL content studio and administration preview. Authentication and cloud services are not connected.">
   <title>FIRE COUNSEL · Admin Studio Preview</title>
   <link rel="icon" href="./assets/fire-counsel-192.png" type="image/png">
   <link rel="stylesheet" href="./admin.css">
@@ -11,57 +11,20 @@
 <body>
   <header class="admin-topbar">
     <a class="admin-brand" href="./index.html"><img src="./assets/images/fire-counsel-brand.jpg" alt="" width="46" height="46"><span><strong>FIRE COUNSEL</strong><small>ADMIN STUDIO</small></span></a>
-    <div class="admin-top-actions"><span class="preview-chip"><i></i> LOCAL PREVIEW</span><a class="preview-site" href="./auth.html?next=admin.html">Sign in / verify admin ↗</a><a class="preview-site" href="./index.html?draft=1" target="_blank" rel="noopener">Preview public website ↗</a></div>
+    <div class="admin-top-actions"><span class="preview-chip"><i></i> LOCAL PREVIEW</span><a class="preview-site" href="./index.html?draft=1" target="_blank" rel="noopener">Preview public website ↗</a></div>
   </header>
   <main class="admin-layout">
     <aside class="admin-sidebar" aria-label="Admin studio sections">
       <div class="sidebar-label">ADMINISTRATION</div>
       <button class="admin-tab is-active" type="button" data-panel="overview"><span>⌂</span>Overview</button>
-      <button class="admin-tab" type="button" data-panel="database"><span>▦</span>Neon Database Data</button>
       <button class="admin-tab" type="button" data-panel="content"><span>▤</span>Pages & JSON</button>
       <button class="admin-tab" type="button" data-panel="media"><span>▧</span>Slides & images</button>
       <button class="admin-tab" type="button" data-panel="ai"><span>✦</span>AI provider</button>
       <button class="admin-tab" type="button" data-panel="plans"><span>◷</span>AI quotas & users</button>
-      <div class="sidebar-bottom"><span class="lock-icon">⌑</span><p>Sign-in is available; live permissions require the verified API.</p><a href="./index.html">← Back to FIRE COUNSEL</a></div>
+      <div class="sidebar-bottom"><span class="lock-icon">⌑</span><p>Admin sign-in and server permissions are not connected.</p><a href="./index.html">← Back to FIRE COUNSEL</a></div>
     </aside>
     <section class="admin-main">
-      <div class="security-warning"><span class="warning-icon">!</span><div><strong>Local preview only — live admin actions remain locked.</strong><p>Website drafts and quota examples stay in this browser. The Neon Database Data workspace uses Firebase-verified admin routes, but it cannot write until the server has a private DATABASE_URL. Firebase slide uploads, real account lookup, AI generation and quota enforcement remain locked. Do not paste a Gemini key here.</p></div></div>
-      <section class="admin-auth-status" id="admin-auth-status" aria-live="polite">
-        <div><strong id="admin-auth-title">Admin permission not verified</strong><p id="admin-auth-message">Sign in to check the server-issued administrator claim. This does not enable local draft publishing.</p></div>
-        <a class="button button-light" id="admin-auth-link" href="./auth.html?next=admin.html">Sign in</a>
-        <button class="button button-light" id="admin-signout" type="button" hidden>Sign out</button>
-      </section>
-
-      <section class="admin-panel" id="panel-database" aria-labelledby="database-title" hidden>
-        <div class="admin-heading"><div><span class="eyebrow">NEON · CONTENT DATABASE</span><h1 id="database-title">Database Data.</h1><p>Add, review, edit and remove the structured learning data that powers course materials, legal research and assessment content.</p></div><button class="button button-light" id="database-refresh" type="button">Refresh database</button></div>
-        <div class="database-systems-grid">
-          <article class="database-system-card neon-system"><div><span class="database-system-mark">N</span><div><span class="eyebrow">CONTENT & LEARNING RECORDS</span><h2>Neon PostgreSQL</h2></div></div><span class="database-connection-state" id="database-neon-state" data-state="checking">Checking connection…</span><p>Universities, courses, topics, materials and versions, cases, statutes, past questions and rubrics are managed here through validated forms.</p></article>
-          <article class="database-system-card firebase-system"><div><span class="database-system-mark">F</span><div><span class="eyebrow">IDENTITY & HOMEPAGE MEDIA</span><h2>Firebase</h2></div></div><span class="database-connection-state" id="database-firebase-state" data-state="checking">Checking administrator sign-in…</span><p>Firebase Auth owns email/Google accounts, passwords and admin claims. Passwords cannot be viewed or stored in Neon; use Firebase Auth reset emails. Firebase Storage is reserved for homepage slideshow images.</p><a class="button button-light" href="https://console.firebase.google.com/project/fire-counsel/authentication/users" target="_blank" rel="noopener noreferrer">Open Firebase Auth users ↗</a></article>
-        </div>
-        <div class="database-boundary-note"><strong>Safe database workspace</strong><p>This is a form-based content manager, not a raw SQL console. Firebase passwords never appear in Neon. Student-private flashcards, role/permission tables, generated summaries and embeddings are intentionally not editable here. File uploads stay off until a storage provider and access rules are approved; paste text content in a material version for now.</p></div>
-        <section class="database-manager-card" aria-label="Neon content records">
-          <div class="database-manager-heading"><div><span class="eyebrow">ADMIN CONTENT CONTROL</span><h2>Manage Neon records</h2><p id="database-manager-help">Choose a data area to create a record, find existing entries, edit them or remove one with a cascade warning.</p></div><span class="database-mode-chip">FIREBASE-VERIFIED ADMIN ONLY</span></div>
-          <div class="database-toolbar">
-            <label>Data area<select id="database-resource" aria-label="Select Neon data area" disabled><option value="">Checking administrator permission…</option></select></label>
-            <label>Search records<input id="database-search" type="search" placeholder="Search the selected data area" disabled></label>
-            <button class="button button-primary" id="database-new" type="button" disabled>＋ New record</button>
-          </div>
-          <div class="database-status" id="database-status" role="status" aria-live="polite">Waiting for a verified administrator and the Neon API.</div>
-          <div class="database-table-wrap"><table class="database-table"><thead id="database-table-head"></thead><tbody id="database-table-body"><tr><td class="database-empty">Records will appear here after Neon is configured.</td></tr></tbody></table></div>
-          <div class="database-pagination"><button class="button button-light" id="database-prev" type="button" disabled>← Previous</button><span id="database-page-status">No records loaded</span><button class="button button-light" id="database-next" type="button" disabled>Next →</button></div>
-          <form class="database-record-form" id="database-record-form" hidden>
-            <div class="database-form-heading"><div><span class="eyebrow" id="database-form-eyebrow">NEON RECORD</span><h3 id="database-form-title">New record</h3><p id="database-form-description">Fields follow the supplied Neon schema.</p></div><button class="database-close" id="database-form-close" type="button" aria-label="Close form">×</button></div>
-            <div class="database-fields" id="database-fields"></div>
-            <div class="database-form-status" id="database-form-status" role="status" aria-live="polite"></div>
-            <div class="database-form-actions"><button class="button button-light" id="database-delete" type="button" hidden>Delete record</button><span></span><button class="button button-light" id="database-form-cancel" type="button">Cancel</button><button class="button button-primary" id="database-save" type="submit">Save to Neon</button></div>
-          </form>
-          <section class="database-version-panel" id="database-version-panel" hidden aria-labelledby="database-version-title">
-            <div class="database-form-heading"><div><span class="eyebrow">MATERIAL VERSION HISTORY</span><h3 id="database-version-title">Add a text version</h3><p>Paste approved notes or material text. Neon stores a new version and plain text chunks; no AI embedding or external provider is used.</p></div></div>
-            <form id="database-version-form"><label class="database-version-label" for="database-version-text">Full material text</label><textarea id="database-version-text" maxlength="700000" required placeholder="Paste the approved material text here…"></textarea><div class="database-form-actions"><span id="database-version-status" role="status" aria-live="polite"></span><button class="button button-primary" type="submit">Save new version</button></div></form>
-            <div class="database-version-list" id="database-version-list"></div>
-          </section>
-        </section>
-      </section>
+      <div class="security-warning"><span class="warning-icon">!</span><div><strong>Preview only — this page is not an authenticated admin system.</strong><p>Site drafts and quota examples stay in this browser only. No real accounts, provider keys, images, Firebase writes or quota enforcement are connected. Do not paste your Google API key here.</p></div></div>
 
       <section class="admin-panel is-visible" id="panel-overview" aria-labelledby="admin-title">
         <div class="admin-heading"><div><span class="eyebrow">FIRE COUNSEL · ADMIN STUDIO</span><h1 id="admin-title">Your study platform, in one place.</h1><p>Preview the controls for site content, slideshow images, AI settings, plan limits and individual student access.</p></div><a class="button button-primary" href="./index.html?draft=1" target="_blank" rel="noopener">Open website preview ↗</a></div>
@@ -141,11 +104,9 @@
         </section>
       </section>
 
-      <footer class="admin-footer"><span>FIRE COUNSEL · admin studio</span><span>Neon writes are server-side · Firebase slide uploads remain off · no AI key in browser</span></footer>
+      <footer class="admin-footer"><span>FIRE COUNSEL · admin studio preview</span><span>Local-only drafts · no API key · no Firebase writes</span></footer>
     </section>
   </main>
   <script src="./admin.js" defer></script>
-  <script type="module" src="./admin-auth.mjs"></script>
-  <script type="module" src="./admin-database.mjs"></script>
 </body>
 </html>

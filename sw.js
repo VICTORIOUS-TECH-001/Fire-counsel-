@@ -1,10 +1,8 @@
-const CACHE_NAME = "fire-counsel-shell-v10";
+const CACHE_NAME = "fire-counsel-shell-v6";
 const APP_CACHE_PREFIX = "fire-counsel-shell-";
 const APP_SHELL = [
-  "./", "./index.html", "./study.html", "./auth.html", "./admin.html",
-  "./site.css", "./site.js", "./styles.css", "./app.js", "./auth.css", "./auth-page.mjs",
-  "./admin.css", "./admin.js", "./admin-auth.mjs", "./admin-database.mjs", "./study-materials.mjs", "./research-search.mjs",
-  "./firebase/client.mjs", "./firebase/auth-client.mjs",
+  "./", "./index.html", "./study.html",
+  "./site.css", "./site.js", "./styles.css", "./app.js",
   "./data/site-content.json", "./manifest.webmanifest",
   "./assets/fire-counsel-192.png", "./assets/fire-counsel-512.png",
   "./assets/images/fire-counsel-brand.jpg", "./assets/images/pexels-law-judge.jpg", "./assets/images/pexels-law-student.jpg"

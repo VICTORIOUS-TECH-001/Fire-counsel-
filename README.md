@@ -7,33 +7,27 @@ A local-first, installable law-study workspace with a public website, a separate
 - `index.html` — public FIRE COUNSEL homepage with a responsive top navigation bar, real-photo carousel, learning-tool cards, case-note section, study articles, approved-legal-links directory, privacy note and black footer.
 - `data/site-content.json` — JSON source for the homepage navigation, hero slides, features, articles, case notes, legal links and footer.
 - `site.js` / `site.css` — JSON-driven site rendering, accessible carousel, responsive mobile navigation and motion-safe scroll reveals.
-- `study.html` — the student workspace keeps personal files/flashcards local, now displays approved Neon course materials when authenticated, and includes a server-side verified-source search across materials, cases, statutes, exact past questions, mnemonics and approved summaries. AI generation remains disabled pending provider authorization/terms review.
-- `auth.html` — Firebase email/password and Google sign-in UI. Google provider enablement and authorized domains must still be configured in Firebase Console; admin access is allowed only after the API verifies the server-issued claim.
-- `admin.html` — admin studio with a schema-driven Neon Database Data workspace for academic/legal records, website JSON drafts, slideshow previews and synthetic quota/account drafts. Neon writes require a Firebase-verified admin claim and private server-side `DATABASE_URL`; no live Neon connection is configured in this workspace.
-- `firebase/` and `firebase.json` — local Firestore/Storage rule drafts, emulator tests, browser Firebase/Auth helpers and the local Web config template. The provided Web config file is ignored by Git; no live Firebase settings have been changed.
-- `backend/` — Express/Firebase Admin/Neon API with verified ID-token middleware, a server-side `admin: true` gate, allowlisted `/api/v1/admin/database` CRUD routes, approved-material reads and verified-source search. The API code is wired to the frontend, but live Neon behavior is unverified because no `DATABASE_URL` is configured. See `backend/DATABASE_SCHEMA.md` for the supplied schema review.
-- `render.yaml` — a Free-plan staging blueprint with auto-deploy disabled and no database, Firebase Admin, Gemini or payment secrets. It has not been deployed.
+- `study.html` — the existing student workspace, separated from administration. Its AI area has been restyled as a colorful study studio; the chat composer and setup/legal notices were removed from that screen. AI actions remain preview-only, and no student data is sent to an AI provider.
+- `admin.html` — separate, unlinked admin-studio preview. It has website JSON editing, slide removal and temporary multi-photo previews, a locked Google Gemini key slot, editable Free/paid feature quotas, and per-account adjustment controls with synthetic sample IDs. Site and quota drafts stay in that browser. It is not authenticated and must not be publicly deployed as an admin system.
+- `firebase/` and `firebase.json` — local draft Firestore/Storage rules and a proposed collection schema. They are not connected to or deployed on Firebase.
+- `backend/` — the existing Express/Firebase Admin/Neon foundation. It still has no admin, quota, provider-key, account-search, AI or image-upload routes.
 
 ## Local preview
 
-To exercise same-origin `/api/` calls locally, run the backend and the repository dev proxy in separate terminals:
+Run a static server from the repository root; service workers require localhost or HTTPS.
 
 ```bash
-# Terminal 1
-cd backend && npm run dev
-
-# Terminal 2 (repository root)
-python3 tools/dev_server.py
+python3 -m http.server 8080 --bind 0.0.0.0
 ```
 
-Open `http://localhost:8080/`. The student workspace is `/study.html`; the admin studio is `/admin.html`. For an admin-first view, run `python3 tools/admin_preview_server.py` instead (port 8093; `/` redirects to `/admin.html`). Both scripts proxy relative `/api/*` requests to the backend on port 4000, so browser code never calls localhost directly. For a static-only preview, run the selected dev server and skip Terminal 1; API calls will return an offline response. These safe servers do not expose backend files, tools, dotfiles or Firebase project docs. Neon and Firebase Admin still require the local ignored `backend/.env`; don't add real student data or credentials to Render Free staging. Avoid running an unrestricted file server from the repository root because it could expose local environment files.
+Open `http://localhost:8080/`. The student workspace is `http://localhost:8080/study.html`; the unprotected admin preview is `http://localhost:8080/admin.html`. For an admin-first live preview that opens the studio at `/`, run `python3 tools/admin_preview_server.py` from the project root (port 8093).
 
 ## Images and branding
 
 - The owner-supplied gavel-and-flame image is now used as the FIRE COUNSEL brand mark and source artwork for the PNG PWA icons.
 - The slideshow currently uses locally stored JPEG photographs from Pexels (credits and source links are in `assets/images/README.md`). The public renderer accepts local raster images and only HTTPS slide-photo URLs from the supplied `fire-counsel.firebasestorage.app` bucket at `site/slides/`. No Firebase image has been uploaded.
 - Admin can remove slides from the local JSON draft and temporarily preview multiple selected photos in the browser. The preview does not upload, copy or persist those photo files. The homepage renderer no longer imposes an eight-slide cap.
-- `manifest.webmanifest` uses PNG icons. The app-shell cache is `fire-counsel-shell-v10`; it caches the refreshed student pages without clearing IndexedDB or localStorage.
+- `manifest.webmanifest` uses PNG icons. The app-shell cache is `fire-counsel-shell-v6`; it caches the refreshed student pages without clearing IndexedDB or localStorage.
 
 ## Admin, Firebase and secret boundaries
 
@@ -43,6 +37,9 @@ Open `http://localhost:8080/`. The student workspace is `/study.html`; the admin
 - You confirmed the project is already on Blaze and permitted use of that existing plan without a billing change. The Storage rule allows public slide reads and admin-claim-only create/update/delete under `site/slides/`, with any number of files and a 10 MiB per-file cap. This is a local rules proposal only: the new Firebase sign-in code has not been tested against the live project; no provider settings, App Check, Firestore database/collection, rule deployment, upload, delete, budget alert or cost-limit change was made. The API token verifier is not configured with a service account yet.
 - Firebase client API keys identify an app; they are not admin credentials. Security Rules and App Check are separate controls. See [Firebase API key guidance](https://firebase.google.com/docs/projects/api-keys) and [Firebase Storage billing requirements](https://firebase.google.com/docs/storage/faqs-storage-changes-announced-sept-2024).
 - The Neon Database Data workspace can manage allowlisted academic/legal content tables through server routes. Firebase Auth provides self-service password-reset email; account listing/admin resets remain in Firebase Console. Public homepage JSON publishing and slideshow uploads/deletes are not wired. Gemini key storage, AI generation and quota enforcement remain locked pending authorization and provider-terms review.
+- You confirmed the project is already on Blaze and permitted use of that existing plan without a billing change. The Storage rule allows public slide reads and admin-claim-only create/update/delete under `site/slides/`, with any number of files and a 10 MiB per-file cap. This is a local rules proposal only: no Firebase sign-in, App Check configuration, Firestore database/collection, rule deployment, upload, delete, budget alert or cost-limit change was made.
+- Firebase client API keys identify an app; they are not admin credentials. Security Rules and App Check are separate controls. See [Firebase API key guidance](https://firebase.google.com/docs/projects/api-keys) and [Firebase Storage billing requirements](https://firebase.google.com/docs/storage/faqs-storage-changes-announced-sept-2024).
+- The admin page is a design preview only. It has no Firebase sign-in, server authorization, AI-key storage endpoint, account search API, quota enforcement or global publish endpoint.
 
 ## Study-data compatibility and privacy
 
@@ -62,3 +59,4 @@ Open `http://localhost:8080/`. The student workspace is `/study.html`; the admin
 ## No production or billing actions
 
 No Firebase/Neon write, migration, Firestore database/collection creation, rules deployment, account creation, Gemini key setup, AI request, image upload/delete, payment, activation code, paid-plan change or deployment was made. The Firebase Web config is local-only and ignored by Git; the Firebase rules remain un-deployed proposals. Render Free was selected for staging only and now has a blueprint, but has not been deployed; no real student data, prompts or payment credentials are configured there.
+No Firebase/Neon write, migration, Firestore database/collection creation, rules deployment, account creation, API-key setup, AI request, image upload/delete, payment, activation code, paid-plan change, commit or deployment was made. The Firebase rule/schema files are local proposals only. Render Free was selected for staging only and has not been deployed; the API secret, authenticated admin, account data and publishing remain disconnected.
