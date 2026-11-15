@@ -1,0 +1,108 @@
+{
+  "brand": {
+    "name": "FIRE COUNSEL",
+    "tagline": "Ignite your legal intelligence",
+    "markImage": "./assets/images/fire-counsel-brand.jpg",
+    "markAlt": "FIRE COUNSEL flaming gavel brand artwork"
+  },
+  "navigation": [
+    {"label": "Home", "href": "#home"},
+    {"label": "Learning", "href": "#learning"},
+    {"label": "Case notes", "href": "#cases"},
+    {"label": "Articles", "href": "#articles"},
+    {"label": "Legal links", "href": "#resources"}
+  ],
+  "hero": {
+    "autoplayMs": 6500,
+    "slides": [
+      {
+        "eyebrow": "A FRESH WAY TO STUDY LAW",
+        "title": "Build legal clarity.",
+        "accent": "Move with confidence.",
+        "body": "A focused home for your law courses, case recall and exam practice — designed to keep your own study work close to you.",
+        "image": "./assets/images/pexels-law-judge.jpg",
+        "imageAlt": "A Black woman judge writing in a law library",
+        "imageCredit": "Photo by Katrin Bolovtsova · Pexels",
+        "primaryLabel": "Open student workspace",
+        "primaryHref": "./study.html#dashboard",
+        "secondaryLabel": "See the study tools",
+        "secondaryHref": "#learning"
+      },
+      {
+        "eyebrow": "MAKE YOUR STUDY TIME COUNT",
+        "title": "Learn at your pace.",
+        "accent": "Keep what you create.",
+        "body": "Organise notes, build personal case cards and practise deliberately. Your saved study files stay in this browser in this preview.",
+        "image": "./assets/images/pexels-law-student.jpg",
+        "imageAlt": "A student studying with books and a laptop in a library",
+        "imageCredit": "Photo by Ludovic Delot · Pexels",
+        "primaryLabel": "Start studying",
+        "primaryHref": "./study.html#dashboard",
+        "secondaryLabel": "Explore learning tools",
+        "secondaryHref": "#learning"
+      }
+    ]
+  },
+  "quickFacts": [
+    {"number": "01", "label": "Stay focused", "detail": "A calm, organised study space"},
+    {"number": "02", "label": "Recall more", "detail": "Personal flashcards saved locally"},
+    {"number": "03", "label": "Practise well", "detail": "Past-question practice tools"}
+  ],
+  "learning": {
+    "eyebrow": "YOUR STUDY, BETTER ORGANISED",
+    "title": "Tools for the work",
+    "accent": "behind the law.",
+    "intro": "Everything has a place: course choice, personal notes, active recall and deliberate exam practice.",
+    "cards": [
+      {"number": "01", "title": "Course study", "text": "Keep subjects and your selected course in one clear study space.", "icon": "§", "href": "./study.html#subjects", "tone": "violet"},
+      {"number": "02", "title": "Personal library", "text": "Save PDFs and notes locally on this device. Nothing is uploaded in this preview.", "icon": "▤", "href": "./study.html#library", "tone": "gold"},
+      {"number": "03", "title": "Case recall", "text": "Build your own question-and-answer cards for active recall.", "icon": "✧", "href": "./study.html#memory", "tone": "teal"},
+      {"number": "04", "title": "Exam practice", "text": "Use a focus timer and work through your revision at a steady pace.", "icon": "↗", "href": "./study.html#exams", "tone": "coral"}
+    ]
+  },
+  "caseNotes": {
+    "eyebrow": "CASE NOTES · CURATED LEARNING",
+    "title": "A case note should show the reasoning",
+    "accent": "not just the result.",
+    "intro": "The case library is being prepared for editor-reviewed notes with verified citations, court details and source links.",
+    "status": "CASE LIBRARY PREVIEW",
+    "points": [
+      "Case name, court and citation",
+      "Material facts and legal issue",
+      "Decision and reasoning",
+      "Links to approved source material"
+    ],
+    "ctaLabel": "Open exam practice",
+    "ctaHref": "./study.html#exams",
+    "image": "./assets/images/pexels-law-judge.jpg",
+    "imageAlt": "Judge working at a desk in a law library"
+  },
+  "articles": {
+    "eyebrow": "IDEAS FOR BETTER REVISION",
+    "title": "Notes from the",
+    "accent": "study desk.",
+    "intro": "Short, practical guides for building a steady legal-study routine. These editorial examples are not legal advice.",
+    "items": [
+      {"category": "Study skills", "title": "Read a case with a question in mind", "excerpt": "Start with the issue you are trying to understand, then track how the court moves from facts to principle.", "readTime": "4 min", "body": "A useful first pass through a case is purposeful: identify the issue, the rule the court applies, and the reasoning that connects the two. Then write a short note in your own words and check it against the approved report or course material. This is a study method, not legal advice."},
+      {"category": "Exam practice", "title": "Turn revision into a repeatable routine", "excerpt": "Small sessions, active recall and a clear review plan can make revision easier to return to.", "readTime": "3 min", "body": "Choose one topic, set a short timer, close your notes and recall the main points. Afterwards, reopen the material and correct gaps. Save the next action for your next session. FIRE COUNSEL stores the personal study tools in your browser in this preview."},
+      {"category": "Legal writing", "title": "Make your answer easier to follow", "excerpt": "Use a clear issue, rule, application and conclusion structure, then check each step against the course rubric.", "readTime": "5 min", "body": "A clear answer makes its reasoning visible. State the issue, identify the relevant rule from approved course material, apply the rule to the facts, and give a concise conclusion. Use the marking rubric when one is available; do not invent authority or citations."}
+    ]
+  },
+  "resources": {
+    "eyebrow": "TRUSTED LEGAL WEBSITES",
+    "title": "A directory built on",
+    "accent": "approved sources.",
+    "intro": "Only official legal sources and school-approved domains should be listed here. The extra jurisdictions and institution domains are awaiting confirmation.",
+    "items": []
+  },
+  "footer": {
+    "summary": "A focused legal-learning space for clearer study, stronger recall and confident practice.",
+    "columns": [
+      {"title": "Explore", "items": [{"label": "Learning tools", "href": "#learning"}, {"label": "Case notes", "href": "#cases"}, {"label": "Articles", "href": "#articles"}]},
+      {"title": "Study space", "items": [{"label": "Open student workspace", "href": "./study.html#dashboard"}, {"label": "Personal library", "href": "./study.html#library"}, {"label": "Exam practice", "href": "./study.html#exams"}]},
+      {"title": "Information", "items": [{"label": "Trusted legal links", "href": "#resources"}, {"label": "Privacy-first preview", "href": "#privacy-note"}]}
+    ],
+    "disclaimer": "FIRE COUNSEL is a study aid, not a law firm or a substitute for legal advice. Verify legal materials against their authoritative sources.",
+    "copyright": "© 2026 FIRE COUNSEL. All rights reserved."
+  }
+}
