@@ -67,6 +67,7 @@ test("trusts the admin claim only from a Firebase-verified decoded token", async
     email: "admin@example.invalid",
     name: null,
     emailVerified: true,
+    authTime: null,
     admin: true
   });
 });
@@ -92,4 +93,12 @@ test("rejects invalid or revoked Firebase tokens", async () => {
 
   assert.equal(res.statusCode, 401);
   assert.match(res.body.error, /invalid/i);
+});
+
+test("recent-installation registration time comes only from the verified Firebase auth_time claim", async () => {
+  const res = responseMock();
+  const auth = { async verifyIdToken() { return { uid: "test-student", auth_time: 1_795_000_000 }; } };
+  const req = { ...requestMock("Bearer example-token"), body: { auth_time: 9_999_999_999 } };
+  await createFirebaseTokenVerifier(() => auth)(req, res, () => {});
+  assert.equal(req.user.authTime, 1_795_000_000);
 });

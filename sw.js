@@ -1,12 +1,14 @@
-const CACHE_NAME = "fire-counsel-shell-v6";
+const CACHE_NAME = "fire-counsel-shell-v12";
 const APP_CACHE_PREFIX = "fire-counsel-shell-";
 const APP_SHELL = [
   "./", "./index.html", "./study.html",
-  "./site.css", "./site.js", "./styles.css", "./app.js",
+  "./site.css", "./site.js", "./styles.css", "./app.js", "./integrations.css",
+  "./study-materials.mjs", "./research-search.mjs", "./student-profile.mjs", "./installation.mjs", "./request-scope.mjs",
   "./data/site-content.json", "./manifest.webmanifest",
   "./assets/fire-counsel-192.png", "./assets/fire-counsel-512.png",
   "./assets/images/fire-counsel-brand.jpg", "./assets/images/pexels-law-judge.jpg", "./assets/images/pexels-law-student.jpg"
 ];
+const SHELL_PATHS = new Set(APP_SHELL.map(path => new URL(path, self.location.href).pathname));
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
@@ -22,17 +24,31 @@ self.addEventListener("activate", event => {
 self.addEventListener("fetch", event => {
   const request = event.request;
   const url = new URL(request.url);
-  // Do not cache authenticated API replies: cache keys would otherwise ignore
-  // the Bearer token and could expose one account's response to another user.
-  if (request.method !== "GET" || url.origin !== self.location.origin || url.pathname === "/api" || url.pathname.startsWith("/api/") || request.headers.has("authorization")) return;
-  event.respondWith(caches.match(request).then(cached => {
-    if (cached) return cached;
-    return fetch(request).then(response => {
-      if (response && response.status === 200 && response.type === "basic") {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
-      }
-      return response;
-    }).catch(() => caches.match("./index.html"));
-  }));
+  // Never cache authenticated replies, runtime Firebase config, admin pages, or
+  // arbitrary same-origin responses. Only the explicit public/study shell is cached.
+  if (request.method !== "GET" || url.origin !== self.location.origin || url.pathname === "/api" || url.pathname.startsWith("/api/") || request.headers.has("authorization") || request.cache === "no-store" || !SHELL_PATHS.has(url.pathname)) return;
+
+  async function updateFromNetwork() {
+    const response = await fetch(request);
+    if (response && response.status === 200 && response.type === "basic") {
+      const cache = await caches.open(CACHE_NAME);
+      // Query strings must not grow the app cache without bound.
+      await cache.put(url.pathname, response.clone());
+    }
+    return response;
+  }
+
+  event.respondWith((async () => {
+    const cached = await caches.match(url.pathname);
+    // HTML and homepage content get fresh edits online. Offline requests fall
+    // back to their own cached document, never HTML masquerading as JavaScript.
+    const networkFirst = request.mode === "navigate" || url.pathname.endsWith(".html") || url.pathname.endsWith(".json");
+    if (cached && !networkFirst) return cached;
+    try {
+      return await updateFromNetwork();
+    } catch (error) {
+      if (cached) return cached;
+      throw error;
+    }
+  })());
 });

@@ -10,6 +10,7 @@
 <link href="./manifest.webmanifest" rel="manifest"/>
 <link href="./assets/fire-counsel-192.png" rel="icon" type="image/png"/>
 <link href="./styles.css" rel="stylesheet"/>
+<link href="./integrations.css" rel="stylesheet"/>
 </head>
 <body data-theme="light">
 <div class="app">
@@ -27,11 +28,14 @@
 <a class="nav-link" data-page="library" href="#library"><span class="nav-icon"><svg viewbox="0 0 24 24"><path d="M5 3h10l4 4v14H5zM14 3v5h5M8 12h8M8 16h8"></path></svg></span>My study library</a>
 <a class="nav-link" data-page="memory" href="#memory"><span class="nav-icon"><svg viewbox="0 0 24 24"><rect height="15" rx="2" width="13" x="4" y="5"></rect><path d="M8 3h11a2 2 0 0 1 2 2v12M7 10h7M7 14h5"></path></svg></span>Case flashcards</a>
 <a class="nav-link" data-page="exams" href="#exams"><span class="nav-icon"><svg viewbox="0 0 24 24"><path d="M5 3h14a2 2 0 0 1 2 2v14l-4-2-5 3-5-3-4 2V5a2 2 0 0 1 2-2Z"></path><path d="M8 8h8M8 12h6"></path></svg></span>Past questions</a>
+<div class="nav-label">Account</div>
+<a class="nav-link" data-page="profile" href="#profile"><span class="nav-icon"><svg viewbox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21v-2a8 8 0 0 1 16 0v2"></path></svg></span>My profile</a>
 </nav>
 <div class="sidebar-spacer"></div>
+<a class="student-signin-link" href="./auth.html?next=study.html">Sign in / create account ↗</a>
 <div class="local-card"><div class="local-card-top"><span class="local-icon">⌂</span><span>Local study vault</span></div><p>Personal files, flashcards and practice stay on this device.</p></div>
 <div class="offline-card"><span class="status-dot" id="connection-dot"></span><div><strong id="connection-label">Ready to study</strong><small id="connection-detail">Checking connection&hellip;</small></div></div>
-<div class="profile"><span class="avatar">FC</span><span class="profile-info"><strong>Student workspace</strong><small id="profile-role">Local-first account</small></span><button aria-label="Profile options" class="icon-button profile-more" data-toast="Account registration will be connected after access rules are approved." type="button">&middot;&middot;&middot;</button></div>
+<div class="profile"><span class="avatar" id="student-profile-avatar">FC</span><span class="profile-info"><strong id="student-profile-name">Student workspace</strong><small id="profile-role">Local-first workspace</small></span><a aria-label="Open my profile" class="icon-button profile-more" data-page="profile" href="#profile">&middot;&middot;&middot;</a></div>
 </aside>
 <div class="scrim" id="scrim"></div>
 <main class="main" id="main-content">
@@ -69,7 +73,7 @@
 <div class="student-layout"><div class="course-grid subject-grid" id="dashboard-subjects"></div><aside class="card study-panel"><div class="panel-head"><div><h3>Today&rsquo;s gentle plan</h3><p>A little progress goes a long way.</p></div><a class="mini-link" data-page="exams" href="#exams">Focus timer</a></div><div class="today-item"><span class="today-icon">&sect;</span><div class="today-copy"><strong>Review one legal principle</strong><span>Choose a course and continue a topic</span></div><span class="task-pill">15 min</span></div><div class="today-item"><span class="today-icon">✎</span><div class="today-copy"><strong>Try one past question</strong><span>Practise issue spotting</span></div><span class="task-pill">1 question</span></div><div class="today-item"><span class="today-icon">✧</span><div class="today-copy"><strong>Refresh your case cards</strong><span>Active recall practice</span></div><span class="task-pill">Your pace</span></div></aside></div>
 <div class="section-row" id="student-tools"><div><h2 class="section-title">Study tools, ready when you are</h2><p class="section-subtitle">Personal learning work is designed to stay on your device.</p></div></div>
 <div class="quick-grid"><button class="card quick-card" data-go="exams"><span class="quick-icon">▤</span><span><strong>Past questions</strong><small>Practise and review exam work.</small></span></button><button class="card quick-card" data-go="memory"><span class="quick-icon">✧</span><span><strong>Case flashcards</strong><small>Create a personal case recall set.</small></span></button></div>
-<div class="privacy-strip" id="student-privacy"><span class="privacy-icon">&checkmark;</span><div><strong>Local-first learning by design</strong><p>Flashcards, personal case notes, OCR text, answers and progress are planned to stay in this browser&rsquo;s IndexedDB. Student registration and institution/course memberships are the only student-specific records planned for server-side storage. AI uploads are not connected until Gemini&rsquo;s data terms are reviewed; this app does not send your study work to AI today.</p></div></div>
+<div class="privacy-strip" id="student-privacy"><span class="privacy-icon">&checkmark;</span><div><strong>Local-first learning by design</strong><p>Personal files, flashcards, subjects and progress stay in this browser. OCR and AI answer tools are not enabled. Authenticated course access is checked by the server; signing in does not upload your personal study work. AI uploads are not connected until Gemini&rsquo;s data terms are reviewed; this app does not send your study work to AI today.</p></div></div>
 <footer class="page-footer"><span>FIRE COUNSEL <b>&bull;</b> Legal study workspace</span><span>Study data stays close to you.</span></footer>
 </section>
 <section aria-label="FIRE COUNSEL AI study studio" class="page ai-chat-page" id="ai-chat-page">
@@ -86,21 +90,30 @@
   <button class="ai-task-card ai-task-teal" data-preview-action="Rubric-based feedback is being prepared." type="button"><span class="ai-task-icon">✓</span><span class="ai-task-copy"><small>REFINE</small><strong>Review an answer</strong><em>Check structure against a course rubric.</em></span><span class="ai-task-arrow">↗</span></button>
   <button class="ai-task-card ai-task-gold" data-preview-action="Practice scenarios are being prepared from approved course materials." type="button"><span class="ai-task-icon">◇</span><span class="ai-task-copy"><small>PRACTISE</small><strong>Try a scenario</strong><em>Apply a rule to a fresh study problem.</em></span><span class="ai-task-arrow">↗</span></button>
 </div>
+<section class="integration-card research-panel" aria-labelledby="research-title">
+  <div class="eyebrow">VERIFIED SOURCE RETRIEVAL · NOT AI GENERATION</div><h2 id="research-title">Search trusted sources</h2><p>Search approved materials, verified cases, statutes and exact archived questions in Neon. Queries stay within FIRE COUNSEL; no AI provider or external web search is called.</p>
+  <form class="research-search-form" id="research-search-form"><label for="research-query">Topic, case citation or legal phrase<input id="research-query" type="search" minlength="3" maxlength="500" required placeholder="e.g. consideration in contract law"></label><button class="button primary" id="research-search-button" type="submit">Search sources</button></form>
+  <p class="integration-status" id="research-search-status" role="status" aria-live="polite">Checking sign-in setup…</p><div id="research-search-results" class="research-search-results"></div>
+</section>
 <div class="ai-studio-bottom">
   <article class="card ai-source-card"><div class="ai-card-heading"><span class="ai-card-icon ai-source-icon">§</span><div><h2>Built on trusted materials</h2><p>A clear path from source to answer.</p></div></div><div class="ai-source-steps"><div><span>01</span><strong>Course materials</strong><small>Approved notes, cases and statutes first.</small></div><div><span>02</span><strong>Exact archive</strong><small>Retrieve past questions as published.</small></div><div><span>03</span><strong>Sound reasoning</strong><small>Use the rubric; be clear when evidence is missing.</small></div></div></article>
-  <article class="card ai-account-card"><div class="ai-card-heading"><span class="ai-card-icon ai-account-icon">◷</span><div><h2>My AI allowance</h2><p>Your personal use at a glance.</p></div><span class="ai-preview-badge">ACCOUNT PREVIEW</span></div><div class="ai-account-metrics"><div><small>YOUR PLAN</small><strong>Sign-in pending</strong></div><div><small>AI USE</small><strong>— <i>/ —</i></strong></div></div><div class="ai-account-meter"><span></span></div><p class="ai-account-hint">Your plan, feature limits and any extra allowance will appear here after account access is connected.</p><button class="ai-account-link" data-toast="Account access is being prepared. Your saved study work remains on this device." type="button">Account details <span>→</span></button></article>
+  <article class="card ai-account-card"><div class="ai-card-heading"><span class="ai-card-icon ai-account-icon">◷</span><div><h2>My AI allowance</h2><p>Your personal use at a glance.</p></div><span class="ai-preview-badge">ACCOUNT PREVIEW</span></div><div class="ai-account-metrics"><div><small>YOUR PLAN</small><strong>Plan not connected</strong></div><div><small>AI USE</small><strong>— <i>/ —</i></strong></div></div><div class="ai-account-meter"><span></span></div><p class="ai-account-hint">Your plan, feature limits and any extra allowance will appear here after account access is connected.</p><button class="ai-account-link" data-go="profile" type="button">My student profile <span>→</span></button></article>
 </div>
 </div>
 </section>
 <section aria-label="Courses and subjects" class="page" id="subjects-page">
 <div class="page-heading"><div><div class="eyebrow">YOUR CURRICULUM</div><h1>My courses</h1><p>Choose a course, then study its trusted materials at your own pace.</p></div><div class="heading-actions"><button class="button primary" id="add-subject-button" type="button">＋ Add personal study area</button></div></div>
-<div class="notice"><span>ⓘ</span><div><strong>Your course choice is local in this version</strong><p>This personal subject list is saved in your existing browser database. Official, institution and course-restricted materials will be checked by the server after sign-in is connected.</p></div></div>
+<div class="notice"><span>ⓘ</span><div><strong>Your course choice is local in this version</strong><p>This personal subject list is saved in your existing browser database. Use the separate approved-materials shelf in your study library after signing in. The server checks institution and course access.</p></div></div>
 <div class="subject-grid all-subjects" id="all-subjects"></div>
 </section>
 <section aria-label="Personal study library" class="page" id="library-page">
 <div class="page-heading"><div><div class="eyebrow">YOUR PERSONAL MATERIALS</div><h1>Study library</h1><p>A local-first shelf for documents you choose to keep on this device.</p></div><div class="heading-actions"><label class="button primary upload-button">＋ Add a local file<input accept=".pdf,.txt,.md" hidden="" id="file-input" multiple="" type="file"/></label></div></div>
-<div class="notice"><span>⌂</span><div><strong>Files are saved only in this browser</strong><p>These personal files are not uploaded to Neon or an AI service. Admin-managed course materials will use a separate, authenticated upload flow after storage and privacy checks.</p></div></div>
+<div class="notice"><span>⌂</span><div><strong>Files are saved only in this browser</strong><p>These personal files are not uploaded to Neon or an AI service. Approved Neon text materials appear separately below after sign-in. Academic-material file uploads are not implemented.</p></div></div>
 <div class="card library-panel"><div class="library-toolbar"><strong>My local documents</strong><span id="library-count">0 files</span></div><div class="document-list" id="document-list"><div class="empty-state"><span>▤</span><strong>Your library is ready</strong><p>Add a PDF, text file or Markdown note to keep a local copy for your own study.</p></div></div></div>
+<section class="integration-card server-materials" aria-labelledby="server-materials-title">
+  <div class="integration-heading"><div><div class="eyebrow">APPROVED COURSE CONTENT · NEON</div><h2 id="server-materials-title">Approved course materials</h2><p>Published text for your authorized courses. This shelf never uploads or replaces your personal files.</p></div><button class="button soft" id="refresh-server-materials" type="button">Refresh materials</button></div>
+  <p class="integration-status" id="server-materials-status" role="status" aria-live="polite">Checking sign-in setup…</p><div class="server-material-list" id="server-material-list"></div>
+</section>
 </section>
 <section aria-label="Case flashcards" class="page" id="memory-page">
 <div class="page-heading"><div><div class="eyebrow">ACTIVE RECALL &middot; ON THIS DEVICE</div><h1>Case flashcards</h1><p>Create personal recall cards from your case notes. Your cards remain in this browser&rsquo;s IndexedDB.</p></div></div>
@@ -113,6 +126,39 @@
 <div class="practice-grid"><article class="card practice-card"><span class="practice-icon">▧</span><div><h3>Upload a past-question image</h3><p>Planned: OCR reads the question transiently. The image is not stored in Neon; extracted text and feedback are saved locally only after you choose.</p><button class="button soft small" data-preview-action="OCR and AI marking are not connected. No image was selected or sent." type="button">Preview OCR flow</button></div></article><article class="card practice-card"><span class="practice-icon">✦</span><div><h3>Get source-grounded feedback</h3><p>Planned: marking uses the administrator-approved rubric and course materials, with citations and a clear note when evidence is insufficient.</p><button class="button soft small" data-preview-action="AI marking will wait for Gemini privacy review and the approved source registry." type="button">How marking will work</button></div></article></div>
 <div class="privacy-strip"><span class="privacy-icon">&checkmark;</span><div><strong>No student answer or image is stored in the app database</strong><p>Before cloud OCR is enabled, the chosen model&rsquo;s data handling will be reviewed. Personal study records stay in browser storage.</p></div></div>
 </section>
+<section aria-label="Student profile" class="page" id="profile-page">
+<div class="page-heading"><div><div class="eyebrow">YOUR ACCOUNT · SEPARATE FROM YOUR STUDIES</div><h1>Make yourself at home.</h1><p>Create and edit your student profile. No course, payment or administrator approval is needed.</p></div></div>
+<div class="student-profile-grid">
+<section class="integration-card student-profile-card" aria-labelledby="student-profile-title">
+  <div class="student-profile-heading"><div class="student-profile-picture"><span id="profile-initials">FC</span><img id="profile-photo" width="64" height="64" alt="" referrerpolicy="no-referrer" hidden></div><div><h2 id="student-profile-title">My student profile</h2><p id="profile-display-email">Sign in to create your profile.</p></div></div>
+  <p class="integration-status" id="student-profile-status" role="status" aria-live="polite">Checking account setup…</p>
+  <div class="integration-actions"><a class="button primary" id="profile-signin" href="./auth.html?next=study.html%23profile">Sign in / create account</a><button class="button soft" id="profile-refresh" type="button" hidden>Refresh account</button><button class="button soft" id="profile-signout" type="button" hidden>Sign out</button></div>
+  <form id="student-profile-form" class="student-profile-form" hidden>
+    <label class="database-field">Your name<input id="student-full-name" type="text" autocomplete="name" required maxlength="120" placeholder="Your full name"></label>
+    <label class="database-field">Firebase email<input id="student-email" type="email" readonly autocomplete="off"><small>Supplied by Firebase, not an editable identity field. Use the secure email-change form after creating your profile.</small></label>
+    <label class="profile-policy" id="profile-installation-consent" hidden><input id="accept-installation-policy" type="checkbox" required><span><strong>Register this browser installation to my account.</strong> A new device, another browser, private browsing or cleared site data cannot reuse this profile. There is no self-service transfer or recovery. Keep this browser&rsquo;s saved data. The server stores the last observed connection IP separately; it may be a proxy address.</span></label>
+    <button class="button primary" id="profile-save" type="submit">Create my student profile</button>
+  </form>
+  <p class="profile-privacy">Only your account details and installation binding are stored on the server. Personal files, flashcards, subjects and progress stay in this browser; signing in or out never clears or uploads them. Accounts using this same browser share that local vault. Profile photos use Google&rsquo;s available image or your initials; photo uploads are not enabled.</p>
+</section>
+<section class="integration-card student-device-card" aria-labelledby="profile-device-title">
+  <div class="eyebrow">ONE ACCOUNT · ONE BROWSER INSTALLATION</div><h2 id="profile-device-title">Your registered installation</h2>
+  <p>This is a saved random browser identifier, not a physical-device fingerprint. It can be lost or copied. A different installation must use a separate Firebase account; existing profiles are never automatically transferred.</p>
+  <dl class="profile-device-details" id="profile-device-details" hidden><dt>Registered</dt><dd id="profile-bound-at">—</dd><dt>Last profile sync</dt><dd id="profile-last-seen">—</dd><dt>Last observed connection IP</dt><dd id="profile-observed-ip">Unavailable</dd><dt>Address source</dt><dd id="profile-ip-source">Unavailable</dd></dl>
+  <p>IP addresses change on mobile data, Wi-Fi and VPNs, and several people may share one. An IP change does not create another account. An unconfigured or intermediary proxy may hide your public IP; FIRE COUNSEL does not guess it or ask an external IP service.</p>
+</section>
+<section class="integration-card student-security-card" id="profile-security" aria-labelledby="profile-security-title" hidden>
+  <div class="eyebrow">FIREBASE ACCOUNT SECURITY</div><h2 id="profile-security-title">Email &amp; password</h2><p>Credentials are handled directly by Firebase, never stored in Neon or returned with your profile. Sensitive changes require you to confirm your current Firebase password or Google account.</p>
+  <p class="integration-status" id="profile-security-status" role="status" aria-live="polite"></p>
+  <div class="profile-verification" id="profile-verification" hidden><p>Your email is not verified. You can edit your profile, but protected student content remains unavailable until verification.</p><button class="button soft" id="profile-send-verification" type="button">Send verification email</button><p>After following Firebase&rsquo;s email link, use &ldquo;Refresh account&rdquo; above.</p></div>
+  <div class="profile-security-forms">
+    <form id="profile-email-form" class="student-profile-form"><h3>Change Firebase email</h3><label class="database-field">New email address<input id="profile-new-email" type="email" required maxlength="254" autocomplete="email"></label><label class="database-field" id="profile-email-password-row">Current password<input id="profile-email-password" type="password" autocomplete="current-password" required></label><p>Firebase sends a verification link to the new address. Complete verification, then refresh this account to sync the new email. This does not change a linked Google account&rsquo;s email.</p><button class="button soft" id="profile-email-save" type="submit">Verify new email</button></form>
+    <form id="profile-password-form" class="student-profile-form"><h3>Change Firebase password</h3><label class="database-field">Current password<input id="profile-current-password" type="password" autocomplete="current-password" required></label><label class="database-field">New password<input id="profile-new-password" type="password" autocomplete="new-password" required minlength="8"></label><label class="database-field">Confirm new password<input id="profile-confirm-password" type="password" autocomplete="new-password" required minlength="8"></label><button class="button soft" id="profile-password-save" type="submit">Update password</button></form>
+    <div id="profile-google-password" hidden><h3>Your Google password stays with Google</h3><p>Google never shares your password with FIRE COUNSEL. This Google-only account has no Firebase password to show or edit.</p><a class="mini-link" href="https://myaccount.google.com/security" target="_blank" rel="noopener noreferrer">Manage Google security ↗</a></div>
+  </div>
+</section>
+</div>
+</section>
 </div>
 
 </main>
@@ -121,17 +167,20 @@
 <div class="modal-backdrop" hidden="" id="modal-backdrop"><div aria-labelledby="modal-title" aria-modal="true" class="modal" role="dialog"><button aria-label="Close" class="modal-close" id="modal-close" type="button">&times;</button><span class="eyebrow">FIRE COUNSEL</span><h2 id="modal-title">A little more detail</h2><div id="modal-body"></div><div class="modal-actions"><button class="button soft" id="modal-cancel" type="button">Cancel</button><button class="button primary" id="modal-confirm" type="button">Continue</button></div></div></div>
  <footer class="site-footer" id="site-footer">
     <div class="footer-main" id="footer-main">
-      <div class="footer-brand"><a class="site-brand footer-mark" href="#home"><span class="brand-image-wrap"><img src="./assets/images/fire-counsel-brand.jpg" alt="" width="52" height="52" loading="lazy"></span><span class="brand-copy"><strong>FIRE COUNSEL</strong><small>Ignite your legal intelligence</small></span></a><p>A focused legal-learning space for clearer study, stronger recall and confident practice.</p></div>
-      <div class="footer-column"><h3>Explore</h3><a href="#learning">Learning tools</a><a href="#cases">Case notes</a><a href="#articles">Articles</a></div>
+      <div class="footer-brand"><a class="site-brand footer-mark" href="./index.html#home"><span class="brand-image-wrap"><img src="./assets/images/fire-counsel-brand.jpg" alt="" width="52" height="52" loading="lazy"></span><span class="brand-copy"><strong>FIRE COUNSEL</strong><small>Ignite your legal intelligence</small></span></a><p>A focused legal-learning space for clearer study, stronger recall and confident practice.</p></div>
+      <div class="footer-column"><h3>Explore</h3><a href="./index.html#learning">Learning tools</a><a href="./index.html#cases">Case notes</a><a href="./index.html#articles">Articles</a></div>
       <div class="footer-column"><h3>Study space</h3><a href="./study.html#dashboard">Student workspace</a><a href="./study.html#library">Personal library</a><a href="./study.html#exams">Exam practice</a></div>
-      <div class="footer-column"><h3>Information</h3><a href="#resources">Trusted legal links</a><a href="#privacy-note">Privacy-first preview</a></div>
+      <div class="footer-column"><h3>Information</h3><a href="./index.html#resources">Trusted legal links</a><a href="./index.html#privacy-note">Privacy-first preview</a></div>
     </div>
     <div class="footer-disclaimer" id="footer-disclaimer">FIRE COUNSEL is a study aid, not a law firm or a substitute for legal advice. Verify legal materials against authoritative sources.</div>
-    <div class="footer-bottom"><span id="copyright-text">© 2026 FIRE COUNSEL. <br>  powered by <br> Victorious Tech Institute <br> All rights reserved.</span><a href="#home">Back to top ↑</a></div>
+    <div class="footer-bottom"><span id="copyright-text">© 2026 FIRE COUNSEL. <br>  powered by <br> Victorious Tech Institute <br> All rights reserved.</span><a href="./index.html#home">Back to top ↑</a></div>
   </footer>
 
 
 <script defer="" src="./app.js"></script>
+<script type="module" src="./study-materials.mjs"></script>
+<script type="module" src="./research-search.mjs"></script>
+<script type="module" src="./student-profile.mjs"></script>
 
 </body>
 </html>

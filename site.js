@@ -59,6 +59,7 @@
     </article>`).join("");
     const dots = $("#hero-dots");
     dots.innerHTML = slides.map((_, index) => `<button class="hero-dot ${index === 0 ? "is-active" : ""}" type="button" aria-label="Show slide ${index + 1}" aria-current="${index === 0 ? "true" : "false"}" data-slide-to="${index}"></button>`).join("");
+    showSlide(0);
     const interval = Number(data.hero?.autoplayMs);
     initCarousel(Number.isFinite(interval) ? Math.max(4000, Math.min(interval, 15000)) : 6500);
   }

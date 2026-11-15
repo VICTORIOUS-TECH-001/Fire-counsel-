@@ -234,9 +234,7 @@ async function ensureAdminUser(db, user) {
     `INSERT INTO app_users (firebase_uid, email, full_name)
      VALUES ($1, $2, $3)
      ON CONFLICT (firebase_uid) DO UPDATE
-       SET email = EXCLUDED.email,
-           full_name = COALESCE(NULLIF(EXCLUDED.full_name, ''), app_users.full_name),
-           updated_at = NOW()
+       SET firebase_uid = app_users.firebase_uid
      RETURNING id, account_status`,
     [user.uid, user.email, fullName]
   );

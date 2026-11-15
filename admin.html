@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#10121b"><meta name="robots" content="noindex,nofollow">
-  <meta name="description" content="FIRE COUNSEL content studio and administration preview. Authentication and cloud services are not connected.">
+  <meta name="description" content="FIRE COUNSEL content studio and administration preview. Local content previews with server-verified administrator access for Neon content.">
   <title>FIRE COUNSEL · Admin Studio Preview</title>
   <link rel="icon" href="./assets/fire-counsel-192.png" type="image/png">
   <link rel="stylesheet" href="./admin.css">
+  <link rel="stylesheet" href="./integrations.css">
 </head>
 <body>
   <header class="admin-topbar">
@@ -17,19 +18,48 @@
     <aside class="admin-sidebar" aria-label="Admin studio sections">
       <div class="sidebar-label">ADMINISTRATION</div>
       <button class="admin-tab is-active" type="button" data-panel="overview"><span>⌂</span>Overview</button>
+      <button class="admin-tab" type="button" data-panel="database"><span>▦</span>Database data</button>
       <button class="admin-tab" type="button" data-panel="content"><span>▤</span>Pages & JSON</button>
       <button class="admin-tab" type="button" data-panel="media"><span>▧</span>Slides & images</button>
       <button class="admin-tab" type="button" data-panel="ai"><span>✦</span>AI provider</button>
       <button class="admin-tab" type="button" data-panel="plans"><span>◷</span>AI quotas & users</button>
-      <div class="sidebar-bottom"><span class="lock-icon">⌑</span><p>Admin sign-in and server permissions are not connected.</p><a href="./index.html">← Back to FIRE COUNSEL</a></div>
+      <div class="sidebar-bottom"><span class="lock-icon">⌑</span><p>Neon editing requires Firebase sign-in and a server-verified admin claim.</p><a href="./index.html">← Back to FIRE COUNSEL</a></div>
     </aside>
     <section class="admin-main">
-      <div class="security-warning"><span class="warning-icon">!</span><div><strong>Preview only — this page is not an authenticated admin system.</strong><p>Site drafts and quota examples stay in this browser only. No real accounts, provider keys, images, Firebase writes or quota enforcement are connected. Do not paste your Google API key here.</p></div></div>
+      <div class="security-warning"><span class="warning-icon">!</span><div><strong>Local previews and protected content tools — staging only.</strong><p>Site drafts and quota examples stay in this browser. Only the Database data panel can write Neon content, after server authorization and database setup. Uploads, AI, account management and quota enforcement remain disabled. Do not use real student data or paste provider keys here.</p></div></div>
+
+      <section class="integration-card admin-auth-card" id="admin-auth-status" data-state="checking" aria-labelledby="admin-auth-title">
+        <div><span class="eyebrow">FIREBASE · SERVER AUTHORIZATION</span><h2 id="admin-auth-title">Checking administrator setup…</h2><p id="admin-auth-message" role="status" aria-live="polite">Local drafts do not grant database access.</p></div>
+        <div class="integration-actions"><a class="button button-light" id="admin-auth-link" href="./auth.html?next=admin.html">Sign in as administrator</a><button class="button button-light" id="admin-signout" type="button" hidden>Sign out</button></div>
+      </section>
 
       <section class="admin-panel is-visible" id="panel-overview" aria-labelledby="admin-title">
         <div class="admin-heading"><div><span class="eyebrow">FIRE COUNSEL · ADMIN STUDIO</span><h1 id="admin-title">Your study platform, in one place.</h1><p>Preview the controls for site content, slideshow images, AI settings, plan limits and individual student access.</p></div><a class="button button-primary" href="./index.html?draft=1" target="_blank" rel="noopener">Open website preview ↗</a></div>
         <div class="admin-stat-grid"><article class="admin-stat"><span>01</span><strong>Website content</strong><small>JSON draft & local preview</small></article><article class="admin-stat"><span>02</span><strong>Slideshow images</strong><small>Add/remove preview controls</small></article><article class="admin-stat"><span>03</span><strong>AI provider</strong><small>Google key slot · locked safely</small></article><article class="admin-stat"><span>04</span><strong>Student allowances</strong><small>Feature and account controls</small></article></div>
         <div class="admin-card next-card"><div><span class="eyebrow">ADMIN WORKSPACE</span><h2>Set the rules. Give each student the right access.</h2><p>Configure feature-by-feature AI allowances, review account usage and make an individual adjustment. In this preview, the controls create only a local draft; a secure API must be connected before changes affect students.</p><button class="button button-primary" type="button" data-switch="plans">Open quotas & student accounts →</button></div><div class="step-stack"><span><b>1</b> Set Free and paid-plan allowances</span><span><b>2</b> Adjust a student account</span><span><b>3</b> Apply changes through a secure server</span></div></div>
+      </section>
+
+      <section class="admin-panel" id="panel-database" aria-labelledby="database-title" hidden>
+        <div class="admin-heading"><div><span class="eyebrow">NEON · APPROVED ACADEMIC CONTENT</span><h1 id="database-title">Database data.</h1><p>Manage only allowlisted academic and legal records through the protected API. These are real writes when configured; use disposable staging content only.</p></div><button class="button button-light" id="database-refresh" type="button">Check connection</button></div>
+        <div class="integration-state-grid"><p class="integration-state" id="database-firebase-state" data-state="checking" role="status">Checking Firebase setup…</p><p class="integration-state" id="database-neon-state" data-state="checking" role="status">Checking Neon readiness…</p></div>
+        <div class="integration-card">
+          <div class="database-toolbar"><label>Content table<select id="database-resource" disabled><option>Sign in to load the catalog</option></select></label><label>Find a record<input id="database-search" type="search" maxlength="150" placeholder="Search this content table" disabled></label><button class="button button-primary" id="database-new" type="button" disabled>New record</button></div>
+          <p class="integration-status" id="database-status" role="status" aria-live="polite">Database controls stay locked until the server verifies access and Neon is ready.</p>
+          <div class="database-table-wrap"><table class="database-table" aria-label="Academic content records"><thead id="database-table-head"></thead><tbody id="database-table-body"></tbody></table></div>
+          <div class="database-pagination"><span id="database-page-status">No records loaded</span><div class="integration-actions"><button class="button button-light" id="database-prev" type="button" disabled>Previous</button><button class="button button-light" id="database-next" type="button" disabled>Next</button></div></div>
+        </div>
+        <form class="integration-card database-record-form" id="database-record-form" hidden>
+          <div class="database-form-heading"><div><span class="eyebrow" id="database-form-eyebrow">NEON RECORD</span><h2 id="database-form-title">Content record</h2><p id="database-form-description"></p></div><button class="button button-light" id="database-form-close" type="button">Close</button></div>
+          <div class="database-fields" id="database-fields"></div>
+          <p class="integration-status" id="database-form-status" role="status" aria-live="polite"></p>
+          <div class="integration-actions"><button class="button button-light" id="database-delete" type="button" disabled hidden>Delete record</button><button class="button button-light" id="database-form-cancel" type="button">Cancel</button><button class="button button-primary" id="database-save" type="submit" disabled>Save to Neon</button></div>
+        </form>
+        <section class="integration-card" id="database-version-panel" aria-labelledby="database-version-title" hidden>
+          <h2 id="database-version-title">Material text versions</h2><p>Paste text to create a version and searchable chunks. File uploads, embeddings and AI generation are not implemented.</p>
+          <div class="database-version-list" id="database-version-list"></div>
+          <form id="database-version-form"><label class="database-field" for="database-version-text">New material text<textarea id="database-version-text" rows="10" maxlength="700000" placeholder="Paste reviewed staging material text" disabled></textarea></label><p class="integration-status" id="database-version-status" role="status" aria-live="polite"></p><button class="button button-primary" type="submit" disabled>Save new text version</button></form>
+        </section>
+        <div class="info-card"><span class="info-mark">i</span><p>No account tables, passwords, personal study files, embeddings or raw SQL are exposed here. Deletions require confirmation; applicable records are deactivated or unpublished instead.</p></div>
       </section>
 
       <section class="admin-panel" id="panel-content" aria-labelledby="content-title" hidden>
@@ -61,7 +91,7 @@
             <label class="field-label" for="provider-key">Google Gemini API key</label>
             <div class="secret-input-wrap"><span aria-hidden="true">⌑</span><input id="provider-key" type="password" placeholder="Locked until secure admin setup" disabled aria-disabled="true" autocomplete="new-password"></div>
             <button class="button button-disabled" id="save-provider-key" type="button" disabled aria-disabled="true">Save key securely · server setup required</button>
-            <div class="security-note"><strong>Do not paste the key into this preview or this chat.</strong><p>This page has no login or protected backend. A real key must go directly to an authenticated HTTPS API and be stored as a server-side secret, never in browser code, localStorage, a website JSON file or a public Firestore document. The key field here is deliberately disabled.</p></div>
+            <div class="security-note"><strong>Do not paste the key into this preview or this chat.</strong><p>This provider panel has no secret-storage endpoint. A real key must go directly to an authenticated HTTPS API and be stored as a server-side secret, never in browser code, localStorage, a website JSON file or a public Firestore document. The key field here is deliberately disabled.</p></div>
           </section>
           <aside class="provider-card provider-steps-card"><span class="eyebrow">SAFE CONNECTION FLOW</span><h2>Keep the secret on the server.</h2><div class="provider-step"><b>01</b><div><strong>Verify the admin</strong><small>Firebase ID token and server-checked admin claim.</small></div></div><div class="provider-step"><b>02</b><div><strong>Store the key privately</strong><small>Use a host secret such as <code>GEMINI_API_KEY</code>; never expose it to students.</small></div></div><div class="provider-step"><b>03</b><div><strong>Check student-use terms</strong><small>Confirm Google eligibility and data-retention terms before sending student work.</small></div></div><div class="provider-terms-note">Adults-only was selected, but age checking and provider approval are not connected. Do not use Gemini Free for student work.</div></aside>
         </div>
@@ -104,9 +134,11 @@
         </section>
       </section>
 
-      <footer class="admin-footer"><span>FIRE COUNSEL · admin studio preview</span><span>Local-only drafts · no API key · no Firebase writes</span></footer>
+      <footer class="admin-footer"><span>FIRE COUNSEL · admin studio preview</span><span>Local drafts · protected Neon content · AI and uploads disabled</span></footer>
     </section>
   </main>
   <script src="./admin.js" defer></script>
+  <script type="module" src="./admin-auth.mjs"></script>
+  <script type="module" src="./admin-database.mjs"></script>
 </body>
 </html>

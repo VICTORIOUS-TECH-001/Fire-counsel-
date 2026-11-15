@@ -1,6 +1,7 @@
 import express from "express";
 import { getPool } from "../config/database.js";
 import { verifyFirebaseToken } from "../middleware/verifyFirebaseToken.js";
+import { createStudentInstallationGate } from "../middleware/requireStudentInstallation.js";
 import { materialAccessSql } from "../services/materialAccess.js";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -24,10 +25,12 @@ function publicDatabaseError(error) {
 export function createStudentMaterialsRouter({
   poolProvider = getPool,
   verifyToken = verifyFirebaseToken,
-  configured = () => Boolean(process.env.DATABASE_URL)
+  configured = () => Boolean(process.env.DATABASE_URL),
+  enabled = () => process.env.STUDENT_PROFILES_ENABLED === "true",
+  installationGate
 } = {}) {
   const router = express.Router();
-  router.use(verifyToken);
+  router.use(verifyToken, installationGate || createStudentInstallationGate({ poolProvider, configured, enabled }));
 
   router.get("/", async (req, res) => {
     if (!configured()) return res.status(503).json({ error: "Neon is not configured on this server.", code: "DATABASE_NOT_CONFIGURED" });

@@ -19,6 +19,7 @@ async function serveRouter(t, router) {
 function makeRouter(pool, configured = () => true) {
   return createResearchSearchRouter({
     configured,
+    installationGate: (_req, _res, next) => next(),
     poolProvider: () => pool,
     verifyToken(req, _res, next) {
       req.user = { uid: "student-firebase-uid", email: "student@example.invalid", admin: false };

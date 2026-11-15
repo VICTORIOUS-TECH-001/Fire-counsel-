@@ -1,3 +1,5 @@
+import { createRequestScope } from "./request-scope.mjs";
+
 const $ = (selector) => document.querySelector(selector);
 const resourceSelect = $("#database-resource");
 const searchInput = $("#database-search");
@@ -13,8 +15,14 @@ let activeRecord = null;
 let databaseReady = false;
 let serverAdmin = false;
 let offset = 0;
+let totalRecords = 0;
 const pageSize = 50;
 let searchTimer;
+const sessionScope = createRequestScope();
+const viewScope = createRequestScope();
+const refreshScope = createRequestScope();
+const rowsScope = createRequestScope();
+const isStale = error => error?.name === "AbortError";
 
 function setStatus(text, kind = "") {
   const node = $("#database-status");
@@ -37,10 +45,11 @@ function apiPath(suffix = "") {
   return `/api/v1/admin/database${suffix}`;
 }
 
-async function getDatabaseHealth() {
+async function getDatabaseHealth(isCurrent) {
   try {
     const response = await fetch("/api/health", { cache: "no-store" });
     const data = await safeJson(response);
+    if (!isCurrent()) return;
     databaseReady = response.ok && data.database === "connected";
     if (databaseReady) {
       setSystemState("#database-neon-state", "ready", "Neon connected · TLS verified by backend");
@@ -50,6 +59,7 @@ async function getDatabaseHealth() {
       setSystemState("#database-neon-state", "offline", "Neon unavailable · check backend health");
     }
   } catch {
+    if (!isCurrent()) return;
     databaseReady = false;
     setSystemState("#database-neon-state", "offline", "Neon API is not connected on this origin");
   }
@@ -60,22 +70,28 @@ function setControlsEnabled(enabled) {
   resourceSelect.disabled = locked;
   searchInput.disabled = locked;
   $("#database-new").disabled = locked || !activeDataset;
-  $("#database-save").disabled = locked;
-  $("#database-delete").disabled = locked;
+  $("#database-save").disabled = locked || !activeDataset;
+  $("#database-delete").disabled = locked || !activeRecord;
   $("#database-prev").disabled = locked || offset === 0;
-  $("#database-next").disabled = locked;
+  $("#database-next").disabled = locked || offset + pageSize >= totalRecords;
   recordForm.querySelectorAll("input, select, textarea").forEach((control) => { control.disabled = locked; });
-  $("#database-version-text").disabled = locked;
-  $("#database-version-form button[type=submit]").disabled = locked;
+  const versionLocked = locked || activeDataset?.key !== "materials" || !activeRecord;
+  $("#database-version-text").disabled = versionLocked;
+  $("#database-version-form button[type=submit]").disabled = versionLocked;
+  tableBody.querySelectorAll("button").forEach(button => { button.disabled = locked; });
 }
 
 function clearAdminDataState() {
+  rowsScope.invalidate();
+  clearTimeout(searchTimer);
   catalog = [];
   activeDataset = null;
   activeRecord = null;
   resourceSelect.replaceChildren();
   tableHead.replaceChildren();
   tableBody.replaceChildren();
+  searchInput.value = "";
+  offset = 0;
   closeRecordForm();
   setPageStatus(0);
 }
@@ -89,15 +105,16 @@ function fillResourceSelect() {
     resourceSelect.append(option);
   }
   resourceSelect.disabled = !catalog.length || !serverAdmin || !databaseReady;
-  if (catalog.length) selectDataset(resourceSelect.value || catalog[0].key);
+  if (catalog.length) return selectDataset(resourceSelect.value || catalog[0].key);
 }
 
 function setPageStatus(total) {
+  totalRecords = total;
   const first = total ? offset + 1 : 0;
   const last = Math.min(offset + pageSize, total);
   $("#database-page-status").textContent = total ? `${first}–${last} of ${total}` : "No matching records";
-  $("#database-prev").disabled = !serverAdmin || offset === 0;
-  $("#database-next").disabled = !serverAdmin || offset + pageSize >= total;
+  $("#database-prev").disabled = !serverAdmin || !databaseReady || offset === 0;
+  $("#database-next").disabled = !serverAdmin || !databaseReady || offset + pageSize >= total;
 }
 
 function friendlyError(body, response) {
@@ -109,19 +126,23 @@ function friendlyError(body, response) {
 }
 
 async function apiRequest(path, options = {}) {
+  const sameSession = sessionScope.capture();
+  const sameView = viewScope.capture();
   if (!authClient) throw new Error("Firebase Auth is not configured.");
   const response = await authClient.apiRequest(path, options);
   const body = await safeJson(response);
+  if (!sameSession() || !sameView()) throw new DOMException("Stale content request.", "AbortError");
   if (!response.ok) throw new Error(friendlyError(body, response));
   return body;
 }
 
-function selectDataset(key) {
+async function selectDataset(key) {
+  viewScope.invalidate();
   activeDataset = catalog.find((dataset) => dataset.key === key) || null;
   resourceSelect.value = activeDataset?.key || "";
   offset = 0;
   closeRecordForm();
-  renderRows().catch((error) => setStatus(error.message, "error"));
+  await renderRows();
   $("#database-new").disabled = !serverAdmin || !databaseReady || !activeDataset;
 }
 
@@ -196,6 +217,7 @@ function renderTableRows(dataset, rows) {
 }
 
 async function renderRows() {
+  const isCurrent = rowsScope.begin();
   if (!activeDataset || !serverAdmin) {
     tableBody.replaceChildren();
     setPageStatus(0);
@@ -218,6 +240,7 @@ async function renderRows() {
   const query = new URLSearchParams({ limit: String(pageSize), offset: String(offset) });
   if (searchInput.value.trim()) query.set("q", searchInput.value.trim());
   const result = await apiRequest(`${apiPath(`/${encodeURIComponent(activeDataset.key)}`)}?${query}`);
+  if (!isCurrent()) return;
   renderTableRows(activeDataset, result.data || []);
   setPageStatus(result.pagination?.total || 0);
   setStatus(`Showing ${activeDataset.label.toLowerCase()} from Neon. Changes are written through the verified backend.`, "ok");
@@ -288,6 +311,7 @@ async function buildForm(dataset, record = null) {
         const result = await apiRequest(apiPath(`/options/${encodeURIComponent(field.resource)}?limit=500`));
         options = result.data || [];
       } catch (error) {
+        if (isStale(error)) throw error;
         setFormStatus(`Could not load ${field.label.toLowerCase()} choices: ${error.message}`, "error");
       }
     }
@@ -316,6 +340,7 @@ async function buildForm(dataset, record = null) {
   $("#database-save").textContent = record ? "Save changes to Neon" : "Save to Neon";
   recordForm.hidden = false;
   versionPanel.hidden = !(dataset.key === "materials" && record?.id);
+  setControlsEnabled(serverAdmin && databaseReady);
   if (versionPanel.hidden) return;
   $("#database-version-text").value = "";
   setVersionStatus("Loading saved versions…");
@@ -334,6 +359,7 @@ function setVersionStatus(text) {
 
 async function openRecordForm(id = null) {
   if (!activeDataset || !databaseReady || !serverAdmin) return;
+  viewScope.invalidate();
   activeRecord = null;
   setFormStatus("Loading form…");
   recordForm.hidden = false;
@@ -349,16 +375,21 @@ async function openRecordForm(id = null) {
     setFormStatus("Only the fields defined for this Neon table can be saved.");
     recordForm.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
+    if (isStale(error)) return;
     recordForm.hidden = true;
     setStatus(error.message, "error");
   }
 }
 
 function closeRecordForm() {
+  viewScope.invalidate();
   recordForm.hidden = true;
   versionPanel.hidden = true;
   activeRecord = null;
   fieldsHolder.replaceChildren();
+  $("#database-version-list").replaceChildren();
+  $("#database-version-text").value = "";
+  setVersionStatus("");
   setFormStatus("");
 }
 
@@ -392,6 +423,7 @@ async function submitRecord(event) {
     await renderRows();
     setStatus("Saved to Neon.", "ok");
   } catch (error) {
+    if (isStale(error)) return;
     setFormStatus(error.message, "error");
   } finally {
     $("#database-save").disabled = !databaseReady || !serverAdmin;
@@ -406,16 +438,15 @@ async function removeRecord(record) {
   const warning = activeDataset.deleteWarning || "This action cannot be undone.";
   if (!window.confirm(`Do you want to ${action} “${label}”?\n\n${warning}\n\nContinue?`)) return;
   try {
-    const response = await authClient.apiRequest(apiPath(`/${encodeURIComponent(activeDataset.key)}/${encodeURIComponent(record.id)}`), {
+    await apiRequest(apiPath(`/${encodeURIComponent(activeDataset.key)}/${encodeURIComponent(record.id)}`), {
       method: "DELETE",
       body: JSON.stringify({ confirm: true })
     });
-    const body = await safeJson(response);
-    if (!response.ok) throw new Error(friendlyError(body, response));
     closeRecordForm();
     await renderRows();
     setStatus(activeDataset.deleteMode === "deactivate" ? "Record deactivated." : "Record deleted from Neon.", "ok");
   } catch (error) {
+    if (isStale(error)) return;
     setStatus(error.message, "error");
   }
 }
@@ -441,6 +472,7 @@ async function renderVersions(materialId) {
     }
     setVersionStatus(versions.length ? `${versions.length} saved text version${versions.length === 1 ? "" : "s"}. Saving creates a new version.` : "No text versions saved yet.");
   } catch (error) {
+    if (isStale(error)) return;
     setVersionStatus(error.message);
   }
 }
@@ -459,7 +491,7 @@ async function saveMaterialVersion(event) {
     $("#database-version-text").value = "";
     setVersionStatus(`Saved version ${result.data.version_number} with ${result.data.chunk_count} plain-text chunks. No AI call was made.`);
     await renderVersions(activeRecord.id);
-  } catch (error) { setVersionStatus(error.message); }
+  } catch (error) { if (!isStale(error)) setVersionStatus(error.message); }
 }
 
 async function removeRecordFromForm() {
@@ -467,8 +499,12 @@ async function removeRecordFromForm() {
 }
 
 async function loadAdminData() {
-  await getDatabaseHealth();
+  const isCurrent = refreshScope.begin();
+  const sameSession = sessionScope.capture();
+  const valid = () => isCurrent() && sameSession();
   setControlsEnabled(false);
+  await getDatabaseHealth(valid);
+  if (!valid()) return;
   if (!authClient?.firebaseAuth.currentUser) {
     serverAdmin = false;
     clearAdminDataState();
@@ -478,6 +514,7 @@ async function loadAdminData() {
   }
   try {
     const adminResponse = await authClient.apiRequest("/api/v1/admin/me");
+    if (!valid()) return;
     if (!adminResponse.ok) {
       serverAdmin = false;
       clearAdminDataState();
@@ -491,10 +528,13 @@ async function loadAdminData() {
       setStatus("Admin verified. Neon is not connected yet; set DATABASE_URL in the ignored backend/.env. No DB write has occurred.");
     }
     const result = await apiRequest(apiPath("/catalog"));
+    if (!valid()) return;
     catalog = result.data || [];
-    fillResourceSelect();
+    await fillResourceSelect();
+    if (!valid()) return;
     setControlsEnabled(serverAdmin && databaseReady);
   } catch (error) {
+    if (isStale(error) || !valid()) return;
     serverAdmin = false;
     clearAdminDataState();
     setSystemState("#database-firebase-state", "offline", "Firebase or admin API unavailable");
@@ -505,17 +545,20 @@ async function loadAdminData() {
 
 async function refresh() {
   await loadAdminData();
-  if (serverAdmin && activeDataset) await renderRows();
 }
 
-$("#database-refresh").addEventListener("click", refresh);
-resourceSelect.addEventListener("change", () => selectDataset(resourceSelect.value));
+function handleUiError(error) {
+  if (!isStale(error)) setStatus(error.message, "error");
+}
+
+$("#database-refresh").addEventListener("click", () => refresh().catch(handleUiError));
+resourceSelect.addEventListener("change", () => selectDataset(resourceSelect.value).catch(handleUiError));
 $("#database-new").addEventListener("click", () => openRecordForm());
-$("#database-prev").addEventListener("click", () => { offset = Math.max(0, offset - pageSize); renderRows().catch((error) => setStatus(error.message, "error")); });
-$("#database-next").addEventListener("click", () => { offset += pageSize; renderRows().catch((error) => setStatus(error.message, "error")); });
+$("#database-prev").addEventListener("click", () => { offset = Math.max(0, offset - pageSize); renderRows().catch(handleUiError); });
+$("#database-next").addEventListener("click", () => { offset += pageSize; renderRows().catch(handleUiError); });
 searchInput.addEventListener("input", () => {
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => { offset = 0; renderRows().catch((error) => setStatus(error.message, "error")); }, 220);
+  searchTimer = setTimeout(() => { offset = 0; renderRows().catch(handleUiError); }, 220);
 });
 recordForm.addEventListener("submit", submitRecord);
 $("#database-form-close").addEventListener("click", closeRecordForm);
@@ -525,11 +568,24 @@ $("#database-version-form").addEventListener("submit", saveMaterialVersion);
 
 try {
   authClient = await import("./firebase/auth-client.mjs");
-  authClient.onAuthStateChanged(authClient.firebaseAuth, () => refresh().catch((error) => setStatus(error.message, "error")));
-  await refresh();
+  authClient.onAuthStateChanged(authClient.firebaseAuth, () => {
+    sessionScope.invalidate();
+    serverAdmin = false;
+    clearAdminDataState();
+    setControlsEnabled(false);
+    refresh().catch(handleUiError);
+  }, () => {
+    sessionScope.invalidate();
+    refreshScope.invalidate();
+    serverAdmin = false;
+    clearAdminDataState();
+    setControlsEnabled(false);
+    setStatus("Firebase could not verify this session. Database controls are locked.", "error");
+  });
 } catch (error) {
   setSystemState("#database-firebase-state", "offline", "Firebase configuration is missing");
-  setSystemState("#database-neon-state", "offline", "Waiting for verified server API");
+  await getDatabaseHealth(() => true);
+  setControlsEnabled(false);
   setStatus("Firebase client configuration could not load. Add the ignored firebase/firebase-config.local.mjs and reload.", "error");
   console.warn("Neon database panel unavailable:", error.message);
 }

@@ -93,7 +93,12 @@ test("admin create uses parameterized values and server-controlled Neon actor fi
   assert.ok(insert);
   assert.deepEqual(insert.values, ["University of Test", "test-u", "Nigeria"]);
   assert.doesNotMatch(insert.text, /University of Test|firebase-admin-uid/);
-  assert.ok(pool.queries.some((query) => query.text.includes("INSERT INTO app_users")));
+  const identityWrite = pool.queries.find(query => query.text.includes("INSERT INTO app_users"));
+  assert.ok(identityWrite);
+  // Resolving an administrator actor must not reset a self-edited profile from
+  // an old Firebase displayName/email claim on each unrelated content write.
+  const conflictUpdate = identityWrite.text.split("ON CONFLICT")[1];
+  assert.doesNotMatch(conflictUpdate, /SET email|full_name\s*=/);
 });
 
 test("admin rejects unknown fields and unknown database tables", async (t) => {
@@ -230,4 +235,68 @@ test("delete requires explicit confirmation and deactivates a university instead
   assert.equal(response.status, 200);
   assert.equal(body.data.deactivated, true);
   assert.ok(pool.queries.some((query) => query.text.startsWith("UPDATE universities SET is_active")));
+});
+
+test("pasted text versions and ordered chunks commit in one locked transaction", async (t) => {
+  const versionId = "923e4567-e89b-42d3-a456-426614174000";
+  const pool = makeFakePool(async (text) => {
+    if (text === "SELECT id FROM materials WHERE id = $1 FOR UPDATE") return { rows: [{ id: ROW_ID }] };
+    if (text.startsWith("SELECT COALESCE(MAX(version_number)")) return { rows: [{ version_number: 8 }] };
+    if (text.startsWith("INSERT INTO material_versions")) return { rows: [{ id: versionId, material_id: ROW_ID, version_number: 8, extraction_status: "completed" }] };
+    return undefined;
+  });
+  const content = "Reviewed staging legal text. ".repeat(400).trim();
+  const base = await serveRouter(t, makeRouter(pool));
+  const response = await fetch(`${base}/materials/${ROW_ID}/versions`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ extracted_text: content })
+  });
+  const body = await response.json();
+  assert.equal(response.status, 201);
+  assert.equal(body.data.version_number, 8);
+  const chunks = pool.queries.filter(query => query.text.startsWith("INSERT INTO material_chunks"));
+  assert.equal(chunks.length, body.data.chunk_count);
+  assert.ok(chunks.length > 1);
+  assert.equal(chunks.map(query => query.values[3]).join(" "), content);
+  chunks.forEach((query, index) => {
+    assert.deepEqual(query.values.slice(0, 3), [ROW_ID, versionId, index]);
+    assert.ok(query.values[3].length <= 4000);
+  });
+  const insert = pool.queries.find(query => query.text.startsWith("INSERT INTO material_versions"));
+  assert.deepEqual(insert.values, [ROW_ID, 8, content, USER_ID]);
+  assert.equal(pool.queries[0].text, "BEGIN");
+  assert.equal(pool.queries.at(-1).text, "COMMIT");
+  assert.ok(pool.queries.some(query => query.text.endsWith("FOR UPDATE")));
+});
+
+test("a failed material chunk rolls back the version and releases its connection", async (t) => {
+  const pool = makeFakePool(async (text) => {
+    if (text === "SELECT id FROM materials WHERE id = $1 FOR UPDATE") return { rows: [{ id: ROW_ID }] };
+    if (text.startsWith("INSERT INTO material_versions")) return { rows: [{ id: COURSE_ID }] };
+    if (text.startsWith("INSERT INTO material_chunks")) throw new Error("synthetic chunk failure");
+    return undefined;
+  });
+  let released = false;
+  const connect = pool.connect;
+  pool.connect = async () => ({ ...await connect(), release() { released = true; } });
+  const base = await serveRouter(t, makeRouter(pool));
+  const response = await fetch(`${base}/materials/${ROW_ID}/versions`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ extracted_text: "Synthetic staging material" })
+  });
+  assert.equal(response.status, 500);
+  assert.equal((await response.json()).code, "DATABASE_ERROR");
+  assert.equal(pool.queries.at(-1).text, "ROLLBACK");
+  assert.equal(pool.queries.some(query => query.text === "COMMIT"), false);
+  assert.equal(released, true);
+});
+
+test("invalid text-version input is rejected without opening a database transaction", async (t) => {
+  const pool = makeFakePool();
+  const base = await serveRouter(t, makeRouter(pool));
+  for (const [id, body] of [["invalid-id", { extracted_text: "test" }], [ROW_ID, { extracted_text: "  " }], [ROW_ID, { extracted_text: 123 }]]) {
+    const response = await fetch(`${base}/materials/${id}/versions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    assert.equal(response.status, 400);
+  }
+  assert.equal(pool.queries.length, 0);
 });

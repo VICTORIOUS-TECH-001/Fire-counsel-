@@ -17,19 +17,24 @@
     <section class="auth-card" aria-labelledby="auth-title">
       <span class="auth-eyebrow">STUDENT & ADMIN SIGN IN</span>
       <h1 id="auth-title">Welcome back.</h1>
-      <p class="auth-intro">Sign in with your Firebase account. Admin access is confirmed by the server; a Google account alone does not grant administrator permission.</p>
+      <p class="auth-intro" id="auth-intro">Sign in or create a student account with Google or email. Google supplies your available name, email and photo; you can then confirm and edit your profile. No course, payment or administrator approval is required.</p>
       <div class="auth-state" id="auth-message" role="status" aria-live="polite">Checking Firebase setup…</div>
       <form id="email-signin-form" class="auth-form" hidden>
+        <label id="signup-name-row" hidden>Your name<input id="auth-name" type="text" autocomplete="name" required maxlength="120" placeholder="Your full name" disabled></label>
         <label>Email address<input id="auth-email" type="email" autocomplete="username" required maxlength="254" placeholder="you@example.com"></label>
         <label>Password<input id="auth-password" type="password" autocomplete="current-password" required minlength="6" placeholder="Your password"></label>
+        <label id="signup-confirm-row" hidden>Confirm password<input id="auth-password-confirm" type="password" autocomplete="new-password" required minlength="8" placeholder="Repeat your password" disabled></label>
+        <p class="auth-hint" id="signup-hint" hidden>Firebase stores your password securely; FIRE COUNSEL never puts it in your profile or Neon. After registration, confirm the browser-installation policy to create your student profile.</p>
         <button class="auth-button auth-primary" id="email-signin-button" type="submit">Sign in with email</button>
         <button class="auth-text-button" id="forgot-password-button" type="button">Forgot password? Send me a reset email</button>
+        <button class="auth-text-button" id="auth-mode-toggle" type="button">New here? Create a student account</button>
       </form>
       <div class="auth-divider" id="auth-divider" hidden><span>or</span></div>
       <button class="auth-button auth-google" id="google-signin-button" type="button" hidden><span class="google-g" aria-hidden="true">G</span>Continue with Google</button>
       <div class="auth-signed-in" id="signed-in-panel" hidden>
         <strong id="signed-in-email"></strong>
         <button class="auth-button auth-primary" id="continue-button" type="button" hidden>Continue</button>
+        <a class="auth-button auth-secondary" id="manage-profile-link" href="./study.html#profile">Create or edit my student profile</a>
         <button class="auth-button auth-secondary" id="sign-out-button" type="button">Sign out</button>
       </div>
       <a class="local-link" href="./study.html#dashboard">Continue to local study without signing in</a>

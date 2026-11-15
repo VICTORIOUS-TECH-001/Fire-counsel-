@@ -9,3 +9,16 @@ ui-debug.log
 # Local Firebase Web configuration (contains the project API key by request).
 # Web API keys identify an app; keep this file local per project policy.
 /firebase/firebase-config.local.mjs
+
+# Test outputs and developer-only secrets/configuration.
+/test-results/
+/playwright-report/
+*.log
+.env
+.env.*
+!.env.example
+*.service-account.json
+*serviceAccount*.json
+
+# Scratch dependency reviews and locally unpacked test runtimes.
+.cache/

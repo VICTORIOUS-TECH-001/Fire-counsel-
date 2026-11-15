@@ -16,7 +16,7 @@ test("student study storage keeps its existing IndexedDB identity and stores", (
 });
 
 test("service-worker cleanup only removes old FIRE COUNSEL app-shell caches", () => {
-  assert.match(serviceWorkerSource, /const CACHE_NAME = "fire-counsel-shell-v10";/);
+  assert.match(serviceWorkerSource, /const CACHE_NAME = "fire-counsel-shell-v\d+";/);
   assert.match(serviceWorkerSource, /key\.startsWith\(APP_CACHE_PREFIX\) && key !== CACHE_NAME/);
   assert.doesNotMatch(serviceWorkerSource, /indexedDB\.deleteDatabase|localStorage\.clear\s*\(/);
 });

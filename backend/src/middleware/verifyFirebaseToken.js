@@ -28,6 +28,7 @@ export function createFirebaseTokenVerifier(authProvider = getFirebaseAuth) {
         email: decodedToken.email ?? null,
         name: decodedToken.name ?? null,
         emailVerified: decodedToken.email_verified === true,
+        authTime: Number.isInteger(decodedToken.auth_time) ? decodedToken.auth_time : null,
         // Custom claims are trusted only after Firebase Admin verifies the token.
         admin: decodedToken.admin === true
       };
