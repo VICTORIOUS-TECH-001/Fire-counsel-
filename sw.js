@@ -21,7 +21,10 @@ self.addEventListener("activate", event => {
 
 self.addEventListener("fetch", event => {
   const request = event.request;
-  if (request.method !== "GET" || new URL(request.url).origin !== self.location.origin) return;
+  const url = new URL(request.url);
+  // Do not cache authenticated API replies: cache keys would otherwise ignore
+  // the Bearer token and could expose one account's response to another user.
+  if (request.method !== "GET" || url.origin !== self.location.origin || url.pathname === "/api" || url.pathname.startsWith("/api/") || request.headers.has("authorization")) return;
   event.respondWith(caches.match(request).then(cached => {
     if (cached) return cached;
     return fetch(request).then(response => {

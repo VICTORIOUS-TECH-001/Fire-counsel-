@@ -1,0 +1,20 @@
+# FIRE COUNSEL API — disposable staging only.
+# No database, Firebase Admin, Gemini, or payment secrets are configured here.
+# Review Firebase project settings and pass local emulator tests before adding any.
+services:
+  - type: web
+    name: fire-counsel-api-staging
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: false
+    envVars:
+      - key: NODE_ENV
+        value: staging
+      - key: FIREBASE_PROJECT_ID
+        value: fire-counsel
+      - key: CORS_ORIGINS
+        value: http://localhost:8080

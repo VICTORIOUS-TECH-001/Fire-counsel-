@@ -5,6 +5,10 @@ import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import { checkDatabase } from "./config/database.js";
 import { verifyFirebaseToken } from "./middleware/verifyFirebaseToken.js";
+import { requireAdmin } from "./middleware/requireAdmin.js";
+import { createAdminDatabaseRouter } from "./routes/adminDatabase.js";
+import { createStudentMaterialsRouter } from "./routes/studentMaterials.js";
+import { createResearchSearchRouter } from "./routes/researchSearch.js";
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -24,13 +28,19 @@ app.use(cors({
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "2mb" }));
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 100,
   standardHeaders: "draft-8",
   legacyHeaders: false
 }));
+
+// Render's liveness probe must not require a live database or Firebase project.
+// This makes a staging deployment bootable without enabling external writes.
+app.get("/healthz", (_req, res) => {
+  res.status(200).json({ service: "FIRE COUNSEL API", status: "ok" });
+});
 
 app.get("/api/health", async (_req, res) => {
   let database = "not_configured";
@@ -54,9 +64,29 @@ app.get("/api/health", async (_req, res) => {
   });
 });
 
+// Student and administrator sign-in use Firebase Auth on the client. Every API
+// request must present its Firebase ID token; role data is derived server-side.
 app.get("/api/v1/me", verifyFirebaseToken, (req, res) => {
-  res.json({ user: req.user });
+  res.json({
+    user: {
+      uid: req.user.uid,
+      email: req.user.email,
+      emailVerified: req.user.emailVerified,
+      role: req.user.admin ? "admin" : "student"
+    }
+  });
 });
+
+// This route intentionally has no client-controlled role parameter. Only a
+// Firebase Admin-verified custom claim can pass requireAdmin.
+app.get("/api/v1/admin/me", verifyFirebaseToken, requireAdmin, (req, res) => {
+  res.json({ user: { uid: req.user.uid, email: req.user.email, role: "admin" } });
+});
+
+// Strictly allowlisted CRUD for administrator-managed Neon content.
+app.use("/api/v1/admin/database", createAdminDatabaseRouter());
+app.use("/api/v1/materials", createStudentMaterialsRouter());
+app.use("/api/v1/research", createResearchSearchRouter());
 
 app.use((req, res) => {
   res.status(404).json({ error: "Route not found." });
@@ -70,6 +100,6 @@ app.use((error, _req, res, _next) => {
   return res.status(500).json({ error: "An unexpected server error occurred." });
 });
 
-app.listen(port, () => {
+app.listen(port, "0.0.0.0", () => {
   console.log(`FIRE COUNSEL API listening on port ${port}`);
 });
