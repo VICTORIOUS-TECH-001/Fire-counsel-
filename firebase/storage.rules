@@ -1,0 +1,23 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedInAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+
+    // Homepage photos can be displayed publicly. Only a server-issued Firebase
+    // Auth custom claim may create, replace or delete slide files.
+    match /site/slides/{fileName} {
+      allow read: if true;
+      allow create, update: if signedInAdmin()
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+      allow delete: if signedInAdmin();
+    }
+
+    // No other object path is readable or writable by Firebase clients.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

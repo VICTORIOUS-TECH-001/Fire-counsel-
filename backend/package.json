@@ -5,19 +5,20 @@
   "description": "Node.js API foundation for FIRE COUNSEL",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "check": "node --check src/server.js && node --check src/config/database.js && node --check src/middleware/verifyFirebaseToken.js"
+    "check": "node --check src/server.js && node --check src/config/database.js && node --check src/config/databaseCatalog.js && node --check src/config/firebaseAdmin.js && node --check src/middleware/verifyFirebaseToken.js && node --check src/middleware/requireAdmin.js && node --check src/routes/adminDatabase.js && node --check src/routes/studentMaterials.js && node --check src/routes/researchSearch.js && node --check src/services/materialAccess.js",
+    "test": "node --test"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^5.1.0",
     "express-rate-limit": "^8.1.0",
-    "firebase-admin": "^13.5.0",
+    "firebase-admin": "^14.5.1",
     "helmet": "^8.1.0",
     "pg": "^8.16.3"
   }

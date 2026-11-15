@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport"/>
+<meta content="#111322" name="theme-color"/>
+<meta content="FIRE COUNSEL &mdash; private, local-first study tools for law students." name="description"/>
+<title>FIRE COUNSEL &mdash; Student Study Space</title>
+<link href="./manifest.webmanifest" rel="manifest"/>
+<link href="./assets/fire-counsel-192.png" rel="icon" type="image/png"/>
+<link href="./styles.css" rel="stylesheet"/>
+</head>
+<body data-theme="light">
+<div class="app">
+<aside aria-label="Main navigation" class="sidebar" id="sidebar">
+<a aria-label="FIRE COUNSEL home" class="brand" href="./index.html">
+<span class="brand-mark"><img alt="" decoding="async" height="44" src="./assets/images/fire-counsel-brand.jpg" width="44"/></span>
+<span class="brand-copy"><strong>FIRE COUNSEL</strong><small>AI &middot; LEGAL STUDY</small></span>
+</a>
+<div class="workspace-chip"><span class="status-dot"></span><span id="workspace-label">Student workspace</span></div>
+<nav aria-label="Student navigation" class="nav-list" id="student-nav">
+<div class="nav-label">Study</div>
+<a class="nav-link active" data-page="dashboard" href="#dashboard"><span class="nav-icon"><svg viewbox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg></span>Overview</a>
+<a class="nav-link" data-page="subjects" href="#subjects"><span class="nav-icon"><svg viewbox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21zM4 5.5v13A2.5 2.5 0 0 1 6.5 16H20M8 7h8M8 10h7"></path></svg></span>My courses<span class="nav-count" id="course-nav-count">6</span></a>
+<a class="nav-link" data-page="ai-chat" href="#ai-chat"><span class="nav-icon"><svg viewbox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 0 1 8.7 4a8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"></path><path d="M8 12h8M12 8v8"></path></svg></span>Fire Counsel AI<span class="ai-nav-tag">AI</span></a>
+<a class="nav-link" data-page="library" href="#library"><span class="nav-icon"><svg viewbox="0 0 24 24"><path d="M5 3h10l4 4v14H5zM14 3v5h5M8 12h8M8 16h8"></path></svg></span>My study library</a>
+<a class="nav-link" data-page="memory" href="#memory"><span class="nav-icon"><svg viewbox="0 0 24 24"><rect height="15" rx="2" width="13" x="4" y="5"></rect><path d="M8 3h11a2 2 0 0 1 2 2v12M7 10h7M7 14h5"></path></svg></span>Case flashcards</a>
+<a class="nav-link" data-page="exams" href="#exams"><span class="nav-icon"><svg viewbox="0 0 24 24"><path d="M5 3h14a2 2 0 0 1 2 2v14l-4-2-5 3-5-3-4 2V5a2 2 0 0 1 2-2Z"></path><path d="M8 8h8M8 12h6"></path></svg></span>Past questions</a>
+</nav>
+<div class="sidebar-spacer"></div>
+<div class="local-card"><div class="local-card-top"><span class="local-icon">⌂</span><span>Local study vault</span></div><p>Personal files, flashcards and practice stay on this device.</p></div>
+<div class="offline-card"><span class="status-dot" id="connection-dot"></span><div><strong id="connection-label">Ready to study</strong><small id="connection-detail">Checking connection&hellip;</small></div></div>
+<div class="profile"><span class="avatar">FC</span><span class="profile-info"><strong>Student workspace</strong><small id="profile-role">Local-first account</small></span><a aria-label="Sign in to FIRE COUNSEL" class="icon-button profile-more" href="./auth.html?next=study.html">↗</a></div>
+</aside>
+<div class="scrim" id="scrim"></div>
+<main class="main" id="main-content">
+<header class="topbar">
+<div class="top-left">
+<button aria-label="Open navigation" class="icon-button mobile-menu" id="menu-toggle" type="button"><svg viewbox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"></path></svg></button>
+<div class="breadcrumb"><span id="breadcrumb-workspace">Student</span><b>/</b><strong id="page-breadcrumb">Overview</strong></div>
+<label class="top-search"><svg viewbox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg><input aria-label="Search" id="global-search" placeholder="Search your study space&hellip;" type="search"/></label>
+</div>
+<div class="top-right">
+<span class="demo-pill"><i></i><span id="mode-label">LOCAL STUDY</span></span>
+<button aria-label="Toggle light and dark theme" class="icon-button theme-button" id="theme-toggle" title="Toggle theme" type="button"><svg viewbox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"></path></svg></button>
+<button aria-label="Install app" class="icon-button install-button" hidden="" id="install-button" title="Install FIRE COUNSEL" type="button">&darr;</button>
+<button class="help-button" id="help-button" type="button">Help &amp; privacy <span>&nearrow;</span></button>
+</div>
+</header>
+<div class="views">
+<section aria-label="Student home" class="page active-page" id="dashboard-page">
+<div class="page-heading" id="student-home"><div><div class="eyebrow">YOUR LEGAL STUDY SPACE &middot; <span id="today-label">Today</span></div><h1>Build clarity, case by case.</h1><p>A calmer study plan, stronger recall, and course materials you can trust.</p></div><div class="heading-actions"><button class="button primary" data-go="ai-chat">Ask Fire Counsel AI <span class="arrow">&nearrow;</span></button></div></div>
+<div aria-label="FIRE COUNSEL study highlights" aria-roledescription="carousel" class="hero">
+<div class="hero-track">
+<article class="hero-slide active" data-slide="0"><div class="hero-copy"><div class="hero-tag"><span>✦</span> YOUR LEGAL STUDY COMPANION</div><h2>Understand the law.<br/><em>Remember the details.</em></h2><p>Study with active recall, deliberate practice and answers grounded in trusted course materials.</p><div class="hero-buttons"><button class="button white" data-go="subjects">Explore your courses <span class="arrow">&rarr;</span></button><button class="button ghost-white" data-go="exams">Start a focus session</button></div></div><div class="hero-art"><img alt="A judge in robes writing in a law library" decoding="async" height="340" loading="lazy" src="./assets/images/pexels-law-judge.jpg" width="520"/></div></article>
+<article class="hero-slide" data-slide="1"><div class="hero-copy"><div class="hero-tag"><span>✦</span> A LIBRARY THAT LEARNS WITH YOU</div><h2>Good notes make<br/><em>great arguments.</em></h2><p>Choose a course, keep your own cases close, and practise one useful question at a time.</p><div class="hero-buttons"><button class="button white" data-go="memory">Create a case card <span class="arrow">&rarr;</span></button><button class="button ghost-white" data-go="library">Open my library</button></div></div><div class="hero-art"><img alt="A student studying with books and a laptop in a library" decoding="async" height="340" loading="lazy" src="./assets/images/pexels-law-student.jpg" width="520"/></div></article>
+<article class="hero-slide" data-slide="2"><div class="hero-copy"><div class="hero-tag"><span>✦</span> PRACTISE WITH PURPOSE</div><h2>From past questions<br/><em>to confident answers.</em></h2><p>Work through exam questions, save your own revision notes locally, and build a steady routine.</p><div class="hero-buttons"><button class="button white" data-go="exams">Explore exam practice <span class="arrow">&rarr;</span></button><button class="button ghost-white" data-go="subjects">Choose a course</button></div></div><div class="hero-art"><img alt="FIRE COUNSEL gavel and flame brand artwork" decoding="async" height="340" loading="lazy" src="./assets/images/fire-counsel-brand.jpg" width="520"/></div></article>
+</div>
+<div class="carousel-footer"><button aria-label="Previous slide" class="carousel-arrow" id="prev-slide" type="button">&lsaquo;</button><div class="carousel-dots"><button aria-label="Slide 1" class="carousel-dot active" type="button"></button><button aria-label="Slide 2" class="carousel-dot" type="button"></button><button aria-label="Slide 3" class="carousel-dot" type="button"></button></div><button aria-label="Next slide" class="carousel-arrow" id="next-slide" type="button">&rsaquo;</button></div>
+</div>
+<div class="stats-grid">
+<article class="card stat-card"><div class="stat-icon violet">&sect;</div><div><span>Courses</span><strong id="stat-subjects">6</strong><small>Available to study</small></div></article>
+<article class="card stat-card"><div class="stat-icon cyan">▤</div><div><span>My local files</span><strong id="stat-materials">0</strong><small>On this device</small></div></article>
+<article class="card stat-card"><div class="stat-icon pink">✧</div><div><span>Recall cards</span><strong id="stat-cards">0</strong><small>Saved on this device</small></div></article>
+<article class="card stat-card"><div class="stat-icon green">◷</div><div><span>Focus sessions</span><strong id="stat-sessions">0</strong><small>Tracked locally</small></div></article>
+</div>
+<div class="section-row" id="student-courses"><div><h2 class="section-title">Pick up where you left off</h2><p class="section-subtitle">Choose a course for this study session. Your selection stays on this device.</p></div><label class="course-select">Studying <select aria-label="Choose a course" id="active-course-select"></select></label></div>
+<div class="student-layout"><div class="course-grid subject-grid" id="dashboard-subjects"></div><aside class="card study-panel"><div class="panel-head"><div><h3>Today&rsquo;s gentle plan</h3><p>A little progress goes a long way.</p></div><a class="mini-link" data-page="exams" href="#exams">Focus timer</a></div><div class="today-item"><span class="today-icon">&sect;</span><div class="today-copy"><strong>Review one legal principle</strong><span>Choose a course and continue a topic</span></div><span class="task-pill">15 min</span></div><div class="today-item"><span class="today-icon">✎</span><div class="today-copy"><strong>Try one past question</strong><span>Practise issue spotting</span></div><span class="task-pill">1 question</span></div><div class="today-item"><span class="today-icon">✧</span><div class="today-copy"><strong>Refresh your case cards</strong><span>Active recall practice</span></div><span class="task-pill">Your pace</span></div></aside></div>
+<div class="section-row" id="student-tools"><div><h2 class="section-title">Study tools, ready when you are</h2><p class="section-subtitle">Personal learning work is designed to stay on your device.</p></div></div>
+<div class="quick-grid"><button class="card quick-card" data-go="exams"><span class="quick-icon">▤</span><span><strong>Past questions</strong><small>Practise and review exam work.</small></span></button><button class="card quick-card" data-go="memory"><span class="quick-icon">✧</span><span><strong>Case flashcards</strong><small>Create a personal case recall set.</small></span></button></div>
+<div class="privacy-strip" id="student-privacy"><span class="privacy-icon">&checkmark;</span><div><strong>Local-first learning by design</strong><p>Flashcards, personal case notes, OCR text, answers and progress are planned to stay in this browser&rsquo;s IndexedDB. Student registration and institution/course memberships are the only student-specific records planned for server-side storage. AI uploads are not connected until Gemini&rsquo;s data terms are reviewed; this app does not send your study work to AI today.</p></div></div>
+<footer class="page-footer"><span>FIRE COUNSEL <b>&bull;</b> Legal study workspace</span><span>Study data stays close to you.</span></footer>
+</section>
+<section aria-label="FIRE COUNSEL AI study studio" class="page ai-chat-page" id="ai-chat-page">
+<div class="page-heading ai-page-heading"><div><div class="eyebrow">FIRE COUNSEL AI &middot; YOUR STUDY STUDIO</div><h1>Make law click.</h1><p>A bright, focused space for clearer explanations, case recall and confident practice.</p></div><span class="ai-status-pill ai-studio-pill"><i></i> STUDY STUDIO</span></div>
+<section class="research-search-card" aria-labelledby="research-search-title"><div><span class="eyebrow">NEON · VERIFIED SOURCE SEARCH</span><h2 id="research-search-title">Search trusted legal materials.</h2><p>Search approved course material text, verified cases, statutes and exact archived questions. This search stays on FIRE COUNSEL servers; AI generation is disabled until provider terms and student-data authorization are reviewed.</p></div><form id="research-search-form"><label for="research-query">Topic or legal question</label><div class="research-search-controls"><input id="research-query" type="search" maxlength="500" placeholder="e.g. offer and acceptance in contract formation" required><button class="button primary" id="research-search-button" type="submit">Search Neon</button></div></form><p class="research-search-status" id="research-search-status" role="status" aria-live="polite">Sign in to search published, verified sources.</p><div class="research-search-results" id="research-search-results"></div></section>
+<div class="ai-studio">
+<section class="ai-studio-hero" aria-label="FIRE COUNSEL AI introduction">
+  <div class="ai-studio-copy"><span class="ai-studio-kicker"><span>✦</span> FIRE COUNSEL AI</span><h2>Turn questions<br>into <em>understanding.</em></h2><p>Choose a course, start with a study task, and build stronger legal reasoning step by step.</p><label class="ai-studio-course" for="chat-course-select"><span>YOUR CURRENT COURSE</span><select aria-label="Select course for AI study tools" id="chat-course-select"></select></label><div class="ai-studio-tags"><span>Course-first</span><span>Clear sources</span><span>Your pace</span></div></div>
+  <div class="ai-studio-art" aria-hidden="true"><div class="ai-orbit ai-orbit-one"></div><div class="ai-orbit ai-orbit-two"></div><div class="ai-glow"></div><div class="ai-floating-mark ai-mark-law">§</div><div class="ai-floating-mark ai-mark-star">✦</div><div class="ai-floating-note ai-note-top">ISSUE <b>→</b> RULE</div><div class="ai-floating-note ai-note-bottom">THINK CLEARLY <span>✧</span></div><div class="ai-preview-window"><div class="ai-preview-top"><span class="ai-preview-emblem">FC</span><span><b>Study session</b><small>Legal reasoning</small></span><i></i></div><div class="ai-preview-line ai-preview-line-short"></div><div class="ai-preview-line"></div><div class="ai-preview-answer"><span>§</span><div><b>Build your argument</b><small>Principle · application · conclusion</small></div></div><div class="ai-preview-line ai-preview-line-mid"></div><div class="ai-preview-dots"><i></i><i></i><i></i></div></div></div>
+</section>
+<div class="ai-tools-heading"><div><span class="eyebrow">PICK A STARTING POINT</span><h2>What would you like to work on?</h2></div><span class="ai-tools-count">04 STUDY TOOLS</span></div>
+<div class="ai-task-grid" aria-label="AI study tools">
+  <button class="ai-task-card ai-task-violet" data-preview-action="This study tool is being prepared. Your course materials stay on this device." type="button"><span class="ai-task-icon">✦</span><span class="ai-task-copy"><small>UNDERSTAND</small><strong>Explain a topic</strong><em>Break a legal principle into clear steps.</em></span><span class="ai-task-arrow">↗</span></button>
+  <button class="ai-task-card ai-task-coral" data-preview-action="Exact archived question retrieval is being prepared." type="button"><span class="ai-task-icon">▤</span><span class="ai-task-copy"><small>RECALL</small><strong>Find a past question</strong><em>Look for an exact question in the archive.</em></span><span class="ai-task-arrow">↗</span></button>
+  <button class="ai-task-card ai-task-teal" data-preview-action="Rubric-based feedback is being prepared." type="button"><span class="ai-task-icon">✓</span><span class="ai-task-copy"><small>REFINE</small><strong>Review an answer</strong><em>Check structure against a course rubric.</em></span><span class="ai-task-arrow">↗</span></button>
+  <button class="ai-task-card ai-task-gold" data-preview-action="Practice scenarios are being prepared from approved course materials." type="button"><span class="ai-task-icon">◇</span><span class="ai-task-copy"><small>PRACTISE</small><strong>Try a scenario</strong><em>Apply a rule to a fresh study problem.</em></span><span class="ai-task-arrow">↗</span></button>
+</div>
+<div class="ai-studio-bottom">
+  <article class="card ai-source-card"><div class="ai-card-heading"><span class="ai-card-icon ai-source-icon">§</span><div><h2>Built on trusted materials</h2><p>A clear path from source to answer.</p></div></div><div class="ai-source-steps"><div><span>01</span><strong>Course materials</strong><small>Approved notes, cases and statutes first.</small></div><div><span>02</span><strong>Exact archive</strong><small>Retrieve past questions as published.</small></div><div><span>03</span><strong>Sound reasoning</strong><small>Use the rubric; be clear when evidence is missing.</small></div></div></article>
+  <article class="card ai-account-card"><div class="ai-card-heading"><span class="ai-card-icon ai-account-icon">◷</span><div><h2>My AI allowance</h2><p>Your personal use at a glance.</p></div><span class="ai-preview-badge">ACCOUNT PREVIEW</span></div><div class="ai-account-metrics"><div><small>YOUR PLAN</small><strong>Sign-in pending</strong></div><div><small>AI USE</small><strong>— <i>/ —</i></strong></div></div><div class="ai-account-meter"><span></span></div><p class="ai-account-hint">Your plan, feature limits and any extra allowance will appear here after account access is connected.</p><button class="ai-account-link" data-toast="Account access is being prepared. Your saved study work remains on this device." type="button">Account details <span>→</span></button></article>
+</div>
+</div>
+</section>
+<section aria-label="Courses and subjects" class="page" id="subjects-page">
+<div class="page-heading"><div><div class="eyebrow">YOUR CURRICULUM</div><h1>My courses</h1><p>Choose a course, then study its trusted materials at your own pace.</p></div><div class="heading-actions"><button class="button primary" id="add-subject-button" type="button">＋ Add personal study area</button></div></div>
+<div class="notice"><span>ⓘ</span><div><strong>Your course choice is local in this version</strong><p>This personal subject list is saved in your existing browser database. Official, institution and course-restricted materials will be checked by the server after sign-in is connected.</p></div></div>
+<div class="subject-grid all-subjects" id="all-subjects"></div>
+</section>
+<section aria-label="Personal study library" class="page" id="library-page">
+<div class="page-heading"><div><div class="eyebrow">YOUR PERSONAL MATERIALS</div><h1>Study library</h1><p>A local-first shelf for documents you choose to keep on this device.</p></div><div class="heading-actions"><label class="button primary upload-button">＋ Add a local file<input accept=".pdf,.txt,.md" hidden="" id="file-input" multiple="" type="file"/></label></div></div>
+<div class="notice"><span>⌂</span><div><strong>Files are saved only in this browser</strong><p>These personal files are not uploaded to Neon or an AI service. Admin-managed course materials will use a separate, authenticated upload flow after storage and privacy checks.</p></div></div>
+<div class="card library-panel"><div class="library-toolbar"><strong>My local documents</strong><span id="library-count">0 files</span></div><div class="document-list" id="document-list"><div class="empty-state"><span>▤</span><strong>Your library is ready</strong><p>Add a PDF, text file or Markdown note to keep a local copy for your own study.</p></div></div></div>
+<div class="card library-panel server-materials-panel" id="server-materials-panel"><div class="library-toolbar"><strong>Approved course materials</strong><button class="button soft small" id="refresh-server-materials" type="button">Refresh</button></div><p id="server-materials-status" class="server-materials-status" role="status" aria-live="polite">Sign in to load materials approved for your courses.</p><div class="server-material-list" id="server-material-list"></div></div>
+</section>
+<section aria-label="Case flashcards" class="page" id="memory-page">
+<div class="page-heading"><div><div class="eyebrow">ACTIVE RECALL &middot; ON THIS DEVICE</div><h1>Case flashcards</h1><p>Create personal recall cards from your case notes. Your cards remain in this browser&rsquo;s IndexedDB.</p></div></div>
+<div class="memory-layout"><div class="card create-card-panel"><div class="panel-head"><div><h3>Build a recall card</h3><p>For now, add and review your cards manually.</p></div></div><form class="stack-form" id="memory-form"><label>Question or prompt<input id="card-front" maxlength="240" placeholder="e.g. What principle did the court establish?" required=""/></label><label>Answer or explanation<textarea id="card-back" maxlength="2000" placeholder="Write the rule, reasoning and key authority&hellip;" required="" rows="5"></textarea></label><label>Course or subject<select id="card-subject"></select></label><button class="button primary" type="submit">Save recall card <span class="arrow">&rarr;</span></button></form><div class="inline-note">AI case-to-card generation is a planned feature and is not connected yet.</div></div><div class="card recall-panel"><div class="panel-head"><div><h3>Recall practice</h3><p>Test yourself, then reveal your answer.</p></div><span class="count-pill" id="memory-count">0 cards</span></div><div class="recall-area" id="recall-area"><div class="empty-state"><span>✧</span><strong>Your memory bank is empty</strong><p>Create a card to begin practising active recall.</p></div></div></div></div>
+</section>
+<section aria-label="Past question practice" class="page" id="exams-page">
+<div class="page-heading"><div><div class="eyebrow">DELIBERATE PRACTICE</div><h1>Past questions</h1><p>Practise issue spotting and timed writing. Your own submissions stay local.</p></div></div>
+<div class="exam-grid"><article class="card exam-start"><div class="exam-symbol">◷</div><div class="eyebrow">FOCUS SESSION</div><h2>Make room for deep work.</h2><p>Choose a duration and work through a question from your own materials. Your session count is saved on this device.</p><label>Session length<select id="timer-duration"><option value="15">15 minutes</option><option selected="" value="25">25 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option></select></label><button class="button primary" id="timer-start" type="button">Start focus session <span class="arrow">&rarr;</span></button></article><article class="card timer-panel"><div class="eyebrow">FOCUS CLOCK</div><div class="timer-display" id="timer-display">25:00</div><p id="timer-status">Ready when you are.</p><div class="timer-actions"><button class="button soft" disabled="" id="timer-pause" type="button">Pause</button><button class="button soft" id="timer-reset" type="button">Reset</button></div></article></div>
+<div class="section-row"><div><h2 class="section-title">Question image &rarr; text &rarr; feedback</h2><p class="section-subtitle">Planned flow; no image is sent or saved by this version.</p></div></div>
+<div class="practice-grid"><article class="card practice-card"><span class="practice-icon">▧</span><div><h3>Upload a past-question image</h3><p>Planned: OCR reads the question transiently. The image is not stored in Neon; extracted text and feedback are saved locally only after you choose.</p><button class="button soft small" data-preview-action="OCR and AI marking are not connected. No image was selected or sent." type="button">Preview OCR flow</button></div></article><article class="card practice-card"><span class="practice-icon">✦</span><div><h3>Get source-grounded feedback</h3><p>Planned: marking uses the administrator-approved rubric and course materials, with citations and a clear note when evidence is insufficient.</p><button class="button soft small" data-preview-action="AI marking will wait for Gemini privacy review and the approved source registry." type="button">How marking will work</button></div></article></div>
+<div class="privacy-strip"><span class="privacy-icon">&checkmark;</span><div><strong>No student answer or image is stored in the app database</strong><p>Before cloud OCR is enabled, the chosen model&rsquo;s data handling will be reviewed. Personal study records stay in browser storage.</p></div></div>
+</section>
+</div>
+
+</main>
+</div>
+<div aria-live="polite" class="toast" id="toast" role="status"></div>
+<div class="modal-backdrop" hidden="" id="modal-backdrop"><div aria-labelledby="modal-title" aria-modal="true" class="modal" role="dialog"><button aria-label="Close" class="modal-close" id="modal-close" type="button">&times;</button><span class="eyebrow">FIRE COUNSEL</span><h2 id="modal-title">A little more detail</h2><div id="modal-body"></div><div class="modal-actions"><button class="button soft" id="modal-cancel" type="button">Cancel</button><button class="button primary" id="modal-confirm" type="button">Continue</button></div></div></div>
+ <footer class="site-footer" id="site-footer">
+    <div class="footer-main" id="footer-main">
+      <div class="footer-brand"><a class="site-brand footer-mark" href="#home"><span class="brand-image-wrap"><img src="./assets/images/fire-counsel-brand.jpg" alt="" width="52" height="52" loading="lazy"></span><span class="brand-copy"><strong>FIRE COUNSEL</strong><small>Ignite your legal intelligence</small></span></a><p>A focused legal-learning space for clearer study, stronger recall and confident practice.</p></div>
+      <div class="footer-column"><h3>Explore</h3><a href="#learning">Learning tools</a><a href="#cases">Case notes</a><a href="#articles">Articles</a></div>
+      <div class="footer-column"><h3>Study space</h3><a href="./study.html#dashboard">Student workspace</a><a href="./study.html#library">Personal library</a><a href="./study.html#exams">Exam practice</a></div>
+      <div class="footer-column"><h3>Information</h3><a href="#resources">Trusted legal links</a><a href="#privacy-note">Privacy-first preview</a></div>
+    </div>
+    <div class="footer-disclaimer" id="footer-disclaimer">FIRE COUNSEL is a study aid, not a law firm or a substitute for legal advice. Verify legal materials against authoritative sources.</div>
+    <div class="footer-bottom"><span id="copyright-text">© 2026 FIRE COUNSEL. <br>  powered by <br> Victorious Tech Institute <br> All rights reserved.</span><a href="#home">Back to top ↑</a></div>
+  </footer>
+
+
+<script defer="" src="./app.js"></script>
+<script type="module" src="./study-materials.mjs"></script>
+<script type="module" src="./research-search.mjs"></script>
+
+</body>
+</html>

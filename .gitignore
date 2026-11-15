@@ -1,0 +1,11 @@
+# Do not track dependency trees, local emulator state, or Python bytecode.
+node_modules/
+__pycache__/
+*.py[cod]
+.firebase/
+firebase-debug.log
+ui-debug.log
+
+# Local Firebase Web configuration (contains the project API key by request).
+# Web API keys identify an app; keep this file local per project policy.
+/firebase/firebase-config.local.mjs

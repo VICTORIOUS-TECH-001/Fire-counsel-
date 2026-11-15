@@ -1,8 +1,26 @@
 import pg from "pg";
 
 const { Pool } = pg;
-
 let pool;
+
+function secureConnectionString(raw) {
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error("DATABASE_URL must be a valid PostgreSQL URL.");
+  }
+
+  if (!["postgres:", "postgresql:"].includes(url.protocol)) {
+    throw new Error("DATABASE_URL must use the PostgreSQL protocol.");
+  }
+  if (!url.hostname) throw new Error("DATABASE_URL must include a database host.");
+
+  // Require TLS certificate and hostname validation even if a copied Neon URL
+  // was generated with the weaker `sslmode=require` setting.
+  url.searchParams.set("sslmode", "verify-full");
+  return url.toString();
+}
 
 export function getPool() {
   if (!process.env.DATABASE_URL) {
@@ -11,8 +29,8 @@ export function getPool() {
 
   if (!pool) {
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false },
+      connectionString: secureConnectionString(process.env.DATABASE_URL),
+      ssl: { rejectUnauthorized: true },
       max: 5,
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 10_000,

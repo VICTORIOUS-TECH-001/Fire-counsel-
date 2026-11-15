@@ -1,46 +1,42 @@
-import { getApps, initializeApp, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
+import { getFirebaseAuth } from "../config/firebaseAdmin.js";
 
-let firebaseAuth;
+export function createFirebaseTokenVerifier(authProvider = getFirebaseAuth) {
+  return async function verifyFirebaseToken(req, res, next) {
+    const authorization = req.headers.authorization || "";
+    const match = authorization.match(/^Bearer\s+([^\s]+)$/i);
 
-function getFirebaseAuth() {
-  if (firebaseAuth) return firebaseAuth;
+    if (!match) {
+      return res.status(401).json({
+        error: "Authentication required. Supply a Firebase ID token as a Bearer token."
+      });
+    }
 
-  const rawServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (!rawServiceAccount) {
-    throw new Error("Firebase Admin credentials are not configured.");
-  }
+    let auth;
+    try {
+      auth = authProvider();
+    } catch (error) {
+      console.error("Firebase authentication is not configured:", error.message);
+      return res.status(503).json({ error: "Authentication service is unavailable." });
+    }
 
-  const serviceAccount = JSON.parse(rawServiceAccount);
-
-  const app = getApps().length
-    ? getApps()[0]
-    : initializeApp({ credential: cert(serviceAccount) });
-
-  firebaseAuth = getAuth(app);
-  return firebaseAuth;
+    try {
+      // Revocation checking keeps disabled/revoked accounts from continuing to
+      // use protected routes with an otherwise unexpired ID token.
+      const decodedToken = await auth.verifyIdToken(match[1], true);
+      req.user = {
+        uid: decodedToken.uid,
+        email: decodedToken.email ?? null,
+        name: decodedToken.name ?? null,
+        emailVerified: decodedToken.email_verified === true,
+        // Custom claims are trusted only after Firebase Admin verifies the token.
+        admin: decodedToken.admin === true
+      };
+      return next();
+    } catch (error) {
+      console.error("Firebase token verification failed:", error.message);
+      return res.status(401).json({ error: "Invalid, expired, revoked, or disabled authentication token." });
+    }
+  };
 }
 
-export async function verifyFirebaseToken(req, res, next) {
-  const authorization = req.headers.authorization || "";
-  const [scheme, token] = authorization.split(" ");
-
-  if (scheme !== "Bearer" || !token) {
-    return res.status(401).json({
-      error: "Authentication required. Supply a Firebase ID token as a Bearer token."
-    });
-  }
-
-  try {
-    const decodedToken = await getFirebaseAuth().verifyIdToken(token);
-    req.user = {
-      uid: decodedToken.uid,
-      email: decodedToken.email ?? null,
-      emailVerified: decodedToken.email_verified ?? false
-    };
-    return next();
-  } catch (error) {
-    console.error("Firebase token verification failed:", error.message);
-    return res.status(401).json({ error: "Invalid or expired authentication token." });
-  }
-}
+export const verifyFirebaseToken = createFirebaseTokenVerifier();
