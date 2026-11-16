@@ -1,14 +1,18 @@
 # Firebase browser configuration and Auth
 
-`firebase-config.local.mjs` holds the Firebase Web configuration supplied for
-`fire-counsel`. Its path is in the repository `.gitignore`; the local config is
-not committed. On another machine, copy `firebase-config.example.mjs` to
-`firebase-config.local.mjs` and provide the Web API key locally.
+`firebase/firebase-config.mjs` is the Web configuration the browser actually loads.
+It already names the `fire-counsel` project, Auth domain, bucket, app ID and
+measurement ID. The Web API key is still a placeholder until you paste `apiKey`
+from **Firebase Console → Project settings → General → Your apps → Config**.
+Commit that public key with the site. It identifies the app; it is not an admin
+credential and it does not replace Security Rules or the Admin SDK.
 
-`client.mjs` initializes the Firebase Web SDK. `auth-client.mjs` implements
-email/password registration/sign-in, Google popup sign-in with redirect fallback,
-sign-out, verification/reset emails, reauthenticated password changes and verified
-email changes. It supplies Firebase ID-token headers and a persisted installation
+`client.mjs` initializes the Firebase Web SDK only after that key is present.
+`auth-client.mjs` implements email/password registration/sign-in, Google popup
+sign-in (redirect when the popup is blocked or the page is inside a frame),
+sign-out, a Google Authenticator (TOTP) second step when Firebase asks for one,
+verification/reset emails, reauthenticated password changes and verified email
+changes. It supplies Firebase ID-token headers and a persisted installation
 marker for protected student same-origin `/api/...` calls. `auth.html` is
 the shared sign-in page; the admin page requests `/api/v1/admin/me` and treats
 the backend response—not a browser claim—as authoritative. It does not grant
@@ -22,45 +26,60 @@ changed remotely.
 
 ## Enable Google sign-in
 
-The Google button and provider code already exist. They have not been verified
-against the live project. The owner must configure the existing project; do not
-create a second project, change billing, deploy rules or upload student data just
-to enable this provider.
+The Google button and `signInWithGoogle()` already exist in this repository.
+They call Firebase Auth's Google provider. Enabling Google in the console is
+required, but it is not sufficient: the published page must load a real Web
+API key, and the hostname you open must be an authorized domain. Do not create
+a second Firebase project, change billing, deploy rules or upload student data
+just to turn the provider on.
 
 1. Open **Firebase Console → fire-counsel → Authentication → Sign-in method**.
    If Authentication has not been initialized, use **Get started** first.
-2. Choose **Add new provider → Google** (or open the existing Google row), turn
-   on **Enable**, set the public-facing app name if requested and select the
-   project support email, then **Save**. The standard Firebase Google-provider
-   setup normally configures its OAuth client; no Gemini key or OAuth client
-   secret belongs in this frontend.
+2. Open **Google**, turn on **Enable**, set the public app name if asked, choose
+   the project support email, then **Save**. Firebase creates the OAuth client.
+   No Gemini key or OAuth client secret belongs in this frontend.
 3. Under **Authentication → Settings → Authorized domains**, add only the exact
-   hostname used to open the website. For Arena, copy the hostname from the
-   **Website** preview's address (not a localhost URL). Enter the hostname only,
-   without `https://`, a port or a page path. For development on your own machine,
-   add `localhost` explicitly if needed. Add the final deployed hostname only
-   when ready; do not add broad parent domains or wildcards.
-4. Open **Project settings → General → Your apps**, select the existing Web app,
-   and find **SDK setup and configuration → Config**. From the repository root:
+   hostname used to open the website. `localhost` and `fire-counsel.firebaseapp.com`
+   are the usual defaults. For any other preview or deployed host, copy that
+   hostname only — no `https://`, port or path. Do not add wildcards.
+4. In **Google Cloud Console → APIs & Services → OAuth consent screen**, if the
+   app is in **Testing**, add every Google account that should sign in as a test
+   user (or publish the app). Otherwise Google refuses the account even though
+   Firebase shows Google as enabled. Also confirm the browser API key allows
+   this site and the Identity Toolkit API (**APIs & Services → Credentials**).
+5. Open **Project settings → General → Your apps → Config**. In
+   `firebase/firebase-config.mjs`, replace `REPLACE_WITH_FIREBASE_WEB_API_KEY`
+   with that `apiKey`. Keep `authDomain` as `fire-counsel.firebaseapp.com` unless
+   Firebase Hosting gives you a different one. Publish this file with the site.
+   The old ignored `firebase-config.local.mjs` is not loaded anymore; a key that
+   exists only on one computer never reaches the sign-in page.
+6. Open `/auth.html` and choose **Continue with Google**. Allow popups. If the
+   page is inside a frame, or the popup is blocked, the same button uses redirect
+   sign-in instead. A normal first success creates the user under
+   **Authentication → Users**.
 
-   ```bash
-   cp firebase/firebase-config.example.mjs firebase/firebase-config.local.mjs
-   ```
+### Google Authenticator (TOTP), only if you turned on multi-factor
 
-   Edit that ignored local file privately: provide the Web API key and check
-   every field against the same project's Web configuration. Keep the named
-   `firebaseConfig` export and use the `authDomain` supplied by Firebase, not an
-   improvised preview URL. Never paste a service-account key, OAuth client secret
-   or Gemini key into this file or chat. Copying the example alone does not
-   configure authentication; its API key is a placeholder.
-5. Open the running website's `/auth.html` in a regular browser and choose
-   **Continue with Google**, using a dedicated test account. Allow popups for
-   the test origin. The code has redirect fallback, but mobile, custom-domain
-   and third-party-storage behavior still need separate live verification.
-6. Check **Authentication → Users** for the test user, sign out, then sign in
-   again. A normal first successful Google sign-in creates a Firebase Auth user;
-   subsequent sign-ins reuse it. The UI must not describe this as course
-   enrollment or administrator approval.
+Google sign-in and the Google Authenticator app are different. The Google
+provider does not ask for an authenticator code. A code is required only when
+this project uses TOTP multi-factor authentication and that user enrolled it.
+
+Firebase requires all of the following before an authenticator code can work:
+
+- Authentication with **Identity Platform**, which needs billing (Blaze).
+- TOTP enabled for the project (Admin SDK `multiFactorConfig` / Identity Platform
+  MFA settings). Turning on the Google provider does not do this.
+- A verified email on the user. Unverified addresses cannot enroll.
+- The user enrolled from a signed-in session: reauthenticate, generate a TOTP
+  secret, scan the QR in Google Authenticator, then confirm a 6-digit code.
+  This repository does not enroll a factor. It only finishes sign-in when
+  Firebase returns `auth/multi-factor-auth-required`.
+- The code is 6 digits, changing about every 30 seconds, for the FIRE COUNSEL
+  entry in the authenticator app.
+
+If MFA is required for every user, an account that has not enrolled cannot
+finish sign-in here. Enroll in a trusted flow first. Phone, anonymous and custom
+tokens are not TOTP factors.
 
 ### Identity is not course access
 
@@ -92,7 +111,7 @@ review its password policy. No provider setting is changed by this repository.
 The Auth page has a **New here? Create a student account** form asking for name,
 email and password/confirmation only. Account creation and initial displayName
 are Firebase SDK operations; the Neon profile is created later after consent.
-Missing ignored Web configuration produces a setup notice while local study
+A placeholder Web API key produces a setup notice on the sign-in page while local study
 continues to work.
 
 After creating a profile, students can explicitly request email verification.

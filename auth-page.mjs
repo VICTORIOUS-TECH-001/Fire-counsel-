@@ -4,6 +4,7 @@ const $ = selector => document.querySelector(selector);
 const message = $("#auth-message");
 const emailForm = $("#email-signin-form");
 const googleButton = $("#google-signin-button");
+const mfaForm = $("#mfa-form");
 const divider = $("#auth-divider");
 const signedInPanel = $("#signed-in-panel");
 const continueButton = $("#continue-button");
@@ -39,14 +40,53 @@ function setMessage(text, kind = "") {
 }
 
 function authErrorText(error) {
-  if (error?.code === "auth/operation-not-allowed") return "That sign-in provider is not enabled in Firebase Authentication yet.";
-  if (error?.code === "auth/unauthorized-domain") return "Add this website's domain to Firebase Authentication → Settings → Authorized domains.";
-  if (["auth/popup-blocked", "auth/operation-not-supported-in-this-environment"].includes(error?.code)) return "The sign-in popup was blocked. Allow popups or retry; the page will use redirect sign-in where supported.";
+  if (error?.code === "auth/operation-not-allowed") return "That sign-in provider is not enabled in Firebase Authentication yet. For Google, turn it on under Authentication → Sign-in method and choose a support email.";
+  if (error?.code === "auth/unauthorized-domain") return "Add this website's exact hostname (no https://, port, or path) under Firebase Authentication → Settings → Authorized domains.";
+  if (error?.code === "auth/app-not-authorized" || /referer.*not.*allow/i.test(error?.message || "")) return "This site is blocked by the Firebase Web API key restrictions. In Google Cloud → APIs & Services → Credentials, allow this URL on the browser key and allow the Identity Toolkit API.";
+  if (error?.code === "auth/invalid-api-key" || /api-key-not-valid/i.test(`${error?.code || ""} ${error?.message || ""}`)) return "Firebase rejected the Web API key. Paste the apiKey from Project settings → Your apps → Config into firebase/firebase-config.mjs.";
+  if (error?.code === "auth/account-exists-with-different-credential") return "That email already has a FIRE COUNSEL account with a different sign-in method. Sign in the original way, or use the same Google account that created it. Automatic linking is not enabled.";
+  if (error?.code === "auth/multi-factor-auth-required") return "This account needs the 6-digit code from Google Authenticator.";
+  if (["auth/invalid-verification-code", "auth/code-expired"].includes(error?.code)) return "That authenticator code was not accepted. Wait for the next code and try again.";
+  if (["auth/popup-blocked", "auth/operation-not-supported-in-this-environment"].includes(error?.code)) return "The sign-in popup was blocked. Allow popups for this site, or retry. A framed preview uses Google redirect instead.";
+  if (["auth/popup-closed-by-user", "auth/cancelled-popup-request"].includes(error?.code)) return "Google sign-in was closed before it finished. If Google said the app is in testing, add this Google account as a test user on the OAuth consent screen.";
   if (["auth/invalid-credential", "auth/wrong-password", "auth/user-not-found"].includes(error?.code)) return "Email or password was not accepted.";
   if (error?.code === "auth/email-already-in-use") return "An account could not be created with those details. Try signing in or requesting a password reset instead.";
   if (error?.code === "auth/weak-password" || error?.code === "auth/password-does-not-meet-requirements") return "Choose a stronger password that meets this Firebase project's password policy.";
   if (error?.code === "auth/too-many-requests") return "Too many attempts. Wait a little before trying again.";
+  if (error?.code === "auth/network-request-failed") return "Firebase could not be reached. Check the connection and try again.";
   return error?.message || "Sign-in could not be completed. Try again.";
+}
+
+function showMfa(info) {
+  emailForm.hidden = true;
+  divider.hidden = true;
+  googleButton.hidden = true;
+  signedInPanel.hidden = true;
+  mfaForm.hidden = false;
+  $("#mfa-hint").textContent = `Enter the current 6-digit code from ${info.displayName}. Firebase Authentication with Identity Platform must have TOTP enabled, this email must be verified, and the account must already be enrolled. Codes change about every 30 seconds.`;
+  setMessage(`Google accepted the first step. Finish with ${info.displayName}.`, "");
+  $("#mfa-code").focus();
+}
+
+function hideMfa() {
+  mfaForm.hidden = true;
+  $("#mfa-code").value = "";
+}
+
+function handleAuthError(error) {
+  if (error?.code === "auth/multi-factor-auth-required") {
+    try {
+      const info = authClient.beginMfaChallenge(error);
+      if (info) {
+        showMfa(info);
+        return;
+      }
+    } catch (challengeError) {
+      setMessage(authErrorText(challengeError), "error");
+      return;
+    }
+  }
+  setMessage(authErrorText(error), "error");
 }
 
 async function verifyServerAccess(user) {
@@ -100,6 +140,7 @@ function showSignedIn(user) {
   emailForm.hidden = true;
   divider.hidden = true;
   googleButton.hidden = true;
+  hideMfa();
   signedInPanel.hidden = false;
   $("#signed-in-email").textContent = user.email || "Signed-in Firebase account";
   continueButton.hidden = true;
@@ -130,7 +171,20 @@ function setAccountMode(create) {
 
 try {
   authClient = await import("./firebase/auth-client.mjs");
-  await authClient.getRedirectResult(authClient.firebaseAuth);
+} catch (error) {
+  emailForm.hidden = true;
+  divider.hidden = true;
+  googleButton.hidden = true;
+  mfaForm.hidden = true;
+  setMessage(error?.message || "Firebase client configuration could not load. Put the Web API key in firebase/firebase-config.mjs, then reload.", "error");
+  console.warn("Firebase Auth setup unavailable:", error?.message || error);
+}
+if (authClient) {
+  try {
+    await authClient.getRedirectResult(authClient.firebaseAuth);
+  } catch (error) {
+    handleAuthError(error);
+  }
   authClient.onAuthStateChanged(authClient.firebaseAuth, user => {
     sessionScope.invalidate();
     googleButton.disabled = false;
@@ -139,7 +193,7 @@ try {
     $("#auth-password").value = "";
     $("#auth-password-confirm").value = "";
     if (user) showSignedIn(user);
-    else {
+    else if (mfaForm.hidden) {
       emailForm.hidden = false;
       divider.hidden = false;
       googleButton.hidden = false;
@@ -148,13 +202,7 @@ try {
       $("#auth-name").value = "";
       setMessage("Sign in with Google or email, or create a student account.");
     }
-  }, error => setMessage(authErrorText(error), "error"));
-} catch (error) {
-  emailForm.hidden = true;
-  divider.hidden = true;
-  googleButton.hidden = true;
-  setMessage("Firebase client configuration is missing or could not load. Create firebase/firebase-config.local.mjs from the example, then reload.", "error");
-  console.warn("Firebase Auth setup unavailable:", error.message);
+  }, error => handleAuthError(error));
 }
 
 modeToggle.addEventListener("click", () => setAccountMode(!creatingAccount));
@@ -174,7 +222,7 @@ emailForm.addEventListener("submit", async event => {
   try {
     if (creatingAccount) await authClient.registerWithEmail(email, password, $("#auth-name").value);
     else await authClient.signInWithEmail(email, password);
-  } catch (error) { setMessage(authErrorText(error), "error"); }
+  } catch (error) { handleAuthError(error); }
   finally {
     $("#auth-password").value = "";
     $("#auth-password-confirm").value = "";
@@ -210,7 +258,23 @@ googleButton.addEventListener("click", async () => {
   googleButton.disabled = true;
   setMessage("Opening Google sign-in…");
   try { await authClient.signInWithGoogle(); }
-  catch (error) { setMessage(authErrorText(error), "error"); googleButton.disabled = false; }
+  catch (error) { handleAuthError(error); }
+  finally { googleButton.disabled = false; }
+});
+
+mfaForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  if (!authClient) return;
+  const button = $("#mfa-submit");
+  button.disabled = true;
+  setMessage("Checking the authenticator code…");
+  try {
+    await authClient.completeMfaChallenge($("#mfa-code").value);
+    hideMfa();
+  } catch (error) {
+    handleAuthError(error);
+    button.disabled = false;
+  }
 });
 
 continueButton.addEventListener("click", () => { if (!continueButton.disabled) location.assign(continueUrl.href); });

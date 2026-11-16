@@ -58,7 +58,7 @@ try {
 } catch (error) {
   signInLink.hidden = false;
   signOutButton.hidden = true;
-  setStatus("offline", "Firebase client configuration is missing", "Copy firebase/firebase-config.example.mjs to the ignored local config file and add the Web API key.");
+  setStatus("offline", "Firebase client configuration is missing", error?.message || "Put the Firebase Web API key in firebase/firebase-config.mjs and reload.");
   console.warn("Admin sign-in unavailable:", error.message);
 }
 

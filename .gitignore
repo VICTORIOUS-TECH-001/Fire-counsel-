@@ -6,8 +6,8 @@ __pycache__/
 firebase-debug.log
 ui-debug.log
 
-# Local Firebase Web configuration (contains the project API key by request).
-# Web API keys identify an app; keep this file local per project policy.
+# Obsolete local override. The browser loads firebase/firebase-config.mjs.
+# Web API keys identify an app; the real apiKey belongs in that committed file.
 /firebase/firebase-config.local.mjs
 
 # Test outputs and developer-only secrets/configuration.

@@ -21,7 +21,7 @@ PUBLIC_FILES = {
     "student-profile.mjs", "installation.mjs",
     "data/site-content.json",
     "firebase/client.mjs", "firebase/auth-client.mjs",
-    "firebase/firebase-config.local.mjs", "firebase/firebase-config.example.mjs",
+    "firebase/firebase-config.mjs", "firebase/firebase-config.example.mjs",
 }
 
 

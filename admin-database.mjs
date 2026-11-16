@@ -586,6 +586,6 @@ try {
   setSystemState("#database-firebase-state", "offline", "Firebase configuration is missing");
   await getDatabaseHealth(() => true);
   setControlsEnabled(false);
-  setStatus("Firebase client configuration could not load. Add the ignored firebase/firebase-config.local.mjs and reload.", "error");
+  setStatus("Firebase client configuration could not load. Put the Web API key in firebase/firebase-config.mjs and reload.", "error");
   console.warn("Neon database panel unavailable:", error.message);
 }

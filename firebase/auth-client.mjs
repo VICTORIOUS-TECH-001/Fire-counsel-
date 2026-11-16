@@ -16,15 +16,41 @@ import {
   signInWithRedirect,
   signOut,
   sendPasswordResetEmail,
+  TotpMultiFactorGenerator,
+  getMultiFactorResolver,
   updatePassword,
   updateProfile,
   verifyBeforeUpdateEmail
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
-import { firebaseApp } from "./client.mjs";
+import { firebaseApp, firebaseSetupError } from "./client.mjs";
 import { browserInstallation, INSTALLATION_HEADER, needsStudentInstallation } from "../installation.mjs";
+
+if (!firebaseApp) {
+  throw new Error(firebaseSetupError() || "Firebase Web configuration is incomplete.");
+}
 
 export const firebaseAuth = getAuth(firebaseApp);
 export { getRedirectResult, onAuthStateChanged, signOut };
+
+let pendingMfaResolver = null;
+
+export function beginMfaChallenge(error) {
+  if (error?.code !== "auth/multi-factor-auth-required") return null;
+  const resolver = getMultiFactorResolver(firebaseAuth, error);
+  const hint = resolver.hints.find((item) => item.factorId === TotpMultiFactorGenerator.FACTOR_ID);
+  if (!hint) throw new Error("This account's second factor is not a Google Authenticator (TOTP) code, so this page cannot finish sign-in.");
+  pendingMfaResolver = resolver;
+  return { displayName: hint.displayName || "Google Authenticator" };
+}
+
+export async function completeMfaChallenge(code) {
+  if (!pendingMfaResolver) throw new Error("Start sign-in again, then enter the authenticator code.");
+  const hint = pendingMfaResolver.hints.find((item) => item.factorId === TotpMultiFactorGenerator.FACTOR_ID);
+  const assertion = TotpMultiFactorGenerator.assertionForSignIn(hint.uid, String(code).replace(/\s/g, ""));
+  const result = await pendingMfaResolver.resolveSignIn(assertion);
+  pendingMfaResolver = null;
+  return result;
+}
 
 function currentAccount() {
   const user = firebaseAuth.currentUser;
@@ -66,6 +92,12 @@ export async function registerWithEmail(email, password, name) {
 export async function signInWithGoogle() {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
+  // Popups fail inside a cross-origin preview frame. Redirect stays on this page.
+  const framed = typeof window !== "undefined" && window.top && window.top !== window;
+  if (framed) {
+    await signInWithRedirect(firebaseAuth, provider);
+    return null;
+  }
   try {
     return await signInWithPopup(firebaseAuth, provider);
   } catch (error) {

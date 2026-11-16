@@ -60,7 +60,7 @@ See [backend/STUDENT_PROFILES.md](backend/STUDENT_PROFILES.md) for the exact flo
 | Public homepage | Implemented and locally/browser tested. Additional jurisdiction and school-approved legal-link domains are still undecided. |
 | Local study tools | Implemented and browser tested. Personal documents, cards, subjects and focus-session counter stay local. Existing storage identifiers are unchanged. |
 | Same-origin API | Runs without external credentials. `/healthz` is liveness only; `/api/health` correctly returns **503 / `not_configured`** without Neon. Anonymous protected requests return 401. |
-| Firebase browser configuration | Ignored `firebase/firebase-config.local.mjs` is absent in this checkout. Pages show setup notices without disabling personal study tools. |
+| Firebase browser configuration | `firebase/firebase-config.mjs` is loaded by the sign-in page. Project IDs are filled in. The Web API key is still the placeholder, so live Google/email sign-in cannot succeed until that public key is pasted from Project settings. |
 | Firebase Admin configuration | `FIREBASE_PROJECT_ID` and `FIREBASE_SERVICE_ACCOUNT_JSON` are not supplied in the local environment. No server-side Firebase connection is verified. |
 | Firebase registration/sign-in and security | Code/SDK-stub/browser tests pass. Real registration, Google/redirect/reauthentication, verification/reset/change-email delivery, password policy and security updates remain **unverified**. |
 | Student-owned profiles | Implemented and locally tested; independent of courses/payments/admin. Migration is proposed only, default enable flag is off, and live identity/profile provisioning remains unverified. Strict lost-installation lockout/recovery consequences still need rollout approval. |

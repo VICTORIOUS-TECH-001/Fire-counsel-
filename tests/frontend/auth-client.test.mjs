@@ -32,6 +32,16 @@ function client({ provider = "password" } = {}) {
     async sendPasswordResetEmail(_auth, email) { calls.push(["reset", email]); },
     async signInWithPopup() { calls.push(["google-popup"]); },
     async signInWithRedirect() { calls.push(["google-redirect"]); },
+    TotpMultiFactorGenerator: {
+      FACTOR_ID: "totp",
+      assertionForSignIn(uid, code) { calls.push(["totp-assertion", uid, code]); return { uid, code }; }
+    },
+    getMultiFactorResolver() {
+      return {
+        hints: [{ factorId: "totp", uid: "factor-1", displayName: "Authenticator" }],
+        async resolveSignIn(assertion) { calls.push(["resolve-mfa", assertion.code]); return { user }; }
+      };
+    },
     async signOut() { auth.currentUser = null; },
     getRedirectResult() {}, onAuthStateChanged() {}
   };
@@ -39,6 +49,8 @@ function client({ provider = "password" } = {}) {
     ...Object.fromEntries(Object.keys(sdk).map(key => [key, (...args) => sdk[key](...args)])),
     // Classes/objects cannot be invoked through the generic async-function stub.
     GoogleAuthProvider: sdk.GoogleAuthProvider, EmailAuthProvider: sdk.EmailAuthProvider, firebaseApp: sdk.firebaseApp,
+    TotpMultiFactorGenerator: sdk.TotpMultiFactorGenerator,
+    getMultiFactorResolver: (...args) => sdk.getMultiFactorResolver(...args),
     URL, Headers, FormData,
     window: { location: { origin: "https://study.example" } },
     browserInstallation: async () => "a".repeat(43), INSTALLATION_HEADER, needsStudentInstallation,
@@ -48,7 +60,7 @@ function client({ provider = "password" } = {}) {
     .replace(/import\s*\{[\s\S]*?\}\s*from\s*"[^"]+";\s*/g, "")
     .replace(/export\s*\{[^}]*\};/g, "")
     .replace(/\bexport /g, "");
-  const exports = ["registerWithEmail", "signInWithEmail", "signInWithGoogle", "hasPasswordProvider", "requestAccountEmailChange", "changeAccountPassword", "requestAccountVerification", "requestPasswordReset", "refreshAccount", "getApiAuthorizationHeader", "apiRequest"];
+  const exports = ["registerWithEmail", "signInWithEmail", "signInWithGoogle", "beginMfaChallenge", "completeMfaChallenge", "hasPasswordProvider", "requestAccountEmailChange", "changeAccountPassword", "requestAccountVerification", "requestPasswordReset", "refreshAccount", "getApiAuthorizationHeader", "apiRequest"];
   vm.runInNewContext(`${executable}\nglobalThis.exports = { ${exports.join(",")} };`, context);
   return { ...context.exports, auth, user, sdk, context, calls, requests };
 }
@@ -164,4 +176,17 @@ test("only blocked/unsupported Google sign-in popups use redirect fallback", asy
   denied.sdk.signInWithPopup = async () => { throw Object.assign(new Error("provider denied"), { code: "auth/operation-not-allowed" }); };
   await assert.rejects(denied.signInWithGoogle(), /provider denied/);
   assert.ok(!denied.calls.some(call => call[0] === "google-redirect"));
+});
+
+test("Google Authenticator completes only a pending TOTP challenge", async () => {
+  const api = client();
+  assert.equal(api.beginMfaChallenge({ code: "auth/wrong-password" }), null);
+  const challenge = api.beginMfaChallenge({ code: "auth/multi-factor-auth-required" });
+  assert.equal(challenge.displayName, "Authenticator");
+  await api.completeMfaChallenge(" 123 456 ");
+  assert.deepEqual(api.calls.filter(call => call[0] === "totp-assertion" || call[0] === "resolve-mfa"), [
+    ["totp-assertion", "factor-1", "123456"],
+    ["resolve-mfa", "123456"]
+  ]);
+  await assert.rejects(api.completeMfaChallenge("123456"), /Start sign-in again/);
 });

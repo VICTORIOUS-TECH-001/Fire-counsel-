@@ -31,6 +31,11 @@
       </form>
       <div class="auth-divider" id="auth-divider" hidden><span>or</span></div>
       <button class="auth-button auth-google" id="google-signin-button" type="button" hidden><span class="google-g" aria-hidden="true">G</span>Continue with Google</button>
+      <form id="mfa-form" class="auth-form" hidden>
+        <label>Google Authenticator code<input id="mfa-code" inputmode="numeric" autocomplete="one-time-code" required minlength="6" maxlength="8" pattern="[0-9 ]{6,8}" placeholder="6-digit code"></label>
+        <p class="auth-hint" id="mfa-hint">Open Google Authenticator, or any TOTP app, and enter the current 6-digit code. Firebase must have TOTP multi-factor authentication enabled, and this account must already be enrolled. Codes change about every 30 seconds.</p>
+        <button class="auth-button auth-primary" id="mfa-submit" type="submit">Verify authenticator code</button>
+      </form>
       <div class="auth-signed-in" id="signed-in-panel" hidden>
         <strong id="signed-in-email"></strong>
         <button class="auth-button auth-primary" id="continue-button" type="button" hidden>Continue</button>
