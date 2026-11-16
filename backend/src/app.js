@@ -10,6 +10,7 @@ import { createStudentMaterialsRouter } from "./routes/studentMaterials.js";
 import { createResearchSearchRouter } from "./routes/researchSearch.js";
 import { createStudentProfileRouter } from "./routes/studentProfile.js";
 import { trustedProxyNetworks } from "./config/trustedProxy.js";
+import { createWebsiteHandler } from "./website.js";
 
 export function createApp({ env = process.env, databaseCheck = checkDatabase } = {}) {
   const app = express();
@@ -17,9 +18,23 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
+  // Render sets RENDER_EXTERNAL_URL to the service's public https URL. When the
+  // same service also hosts the website, its own pages must be allowed to call it.
+  if (env.RENDER_EXTERNAL_URL) {
+    try {
+      const ownOrigin = new URL(env.RENDER_EXTERNAL_URL).origin;
+      if (!allowedOrigins.includes(ownOrigin)) allowedOrigins.push(ownOrigin);
+    } catch {
+      // Ignore a malformed value; explicit CORS_ORIGINS still applies.
+    }
+  }
+  const serveWebsite = env.SERVE_WEBSITE === "true";
 
   app.disable("x-powered-by");
   app.set("trust proxy", trustedProxyNetworks(env.TRUSTED_PROXY_CIDRS || ""));
+  // Optional: serve the allowlisted public website from the same origin so its
+  // same-origin /api/ calls reach this server (e.g. one Render web service).
+  if (serveWebsite) app.use(createWebsiteHandler({ root: env.WEBSITE_ROOT || undefined }));
   app.use(helmet());
   // Authenticated responses and readiness must never enter shared/browser caches.
   app.use("/api", (_req, res, next) => {
