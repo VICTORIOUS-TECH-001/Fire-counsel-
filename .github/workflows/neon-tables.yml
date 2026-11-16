@@ -1,0 +1,32 @@
+name: Neon table check (read-only)
+
+# Connects to Neon with the DATABASE_URL repository secret and lists the public
+# tables. Read-only: the session runs with default_transaction_read_only = on.
+# Add the secret at: Settings -> Secrets and variables -> Actions -> New secret
+#   Name: DATABASE_URL   Value: the full pooled connection string from Neon
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - backend/scripts/list-tables.js
+      - .github/workflows/neon-tables.yml
+
+permissions:
+  contents: read
+
+jobs:
+  list-tables:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm --prefix backend ci
+      - name: List Neon tables
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm --prefix backend run db:tables
