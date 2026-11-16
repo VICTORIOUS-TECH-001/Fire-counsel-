@@ -1,20 +1,35 @@
-# FIRE COUNSEL API — disposable staging only.
-# No database, Firebase Admin, Gemini, or payment secrets are configured here.
-# Review Firebase project settings and pass local emulator tests before adding any.
+# FIRE COUNSEL — website + API on one Render Free web service (staging).
+# The website calls the API on its own address (/api/...), so both are served
+# by the same Express process. Secrets marked `sync: false` are typed into the
+# Render dashboard when the Blueprint is created; they are never stored in Git.
 services:
   - type: web
-    name: fire-counsel-api-staging
+    name: fire-counsel
     runtime: node
     plan: free
-    rootDir: backend
-    buildCommand: npm install
-    startCommand: npm start
+    region: ohio            # same AWS region as the Neon database (us-east-2)
+    # Repo root (not backend/) so the public website files are available.
+    buildCommand: npm --prefix backend ci --omit=dev
+    startCommand: npm --prefix backend start
     healthCheckPath: /healthz
-    autoDeploy: false
+    autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: staging
+      - key: SERVE_WEBSITE
+        value: "true"
       - key: FIREBASE_PROJECT_ID
         value: fire-counsel
+      - key: STUDENT_PROFILES_ENABLED
+        value: "false"
+      # Extra allowed origins (the service's own onrender.com URL is added
+      # automatically from RENDER_EXTERNAL_URL).
       - key: CORS_ORIGINS
         value: http://localhost:8080
+      # Paste the full Neon pooled connection string.
+      - key: DATABASE_URL
+        sync: false
+      # Paste the Firebase Admin service-account JSON (one line). Needed for
+      # sign-in-protected API routes such as the admin panel.
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false

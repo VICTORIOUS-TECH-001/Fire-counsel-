@@ -1,0 +1,60 @@
+import assert from "node:assert/strict";
+import { once } from "node:events";
+import test from "node:test";
+import { createApp } from "../src/app.js";
+import { resolvePublicFile } from "../src/website.js";
+
+async function serve(t, env) {
+  const server = createApp({ env }).listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  return `http://127.0.0.1:${server.address().port}`;
+}
+
+test("website is not served unless SERVE_WEBSITE=true", async t => {
+  const base = await serve(t, {});
+  const response = await fetch(`${base}/`);
+  assert.equal(response.status, 404);
+  assert.match(response.headers.get("content-type"), /json/);
+});
+
+test("website serves allowlisted pages, scripts and assets with popup-safe headers", async t => {
+  const base = await serve(t, { SERVE_WEBSITE: "true" });
+  const home = await fetch(`${base}/`);
+  assert.equal(home.status, 200);
+  assert.match(home.headers.get("content-type"), /text\/html/);
+  assert.match(await home.text(), /FIRE COUNSEL/i);
+  assert.equal(home.headers.get("cross-origin-opener-policy"), "same-origin-allow-popups");
+  assert.equal(home.headers.get("cache-control"), "no-cache");
+
+  for (const [path, type] of [["/study.html", /html/], ["/auth-page.mjs", /javascript/], ["/firebase/client.mjs", /javascript/], ["/data/site-content.json", /json/], ["/assets/fire-counsel-192.png", /png/], ["/sw.js", /javascript/]]) {
+    const response = await fetch(`${base}${path}`);
+    assert.equal(response.status, 200, path);
+    assert.match(response.headers.get("content-type"), type, path);
+  }
+});
+
+test("website never exposes backend, secrets, git metadata, packages or traversal paths", async t => {
+  const base = await serve(t, { SERVE_WEBSITE: "true" });
+  for (const path of ["/backend/src/app.js", "/backend/.env", "/.env", "/.git/config", "/package.json", "/backend/package.json", "/render.yaml", "/firebase/firestore.rules", "/tools/dev_server.py", "/assets/images/README.md", "/%2e%2e/etc/passwd", "/assets/../backend/.env.example", "/tests/browser/app.spec.mjs"]) {
+    const response = await fetch(`${base}${path}`);
+    assert.equal(response.status, 404, path);
+  }
+  assert.equal(resolvePublicFile("/..%2fbackend/.env"), null);
+  assert.equal(resolvePublicFile("/%E0%A4%A"), null);
+});
+
+test("website mode keeps API routes, strict API headers and CORS for the service's own origin", async t => {
+  const origin = "https://fire-counsel.example.onrender.com";
+  const base = await serve(t, { SERVE_WEBSITE: "true", RENDER_EXTERNAL_URL: `${origin}/` });
+  const health = await fetch(`${base}/api/health`, { headers: { Origin: origin } });
+  assert.equal(health.status, 503);
+  assert.equal((await health.json()).database, "not_configured");
+  assert.equal(health.headers.get("access-control-allow-origin"), origin);
+  assert.equal(health.headers.get("cache-control"), "no-store");
+  assert.equal(health.headers.get("cross-origin-opener-policy"), "same-origin");
+
+  const foreign = await fetch(`${base}/api/health`, { headers: { Origin: "https://evil.example" } });
+  assert.equal(foreign.status, 403);
+  assert.equal((await fetch(`${base}/healthz`)).status, 200);
+});
