@@ -10,8 +10,9 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "check": "node --check src/server.js && node --check src/app.js && node --check src/config/database.js && node --check src/config/databaseCatalog.js && node --check src/config/firebaseAdmin.js && node --check src/middleware/verifyFirebaseToken.js && node --check src/middleware/requireAdmin.js && node --check src/routes/adminDatabase.js && node --check src/routes/studentMaterials.js && node --check src/routes/researchSearch.js && node --check src/services/materialAccess.js && node --check src/services/studentAccounts.js && node --check src/routes/studentProfile.js && node --check src/middleware/requireStudentInstallation.js && node --check src/config/trustedProxy.js",
-    "test": "node --test"
+    "check": "node --check src/server.js && node --check src/app.js && node --check src/config/database.js && node --check src/config/databaseCatalog.js && node --check src/config/firebaseAdmin.js && node --check src/middleware/verifyFirebaseToken.js && node --check src/middleware/requireAdmin.js && node --check src/routes/adminDatabase.js && node --check src/routes/studentMaterials.js && node --check src/routes/researchSearch.js && node --check src/services/materialAccess.js && node --check src/services/studentAccounts.js && node --check src/routes/studentProfile.js && node --check src/middleware/requireStudentInstallation.js && node --check src/config/trustedProxy.js && node --check scripts/list-tables.js",
+    "test": "node --test",
+    "db:tables": "node scripts/list-tables.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
