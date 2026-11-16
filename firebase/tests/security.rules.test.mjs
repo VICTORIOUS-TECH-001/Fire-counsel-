@@ -103,7 +103,9 @@ test("Storage allows public slide reads and admin-only valid image uploads", asy
   await assertSucceeds(uploadBytes(ref(adminStorage, path), pngBytes, { contentType: "image/png" }));
 
   const downloaded = await assertSucceeds(getBytes(ref(anonymousStorage, path)));
-  assert.deepEqual([...downloaded], [...pngBytes]);
+  // The Storage SDK returns an ArrayBuffer, which is not itself iterable.
+  assert.equal(downloaded.byteLength, pngBytes.byteLength);
+  assert.deepEqual([...new Uint8Array(downloaded)], [...pngBytes]);
 });
 
 test("Storage rejects non-image types, oversized images, and non-slide paths", async () => {

@@ -37,7 +37,7 @@ test("CI annotations are bounded while the full local log is retained", () => {
   const result = run("console.log('prefix-' + 'x'.repeat(30000)); console.error('last error'); process.exit(1)");
   const annotation = result.stdout.split('\n').find(line => line.startsWith('::error'));
   assert.equal(result.status, 1);
-  assert.ok(annotation.length < 14500);
+  assert.ok(annotation.length < 3600);
   assert.match(annotation, /last error/);
   assert.ok(result.log.length > 30000);
 });
