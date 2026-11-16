@@ -1,4 +1,4 @@
-import { test, expect, stubAuth, student, admin, json, rowId, catalog } from "./fixtures.mjs";
+import { test, expect, expectNoHorizontalOverflow, stubAuth, student, admin, json, rowId, catalog } from "./fixtures.mjs";
 
 async function readyStudy(page, hash = "dashboard") {
   await page.goto(`/study.html#${hash}`);
@@ -114,6 +114,78 @@ test("missing Firebase config degrades safely while the real proxy and authoriza
   expect(state.privateStatus).toBe(404);
 });
 
+test("AI studio sends a question, polls the background job and renders safe answers, links, course choice and downloads", async ({ page }) => {
+  await stubAuth(page, { user: student });
+  const posts = [];
+  let polls = 0;
+  const courseId = "323e4567-e89b-42d3-a456-426614174000";
+  const conversation = { id: "423e4567-e89b-42d3-a456-426614174000", mode: "chat", title: "Synthetic question" };
+  const allowance = { unlimited: false, paused: false, timezone: "Africa/Lagos", features: {
+    chat: { label: "AI chat messages", used: 1, limit: 20, remaining: 19 },
+    case: { label: "Case analyses", used: 0, limit: 3, remaining: 3 },
+    notes: { label: "Exam-ready notes", used: 0, limit: 3, remaining: 3 },
+    questions: { label: "Question sets", used: 0, limit: 5, remaining: 5 } } };
+  const user = { id: "1", role: "user", status: "done", content: "What is consideration?", attachments: [{ name: "notes.txt" }], sources: [], meta: {} };
+  const answer = { id: "2", role: "assistant", status: "done", content: "## Consideration\n\n**Price** for a promise.<script>window.__bad = 1</script>\n\n| Case | Point |\n|---|---|\n| Currie v Misa | definition |", meta: { web_search: true },
+    sources: [{ url: "https://example.org/currie", title: "Currie v Misa report", status: "verified" }, { url: "javascript:alert(1)", title: "bad", status: "broken" }] };
+  await page.route("**/api/**", async route => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/v1/ai/me") return json(route, { data: { configured: true, web_search: true, email_verified: true, admin: false, allowance } });
+    if (path === "/api/v1/ai/courses") return json(route, { data: [{ id: courseId, course_code: "LAW 201", title: "Law of Contract", university: "UNILAG" }] });
+    if (path === "/api/v1/ai/conversations") return json(route, { data: polls ? [{ ...conversation, updated_at: "2026-11-16T10:00:00Z" }] : [] });
+    if (path === `/api/v1/ai/conversations/${conversation.id}`) {
+      polls += 1;
+      return json(route, { data: { conversation, messages: [user, polls > 1 ? answer : { id: "2", role: "assistant", status: "pending", content: "", sources: [], meta: {} }] } });
+    }
+    if (path === "/api/v1/ai/messages" && request.method() === "POST") {
+      const body = request.postDataJSON();
+      posts.push(body);
+      if (body.mode === "questions" && body.options.courseId === "auto") {
+        return json(route, { data: { conversation: { ...conversation, mode: "questions" }, messages: [user, { id: "3", role: "assistant", status: "done", content: "Choose the course.", sources: [], meta: { needs_course: true, candidates: [{ id: courseId, label: "LAW 201 · Law of Contract" }] } }] } }, 202);
+      }
+      if (body.mode === "questions") return json(route, { error: "You have used all 5 question sets for today.", code: "LIMIT_REACHED" }, 429);
+      return json(route, { data: { conversation, messages: [user, { id: "2", role: "assistant", status: "pending", content: "", sources: [], meta: {} }] } }, 202);
+    }
+    if (path === "/api/v1/ai/messages/2/export") return route.fulfill({ status: 200, contentType: "application/pdf", headers: { "content-disposition": 'attachment; filename="consideration.pdf"' }, body: "%PDF-1.4 synthetic" });
+    return json(route, { error: "Not part of this fixture" }, 404);
+  });
+  await readyStudy(page, "ai-chat");
+  await expect(page.locator("#ai-status")).toContainText("Ready");
+  await expect(page.locator("#ai-allowance-list")).toContainText("19 of 20 left");
+  await page.locator("#ai-input").fill("What is consideration?");
+  await page.locator("#ai-file-input").setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("Synthetic note") });
+  await expect(page.locator("#ai-files")).toContainText("notes.txt");
+  await page.locator("#ai-send").click();
+  await expect(page.locator(".ai-pending")).toBeVisible();
+  await expect(page.locator(".ai-answer h3")).toHaveText("Consideration", { timeout: 15_000 });
+  expect(posts[0]).toMatchObject({ mode: "chat", text: "What is consideration?", options: { webSearch: true } });
+  expect(posts[0].attachments).toEqual([{ name: "notes.txt", mimeType: "text/plain", data: Buffer.from("Synthetic note").toString("base64") }]);
+  await expect(page.locator(".ai-answer table")).toBeVisible();
+  await expect(page.locator(".ai-answer script")).toHaveCount(0);
+  expect(await page.evaluate(() => window.__bad)).toBeUndefined();
+  await expect(page.locator("#ai-status")).toHaveText("Answer ready.");
+  await expect(page.locator(".ai-sources a")).toHaveCount(1);
+  await expect(page.locator(".ai-sources summary")).toHaveText("Verification links (1)");
+  await expect(page.locator(".ai-sources a")).toHaveAttribute("href", "https://example.org/currie");
+  await expect(page.locator(".ai-link-badge")).toHaveText("Checked");
+  await expect(page.locator("#ai-send")).toBeEnabled();
+  const download = page.waitForEvent("download");
+  await page.locator("[data-download='2'][data-format=pdf]").click();
+  expect((await download).suggestedFilename()).toBe("consideration.pdf");
+
+  await page.locator("[data-ai-mode=questions]").click();
+  await expect(page.locator("#ai-workspace-title")).toHaveText("Set exam questions");
+  await expect(page.locator("#ai-course-select option")).toHaveCount(2);
+  await page.locator("#ai-input").fill("Offer and acceptance notes");
+  await page.locator("#ai-send").click();
+  await page.locator(`[data-pick-course="${courseId}"]`).click();
+  await expect(page.locator("#ai-status")).toContainText("used all 5 question sets");
+  expect(posts.at(-1).options.courseId).toBe(courseId);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectNoHorizontalOverflow(page);
+});
+
 test("authenticated materials and verified source search render safe text from stubbed API replies", async ({ page }) => {
   await stubAuth(page, { user: student });
   const requests = [];
@@ -137,7 +209,7 @@ test("authenticated materials and verified source search render safe text from s
   await expect(page.locator("#research-search-status")).toContainText("1 source result");
   await expect(page.locator(".research-result-card pre")).toHaveText("First paragraph\n\nSecond paragraph");
   expect(requests.every(request => request.headers().authorization === "Bearer synthetic-test-token")).toBe(true);
-  expect(requests.find(request => request.method() === "POST").postDataJSON()).toEqual({ query: "contract law" });
+  expect(requests.find(request => request.method() === "POST" && request.url().endsWith("/research/search")).postDataJSON()).toEqual({ query: "contract law" });
 });
 
 test("sign-out clears approved materials and ignores an earlier in-flight material reply", async ({ page }) => {
@@ -200,7 +272,10 @@ test("admin sections navigate correctly and a student cannot unlock database con
   await expect(page.locator("#database-firebase-state")).toContainText("not an administrator");
   await expect(page.locator("#database-new")).toBeDisabled();
   await expect(page.locator("#database-resource")).toBeDisabled();
-  await expect(page.locator("#provider-key")).toBeDisabled();
+  await expect(page.locator("#ai-test-button")).toBeDisabled();
+  await expect(page.locator("#ai-prompt-save")).toBeDisabled();
+  await expect(page.locator("#save-default-limits")).toBeDisabled();
+  await expect(page.locator("#admin-claim")).toBeHidden();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
@@ -231,6 +306,7 @@ test("verified admin CRUD uses the API and clears records on sign-out (all repli
     if (path === "/api/health") return json(route, { database: "connected" });
     if (path === "/api/v1/admin/me") return json(route, { user: { ...admin, role: "admin" } });
     if (path.endsWith("/catalog")) return json(route, { data: catalog });
+    if (path === "/api/v1/presence") return route.fulfill({ status: 204 });
     if (request.method() === "POST") {
       mutations.push({ method: request.method(), data: request.postDataJSON() });
       records = [{ id: rowId, ...request.postDataJSON() }];

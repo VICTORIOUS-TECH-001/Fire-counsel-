@@ -71,7 +71,7 @@ test("Google details prefill a new profile and creation requires explicit instal
   await stubAuth(page, { user: google });
   const api = await profileApi(page, { initial: null, identity: google });
   const mutations = [];
-  page.on("request", request => { if (request.url().includes("/api/") && !["GET", "HEAD"].includes(request.method())) mutations.push(request); });
+  page.on("request", request => { if (request.url().includes("/api/") && !request.url().includes("/api/v1/presence") && !["GET", "HEAD"].includes(request.method())) mutations.push(request); });
   await readyProfile(page);
   await expect(page.locator("#student-full-name")).toHaveValue("Google Student");
   await expect(page.locator("#student-email")).toHaveValue("google@example.invalid");

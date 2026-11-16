@@ -1,0 +1,286 @@
+// Admin Studio: AI provider status, private prompts, default daily limits and
+// the account list with Active/Offline badges. Every call is checked by the
+// server (Firebase token + admin claim); nothing here is trusted on its own.
+const $ = (selector) => document.querySelector(selector);
+const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[ch]);
+const FEATURES = [["chat", "Chats"], ["case", "Cases"], ["notes", "Notes"], ["questions", "Questions"]];
+
+let authClient = null;
+let verified = false;
+let session = 0;
+let users = [];
+let defaults = null;
+let promptCustom = false;
+
+function setText(selector, text, kind = "") {
+  const node = $(selector);
+  if (!node) return;
+  node.textContent = text;
+  if (kind !== undefined) node.dataset.kind = kind;
+}
+
+async function api(path, options = {}) {
+  const response = await authClient.apiRequest(path, options);
+  let body = {};
+  try { body = await response.json(); } catch { body = {}; }
+  if (!response.ok) {
+    const error = new Error(body.error || `Request failed (${response.status}).`);
+    error.status = response.status;
+    error.code = body.code;
+    throw error;
+  }
+  return body;
+}
+
+function setEnabled(on) {
+  for (const id of ["#ai-test-button", "#ai-prompt-save", "#ai-prompt-reset", "#ai-extract-button", "#save-default-limits", "#refresh-accounts"]) {
+    const node = $(id);
+    if (node) node.disabled = !on;
+  }
+  const text = $("#ai-prompt-text");
+  if (text) text.disabled = !on;
+  setText("#ai-panel-status", on ? "LIVE · SERVER VERIFIED" : "SIGN IN AS ADMIN", undefined);
+  setText("#plans-panel-status", on ? "LIVE · ENFORCED BY SERVER" : "SIGN IN AS ADMIN", undefined);
+}
+
+// ---------------------------------------------------------------- status
+function renderStatus(data) {
+  const p = data.providers;
+  const state = (ok, yes, no) => `<span class="fc-state" data-ok="${ok}">${ok ? yes : no}</span>`;
+  $("#ai-provider-status").innerHTML = `<dl class="fc-kv">
+    <dt>Google Gemini (main)</dt><dd>${state(p.gemini.configured, "KEY ADDED", "NO KEY")}</dd>
+    <dt>Writing models</dt><dd>${escapeHTML(p.gemini.models.join(", "))}</dd>
+    <dt>Web-search model</dt><dd>${escapeHTML(p.gemini.search_models.join(", "))}</dd>
+    <dt>OpenRouter (backup)</dt><dd>${state(p.openrouter.configured, "KEY ADDED", "NO KEY")} ${escapeHTML(p.openrouter.models.join(", "))}</dd>
+    <dt>Database tables</dt><dd>${state(data.schema_ready, "READY", "NOT INSTALLED")}</dd>
+  </dl>${data.schema_ready ? "" : `<p class="fc-status" data-kind="error">The AI tables are not in Neon yet. On GitHub open <b>Actions → “Neon AI tables migration” → Run workflow</b>.</p>`}`;
+  const today = data.today || {};
+  $("#ai-today").innerHTML = `<dl class="fc-kv">${FEATURES.map(([key, label]) => `<dt>${label}</dt><dd>${today[key]?.used || 0} used${today[key]?.failed ? ` · ${today[key].failed} failed` : ""}</dd>`).join("")}</dl><p>Time zone: ${escapeHTML(data.timezone)}</p>`;
+  if (data.limits) {
+    defaults = data.limits;
+    for (const [key] of FEATURES) $(`#limit-${key}`).value = data.limits[key];
+  }
+}
+
+async function loadStatus(mySession) {
+  try {
+    const body = await api("/api/v1/admin/ai/status");
+    if (mySession !== session) return;
+    renderStatus(body.data);
+  } catch (error) {
+    if (mySession === session) $("#ai-provider-status").innerHTML = `<p class="fc-status" data-kind="error">${escapeHTML(error.message)}</p>`;
+  }
+}
+
+// ---------------------------------------------------------------- prompts
+async function loadPrompt(mySession = session) {
+  const kind = $("#ai-prompt-kind").value;
+  setText("#ai-prompt-status", "Loading…", "");
+  try {
+    const body = await api(`/api/v1/admin/ai/prompts/${encodeURIComponent(kind)}`);
+    if (mySession !== session || kind !== $("#ai-prompt-kind").value) return;
+    promptCustom = body.data.custom;
+    $("#ai-prompt-text").value = body.data.content;
+    const state = $("#ai-prompt-state");
+    state.textContent = body.data.custom ? "YOUR PROMPT IS IN USE" : "BUILT-IN PROMPT IN USE";
+    state.dataset.ok = String(body.data.custom);
+    setText("#ai-prompt-status", body.data.updated_at ? `Saved ${new Date(body.data.updated_at).toLocaleString()}` : "Not saved yet — the short built-in prompt is used.", "");
+  } catch (error) {
+    if (mySession === session) setText("#ai-prompt-status", error.message, "error");
+  }
+}
+
+$("#ai-prompt-kind")?.addEventListener("change", () => { if (verified) loadPrompt(); });
+$("#ai-prompt-file")?.addEventListener("change", async (event) => {
+  const file = event.target.files[0];
+  event.target.value = "";
+  if (!file) return;
+  if (file.size > 400_000) { setText("#ai-prompt-status", "That file is too large for a prompt.", "error"); return; }
+  $("#ai-prompt-text").value = await file.text();
+  setText("#ai-prompt-status", `Loaded ${file.name}. Check it, then press Save prompt.`, "");
+});
+$("#ai-prompt-save")?.addEventListener("click", async () => {
+  const kind = $("#ai-prompt-kind").value;
+  const content = $("#ai-prompt-text").value.trim();
+  if (content.length < 20) { setText("#ai-prompt-status", "The prompt is too short.", "error"); return; }
+  try {
+    await api(`/api/v1/admin/ai/prompts/${encodeURIComponent(kind)}`, { method: "PUT", body: JSON.stringify({ content }) });
+    setText("#ai-prompt-status", `Saved. Students' next ${$("#ai-prompt-kind").selectedOptions[0].textContent.toLowerCase()} requests use it.`, "ok");
+    loadPrompt();
+    loadStatus(session);
+  } catch (error) {
+    setText("#ai-prompt-status", error.message, "error");
+  }
+});
+$("#ai-prompt-reset")?.addEventListener("click", async () => {
+  if (!promptCustom) { setText("#ai-prompt-status", "The built-in prompt is already in use.", ""); return; }
+  if (!window.confirm("Delete your saved prompt and go back to the short built-in one?")) return;
+  try {
+    const response = await authClient.apiRequest(`/api/v1/admin/ai/prompts/${encodeURIComponent($("#ai-prompt-kind").value)}`, { method: "DELETE" });
+    if (!response.ok && response.status !== 204) throw new Error(`Request failed (${response.status}).`);
+    await loadPrompt();
+  } catch (error) {
+    setText("#ai-prompt-status", error.message, "error");
+  }
+});
+
+// ---------------------------------------------------------------- test & extract
+$("#ai-test-button")?.addEventListener("click", async () => {
+  const button = $("#ai-test-button");
+  button.disabled = true;
+  setText("#ai-test-result", "Testing… (web search can take up to a minute)", "");
+  try {
+    const body = await api("/api/v1/admin/ai/test", { method: "POST", body: JSON.stringify({ search: $("#ai-test-search").checked }) });
+    const d = body.data;
+    let text = `Working: ${d.provider === "gemini" ? "Google Gemini" : "OpenRouter backup"} (${d.model}) replied “${d.reply}”.`;
+    if (d.fallback) text += " Gemini did not answer, so the backup was used.";
+    if (d.search) text += d.search.ok ? ` Web search works (${d.search.sources} sources).` : ` Web search failed: ${d.search.error}`;
+    setText("#ai-test-result", text, d.search && !d.search.ok ? "error" : "ok");
+  } catch (error) {
+    setText("#ai-test-result", error.message, "error");
+  } finally {
+    button.disabled = !verified;
+  }
+});
+
+$("#ai-extract-button")?.addEventListener("click", async () => {
+  const file = $("#ai-extract-file").files[0];
+  if (!file) { setText("#ai-extract-status", "Choose a file first.", "error"); return; }
+  if (file.size > 10 * 1024 * 1024) { setText("#ai-extract-status", "Files must be under 10 MB.", "error"); return; }
+  const button = $("#ai-extract-button");
+  button.disabled = true;
+  setText("#ai-extract-status", "Reading the file… this can take a minute.", "");
+  try {
+    const data = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).replace(/^data:[^,]*,/, ""));
+      reader.onerror = () => reject(new Error("Could not read the file."));
+      reader.readAsDataURL(file);
+    });
+    const mimeType = file.type || (/\.pdf$/i.test(file.name) ? "application/pdf" : "text/plain");
+    const body = await api("/api/v1/admin/ai/extract", { method: "POST", body: JSON.stringify({ attachment: { name: file.name, mimeType, data } }) });
+    $("#ai-extract-output").value = body.data.text;
+    setText("#ai-extract-status", body.data.truncated ? "Done, but the text was cut short: split the file and try again for the rest." : "Done. Check the text carefully before using it.", body.data.truncated ? "error" : "ok");
+  } catch (error) {
+    setText("#ai-extract-status", error.message, "error");
+  } finally {
+    button.disabled = !verified;
+  }
+});
+
+// ---------------------------------------------------------------- limits
+$("#default-limits-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const body = Object.fromEntries(FEATURES.map(([key]) => [key, Number($(`#limit-${key}`).value)]));
+  try {
+    const result = await api("/api/v1/admin/ai/limits", { method: "PUT", body: JSON.stringify(body) });
+    defaults = result.data;
+    setText("#default-limits-status", "Saved. These limits apply to every account without its own limit.", "ok");
+    renderUsers();
+  } catch (error) {
+    setText("#default-limits-status", error.message, "error");
+  }
+});
+
+// ---------------------------------------------------------------- users
+function ago(iso) {
+  if (!iso) return "never";
+  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (seconds < 90) return "just now";
+  if (seconds < 3600) return `${Math.round(seconds / 60)} min ago`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)} h ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function renderUsers() {
+  const holder = $("#student-account-rows");
+  if (!holder) return;
+  const query = $("#account-search").value.trim().toLowerCase();
+  const list = users.filter((u) => !query || [u.email, u.name, u.uid].some((v) => v && v.toLowerCase().includes(query)));
+  if (!list.length) { holder.innerHTML = `<tr><td colspan="5">${users.length ? "No account matches that search." : "No accounts yet."}</td></tr>`; return; }
+  holder.innerHTML = list.map((u) => {
+    const tags = [u.admin ? `<span class="fc-tag">ADMIN</span>` : "", u.paused ? `<span class="fc-tag warn">AI PAUSED</span>` : "", u.disabled ? `<span class="fc-tag warn">DISABLED</span>` : "", !u.email_verified ? `<span class="fc-tag warn">EMAIL NOT VERIFIED</span>` : ""].join("");
+    const usage = FEATURES.map(([key, label]) => {
+      const limit = u.admin ? "∞" : u.limits[key] ?? defaults?.[key] ?? "—";
+      return `<span>${label}: ${u.usage_today[key] || 0} / ${limit}</span>`;
+    }).join("");
+    const custom = FEATURES.filter(([key]) => u.limits[key] != null).map(([key, label]) => `${label} ${u.limits[key]}`).join(", ");
+    return `<tr>
+      <td><strong>${escapeHTML(u.name || u.email || u.uid)}</strong><small>${escapeHTML(u.email || "no email")}</small>${tags}</td>
+      <td><span class="fc-badge" data-online="${u.online}">${u.online ? "Active" : "Offline"}</span><small>Last seen ${escapeHTML(ago(u.last_seen_at || u.last_sign_in))}</small></td>
+      <td><div class="fc-usage">${usage}</div></td>
+      <td>${custom ? escapeHTML(custom) : "Default"}${u.note ? `<small>${escapeHTML(u.note)}</small>` : ""}</td>
+      <td><button class="button button-light" type="button" data-edit-account="${escapeHTML(u.uid)}">Change limits</button></td>
+    </tr>`;
+  }).join("");
+}
+
+async function loadUsers(mySession = session) {
+  setText("#accounts-summary", "Loading accounts…", "");
+  try {
+    const body = await api("/api/v1/admin/ai/users");
+    if (mySession !== session) return;
+    users = body.data.users;
+    defaults = body.data.defaults || defaults;
+    setText("#accounts-summary", `${body.data.total} account${body.data.total === 1 ? "" : "s"} · ${body.data.online} active now${body.data.truncated ? " · showing the first 5,000" : ""}`, "ok");
+    renderUsers();
+  } catch (error) {
+    if (mySession === session) setText("#accounts-summary", error.message, "error");
+  }
+}
+
+$("#account-search")?.addEventListener("input", renderUsers);
+$("#refresh-accounts")?.addEventListener("click", () => loadUsers());
+$("#student-account-rows")?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-edit-account]");
+  if (!button) return;
+  const user = users.find((u) => u.uid === button.dataset.editAccount);
+  if (!user) return;
+  const form = $("#account-adjustment-form");
+  form.hidden = false;
+  $("#quota-account-id").value = user.uid;
+  $("#adjustment-account-pill").textContent = user.email || user.name || user.uid;
+  for (const [key] of FEATURES) {
+    const input = $(`#user-limit-${key}`);
+    input.value = user.limits[key] ?? "";
+    input.placeholder = `Default ${defaults?.[key] ?? ""}`;
+  }
+  $("#user-paused").checked = user.paused;
+  $("#user-note").value = user.note || "";
+  setText("#account-adjustment-status", "", "");
+  form.scrollIntoView({ behavior: "smooth", block: "center" });
+});
+$("#cancel-account-adjustment")?.addEventListener("click", () => { $("#account-adjustment-form").hidden = true; });
+$("#account-adjustment-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const uid = $("#quota-account-id").value;
+  const body = Object.fromEntries(FEATURES.map(([key]) => [key, $(`#user-limit-${key}`).value.trim() === "" ? null : Number($(`#user-limit-${key}`).value)]));
+  body.paused = $("#user-paused").checked;
+  body.note = $("#user-note").value.trim();
+  try {
+    await api(`/api/v1/admin/ai/users/${encodeURIComponent(uid)}/limits`, { method: "PUT", body: JSON.stringify(body) });
+    setText("#account-adjustment-status", "Saved. The new limits apply immediately.", "ok");
+    loadUsers();
+  } catch (error) {
+    setText("#account-adjustment-status", error.message, "error");
+  }
+});
+
+// ---------------------------------------------------------------- start
+function onAdminState(state) {
+  session += 1;
+  // Until the sign-in client has loaded, wait: the start-up call below re-runs this.
+  verified = state === "verified" && Boolean(authClient);
+  setEnabled(verified);
+  if (!verified) return;
+  const mySession = session;
+  loadStatus(mySession);
+  loadPrompt(mySession);
+  loadUsers(mySession);
+}
+
+document.addEventListener("fire-counsel:admin-state", (event) => onAdminState(event.detail?.state));
+try {
+  authClient = await import("./firebase/auth-client.mjs");
+  onAdminState($("#admin-auth-status")?.dataset.state);
+} catch { /* sign-in not configured: panels stay disabled */ }

@@ -1,7 +1,6 @@
 (() => {
   "use strict";
   const DRAFT_KEY = "fire-counsel-site-draft-v1";
-  const QUOTA_PREVIEW_KEY = "fire-counsel-admin-quota-preview-v1";
   const $ = selector => document.querySelector(selector);
   const $$ = selector => [...document.querySelectorAll(selector)];
   const editor = $("#json-editor");
@@ -10,15 +9,6 @@
   const setSlideStatus = (message, kind = "") => { const node = $("#slide-status"); if (node) { node.textContent = message; node.className = `slide-status ${kind}`; } };
   const setText = (selector, message) => { const node = $(selector); if (node) node.textContent = message; };
   const escapeHTML = value => String(value ?? "").replace(/[&<>\"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'\"':"&quot;","'":"&#39;"}[ch]));
-  const FEATURE_KEYS = ["explanations", "pastQuestions", "marking", "ocr", "practiceScenarios"];
-  const PLAN_KEYS = ["free", "paid"];
-  const DEMO_USERS = [
-    {id:"demo-student-001", label:"Preview student 001", plan:"Free preview"},
-    {id:"demo-student-002", label:"Preview student 002", plan:"Free preview"},
-    {id:"demo-student-003", label:"Preview student 003", plan:"Paid preview"}
-  ];
-  let defaultContent = null;
-  let quotaDraft = {policy:{features:{}}, accounts:{}};
   let temporarySlides = [];
   let currentObjectUrls = new Set();
 
@@ -176,129 +166,6 @@
     } catch (_) { /* the JSON editor already shows its validation state */ }
   });
 
-  function emptyQuotaDraft() { return {policy:{features:{}}, accounts:{}}; }
-  function loadQuotaDraft() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(QUOTA_PREVIEW_KEY) || "null");
-      if (!saved || typeof saved !== "object") return emptyQuotaDraft();
-      return {policy:saved.policy && typeof saved.policy === "object" ? saved.policy : {features:{}}, accounts:saved.accounts && typeof saved.accounts === "object" ? saved.accounts : {}};
-    } catch (_) { return emptyQuotaDraft(); }
-  }
-  function persistQuotaDraft() {
-    localStorage.setItem(QUOTA_PREVIEW_KEY, JSON.stringify(quotaDraft));
-  }
-  function renderQuotaPolicy() {
-    FEATURE_KEYS.forEach(feature => PLAN_KEYS.forEach(plan => {
-      const rule = quotaDraft.policy?.features?.[feature]?.[plan] || {};
-      const count = $(`[data-quota-count][data-feature="${feature}"][data-plan="${plan}"]`);
-      const period = $(`[data-quota-period][data-feature="${feature}"][data-plan="${plan}"]`);
-      if (count) count.value = rule.limit == null ? "" : String(rule.limit);
-      if (period) period.value = rule.period || "";
-    }));
-    const hasValues = Object.values(quotaDraft.policy?.features || {}).some(pair => Object.values(pair || {}).some(rule => rule && (rule.limit != null || rule.period)));
-    setText("#quota-policy-status", hasValues ? "Local quota draft loaded · not active for any student" : "No quota policy is saved in this browser.");
-  }
-  function collectPolicy() {
-    const features = {};
-    for (const feature of FEATURE_KEYS) {
-      features[feature] = {};
-      for (const plan of PLAN_KEYS) {
-        const countInput = $(`[data-quota-count][data-feature="${feature}"][data-plan="${plan}"]`);
-        const periodInput = $(`[data-quota-period][data-feature="${feature}"][data-plan="${plan}"]`);
-        const raw = countInput.value.trim();
-        const period = periodInput.value || null;
-        if (raw === "") {
-          features[feature][plan] = {limit:null, period};
-          continue;
-        }
-        const limit = Number(raw);
-        if (!Number.isInteger(limit) || limit < 0 || limit > 1_000_000) throw new Error("Enter a whole-number allowance from 0 to 1,000,000.");
-        if (!period) throw new Error("Choose a reset period for every allowance you set.");
-        features[feature][plan] = {limit, period};
-      }
-    }
-    return {features, updatedAt:new Date().toISOString(), previewOnly:true};
-  }
-  const featureLabels = {explanations:"AI explanations", pastQuestions:"archived questions", marking:"rubric marking", ocr:"OCR", practiceScenarios:"practice scenarios"};
-  function accessLabel(access) {
-    if (access === "grant-free") return "Free AI granted · preview";
-    if (access === "pause") return "AI paused · preview";
-    return "Plan defaults · preview";
-  }
-  function renderStudentRows() {
-    const holder = $("#student-account-rows");
-    const query = $("#account-search").value.trim().toLowerCase();
-    const users = DEMO_USERS.filter(user => `${user.id} ${user.label} ${user.plan}`.toLowerCase().includes(query));
-    if (!users.length) { holder.innerHTML = `<tr><td colspan="5" class="account-empty">No sample account matches that search.</td></tr>`; return; }
-    holder.innerHTML = users.map(user => {
-      const entry = quotaDraft.accounts?.[user.id] || {};
-      const changes = Object.entries(entry.overrides || {}).filter(([, value]) => Number(value?.delta) !== 0).map(([feature, value]) => `${Number(value.delta) > 0 ? "+" : ""}${Number(value.delta)} ${featureLabels[feature] || feature}`).join(" · ");
-      return `<tr><td><strong>${escapeHTML(user.label)}</strong><small>${escapeHTML(user.id)}</small></td><td><span class="plan-pill">${escapeHTML(user.plan)}</span></td><td>${escapeHTML(accessLabel(entry.access))}<small>Usage unavailable in preview</small></td><td>${escapeHTML(changes || "No personal override")}</td><td><button class="button button-light account-edit-button" type="button" data-edit-account="${escapeHTML(user.id)}">Adjust</button></td></tr>`;
-    }).join("");
-  }
-  function loadAccountForm(id) {
-    const account = DEMO_USERS.find(user => user.id === id);
-    if (!account) return;
-    const entry = quotaDraft.accounts?.[id] || {};
-    $("#quota-account-id").value = account.id;
-    $("#quota-account-access").value = entry.access || "inherit";
-    $("#adjustment-account-pill").textContent = account.label;
-    loadFeatureAdjustment();
-    setText("#account-adjustment-status", "Editing a sample account. Save stores a local preview only.");
-  }
-  function loadFeatureAdjustment() {
-    const id = $("#quota-account-id").value;
-    const feature = $("#quota-adjust-feature").value;
-    const entry = quotaDraft.accounts?.[id]?.overrides?.[feature] || {};
-    $("#quota-adjust-count").value = entry.delta == null ? "" : String(entry.delta);
-    $("#quota-adjust-period").value = entry.period || "";
-    $("#quota-adjust-reason").value = entry.reason || "";
-  }
-  $("#account-search").addEventListener("input", renderStudentRows);
-  $("#student-account-rows").addEventListener("click", event => {
-    const button = event.target.closest("[data-edit-account]");
-    if (!button) return;
-    loadAccountForm(button.dataset.editAccount);
-    $("#quota-account-id").scrollIntoView({behavior:"smooth", block:"center"});
-  });
-  $("#quota-adjust-feature").addEventListener("change", loadFeatureAdjustment);
-  $("#account-adjustment-form").addEventListener("submit", event => {
-    event.preventDefault();
-    const id = $("#quota-account-id").value;
-    if (!DEMO_USERS.some(user => user.id === id)) { setText("#account-adjustment-status", "Select one of the sample accounts first."); return; }
-    const raw = $("#quota-adjust-count").value.trim();
-    let delta = null;
-    if (raw !== "") {
-      delta = Number(raw);
-      if (!Number.isInteger(delta) || delta < -100_000 || delta > 100_000) { setText("#account-adjustment-status", "Use a whole-number adjustment between −100,000 and +100,000."); return; }
-    }
-    const feature = $("#quota-adjust-feature").value;
-    const account = quotaDraft.accounts[id] || {access:"inherit", overrides:{}};
-    account.access = $("#quota-account-access").value;
-    account.overrides = account.overrides || {};
-    if (delta == null || delta === 0) delete account.overrides[feature];
-    else account.overrides[feature] = {delta, period:$("#quota-adjust-period").value || null, reason:$("#quota-adjust-reason").value.trim() || null};
-    account.previewUpdatedAt = new Date().toISOString();
-    quotaDraft.accounts[id] = account;
-    try {
-      persistQuotaDraft();
-      renderStudentRows();
-      setText("#account-adjustment-status", "Saved in this browser only · no student allowance changed.");
-    } catch (_) { setText("#account-adjustment-status", "Could not save the local preview draft in this browser."); }
-  });
-  $("#save-quota-policy").addEventListener("click", () => {
-    try {
-      quotaDraft.policy = collectPolicy();
-      persistQuotaDraft();
-      setText("#quota-policy-status", "Saved in this browser only · not enforced for students.");
-    } catch (error) { setText("#quota-policy-status", error.message); }
-  });
-  $("#clear-quota-policy").addEventListener("click", () => {
-    quotaDraft.policy = {features:{}};
-    try { persistQuotaDraft(); renderQuotaPolicy(); }
-    catch (_) { setText("#quota-policy-status", "Could not clear the local preview policy."); }
-  });
-
   $$("[data-panel]").forEach(button => button.addEventListener("click", () => {
     const target = button.dataset.panel;
     $$(".admin-tab").forEach(tab => tab.classList.toggle("is-active", tab === button));
@@ -318,9 +185,7 @@
   }));
   window.addEventListener("beforeunload", () => currentObjectUrls.forEach(url => URL.revokeObjectURL(url)));
 
-  quotaDraft = loadQuotaDraft();
-  renderQuotaPolicy();
-  renderStudentRows();
   load().catch(error => { editor.value = ""; setStatus(error.message, "is-error"); renderSlideLibrary(); });
-  // The provider-key field is intentionally disabled and is never read, copied, or persisted here.
+  // AI settings, prompts, limits and the account list live in admin-ai.mjs and
+  // are saved by the server only after it verifies the admin claim.
 })();

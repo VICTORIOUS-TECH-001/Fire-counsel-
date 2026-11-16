@@ -310,7 +310,7 @@
     else startTimer();
   });
   $("#timer-reset").addEventListener("click", resetTimer);
-  $("#help-button").addEventListener("click", () => openModal("FIRE COUNSEL · Privacy & setup", `<p><strong>Student data:</strong> personal documents, recall cards, subjects, course choice and focus-session count are stored in this browser only.</p><p><strong>AI:</strong> chat, OCR, marking, quota enforcement and payments are not connected. This preview sends no student work to an AI provider.</p><p><strong>Website administration:</strong> open <code>admin.html</code> for the separate content-management preview. Sign-in, cloud publishing and media uploads are not connected.</p>`, async () => {}, "Got it"));
+  $("#help-button").addEventListener("click", () => openModal("FIRE COUNSEL · Privacy & setup", `<p><strong>Student data:</strong> personal documents, recall cards, subjects, course choice and focus-session count are stored in this browser only.</p><p><strong>AI:</strong> the Fire Counsel AI studio sends only the messages and files you choose to Google Gemini (with free backup models). On the free service Google may use them to improve its products, so do not upload personal details. Daily limits apply to each account. Payments are not connected.</p><p><strong>Website administration:</strong> administrators use <code>admin.html</code> after signing in.</p>`, async () => {}, "Got it"));
   $("#global-search").addEventListener("input", event => {
     const query = event.target.value.toLowerCase().trim();
     const page = $(".page.active-page");

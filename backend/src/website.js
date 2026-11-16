@@ -14,6 +14,7 @@ export const PUBLIC_FILES = new Set([
   "auth-page.mjs", "admin-auth.mjs", "admin-database.mjs",
   "study-materials.mjs", "research-search.mjs", "request-scope.mjs",
   "student-profile.mjs", "installation.mjs",
+  "ai-studio.css", "ai-studio.mjs", "ai-markdown.mjs", "admin-ai.mjs", "presence.mjs",
   "data/site-content.json",
   "firebase/client.mjs", "firebase/auth-client.mjs",
   "firebase/firebase-config.mjs", "firebase/firebase-config.example.mjs"

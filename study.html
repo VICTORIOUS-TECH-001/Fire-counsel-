@@ -11,6 +11,7 @@
 <link href="./assets/fire-counsel-192.png" rel="icon" type="image/png"/>
 <link href="./styles.css" rel="stylesheet"/>
 <link href="./integrations.css" rel="stylesheet"/>
+<link href="./ai-studio.css" rel="stylesheet"/>
 </head>
 <body data-theme="light">
 <div class="app">
@@ -74,7 +75,7 @@
 <div class="student-layout"><div class="course-grid subject-grid" id="dashboard-subjects"></div><aside class="card study-panel"><div class="panel-head"><div><h3>Today&rsquo;s gentle plan</h3><p>A little progress goes a long way.</p></div><a class="mini-link" data-page="exams" href="#exams">Focus timer</a></div><div class="today-item"><span class="today-icon">&sect;</span><div class="today-copy"><strong>Review one legal principle</strong><span>Choose a course and continue a topic</span></div><span class="task-pill">15 min</span></div><div class="today-item"><span class="today-icon">✎</span><div class="today-copy"><strong>Try one past question</strong><span>Practise issue spotting</span></div><span class="task-pill">1 question</span></div><div class="today-item"><span class="today-icon">✧</span><div class="today-copy"><strong>Refresh your case cards</strong><span>Active recall practice</span></div><span class="task-pill">Your pace</span></div></aside></div>
 <div class="section-row" id="student-tools"><div><h2 class="section-title">Study tools, ready when you are</h2><p class="section-subtitle">Personal learning work is designed to stay on your device.</p></div></div>
 <div class="quick-grid"><button class="card quick-card" data-go="exams"><span class="quick-icon">▤</span><span><strong>Past questions</strong><small>Practise and review exam work.</small></span></button><button class="card quick-card" data-go="memory"><span class="quick-icon">✧</span><span><strong>Case flashcards</strong><small>Create a personal case recall set.</small></span></button></div>
-<div class="privacy-strip" id="student-privacy"><span class="privacy-icon">&checkmark;</span><div><strong>Local-first learning by design</strong><p>Personal files, flashcards, subjects and progress stay in this browser. OCR and AI answer tools are not enabled. Authenticated course access is checked by the server; signing in does not upload your personal study work. AI uploads are not connected until Gemini&rsquo;s data terms are reviewed; this app does not send your study work to AI today.</p></div></div>
+<div class="privacy-strip" id="student-privacy"><span class="privacy-icon">&checkmark;</span><div><strong>Local-first learning by design</strong><p>Personal files, flashcards, subjects and progress stay in this browser. Authenticated course access is checked by the server; signing in does not upload your personal study work. Only what you send in the Fire Counsel AI studio goes to the AI service (Google Gemini, with free backup models).</p></div></div>
 <footer class="page-footer"><span>FIRE COUNSEL <b>&bull;</b> Legal study workspace</span><span>Study data stays close to you.</span></footer>
 </section>
 <section aria-label="FIRE COUNSEL AI study studio" class="page ai-chat-page" id="ai-chat-page">
@@ -84,13 +85,41 @@
   <div class="ai-studio-copy"><span class="ai-studio-kicker"><span>✦</span> FIRE COUNSEL AI</span><h2>Turn questions<br>into <em>understanding.</em></h2><p>Choose a course, start with a study task, and build stronger legal reasoning step by step.</p><label class="ai-studio-course" for="chat-course-select"><span>YOUR CURRENT COURSE</span><select aria-label="Select course for AI study tools" id="chat-course-select"></select></label><div class="ai-studio-tags"><span>Course-first</span><span>Clear sources</span><span>Your pace</span></div></div>
   <div class="ai-studio-art" aria-hidden="true"><div class="ai-orbit ai-orbit-one"></div><div class="ai-orbit ai-orbit-two"></div><div class="ai-glow"></div><div class="ai-floating-mark ai-mark-law">§</div><div class="ai-floating-mark ai-mark-star">✦</div><div class="ai-floating-note ai-note-top">ISSUE <b>→</b> RULE</div><div class="ai-floating-note ai-note-bottom">THINK CLEARLY <span>✧</span></div><div class="ai-preview-window"><div class="ai-preview-top"><span class="ai-preview-emblem">FC</span><span><b>Study session</b><small>Legal reasoning</small></span><i></i></div><div class="ai-preview-line ai-preview-line-short"></div><div class="ai-preview-line"></div><div class="ai-preview-answer"><span>§</span><div><b>Build your argument</b><small>Principle · application · conclusion</small></div></div><div class="ai-preview-line ai-preview-line-mid"></div><div class="ai-preview-dots"><i></i><i></i><i></i></div></div></div>
 </section>
-<div class="ai-tools-heading"><div><span class="eyebrow">PICK A STARTING POINT</span><h2>What would you like to work on?</h2></div><span class="ai-tools-count">04 STUDY TOOLS</span></div>
+<div class="ai-tools-heading"><div><span class="eyebrow">PICK A STARTING POINT</span><h2>What would you like to work on?</h2></div><span class="ai-tools-count">04 AI TOOLS</span></div>
 <div class="ai-task-grid" aria-label="AI study tools">
-  <button class="ai-task-card ai-task-violet" data-preview-action="This study tool is being prepared. Your course materials stay on this device." type="button"><span class="ai-task-icon">✦</span><span class="ai-task-copy"><small>UNDERSTAND</small><strong>Explain a topic</strong><em>Break a legal principle into clear steps.</em></span><span class="ai-task-arrow">↗</span></button>
-  <button class="ai-task-card ai-task-coral" data-preview-action="Exact archived question retrieval is being prepared." type="button"><span class="ai-task-icon">▤</span><span class="ai-task-copy"><small>RECALL</small><strong>Find a past question</strong><em>Look for an exact question in the archive.</em></span><span class="ai-task-arrow">↗</span></button>
-  <button class="ai-task-card ai-task-teal" data-preview-action="Rubric-based feedback is being prepared." type="button"><span class="ai-task-icon">✓</span><span class="ai-task-copy"><small>REFINE</small><strong>Review an answer</strong><em>Check structure against a course rubric.</em></span><span class="ai-task-arrow">↗</span></button>
-  <button class="ai-task-card ai-task-gold" data-preview-action="Practice scenarios are being prepared from approved course materials." type="button"><span class="ai-task-icon">◇</span><span class="ai-task-copy"><small>PRACTISE</small><strong>Try a scenario</strong><em>Apply a rule to a fresh study problem.</em></span><span class="ai-task-arrow">↗</span></button>
+  <button class="ai-task-card ai-task-violet" data-ai-mode="chat" type="button" aria-pressed="true"><span class="ai-task-icon">✦</span><span class="ai-task-copy"><small>ASK</small><strong>Fire Counsel AI chat</strong><em>Ask anything; upload notes, photos or PDFs.</em></span><span class="ai-task-arrow">↗</span></button>
+  <button class="ai-task-card ai-task-coral" data-ai-mode="case" type="button" aria-pressed="false"><span class="ai-task-icon">§</span><span class="ai-task-copy"><small>RESEARCH</small><strong>Case analysis</strong><em>Full casebook with verification links, as a PDF.</em></span><span class="ai-task-arrow">↗</span></button>
+  <button class="ai-task-card ai-task-teal" data-ai-mode="notes" type="button" aria-pressed="false"><span class="ai-task-icon">✎</span><span class="ai-task-copy"><small>REVISE</small><strong>Exam-ready notes</strong><em>Turn your notes into a clean Word study pack.</em></span><span class="ai-task-arrow">↗</span></button>
+  <button class="ai-task-card ai-task-gold" data-ai-mode="questions" type="button" aria-pressed="false"><span class="ai-task-icon">◇</span><span class="ai-task-copy"><small>PRACTISE</small><strong>Set exam questions</strong><em>In your course&rsquo;s own past-question style.</em></span><span class="ai-task-arrow">↗</span></button>
 </div>
+<section class="ai-workspace card" id="ai-workspace" aria-labelledby="ai-workspace-title" data-mode="chat">
+  <header class="ai-workspace-head">
+    <div><span class="eyebrow" id="ai-mode-eyebrow">FIRE COUNSEL AI · CHAT</span><h2 id="ai-workspace-title">Ask Fire Counsel AI</h2><p id="ai-mode-help">Ask a legal question or upload notes, textbook photos or a PDF.</p></div>
+    <div class="ai-history"><label for="ai-history-select">Saved conversations</label><div><select id="ai-history-select"><option value="">New conversation</option></select><button class="button soft" id="ai-new-conversation" type="button">＋ New</button><button class="button soft ai-delete" id="ai-delete-conversation" type="button" hidden aria-label="Delete this conversation">Delete</button></div></div>
+  </header>
+  <p class="integration-status ai-connection" id="ai-status" role="status" aria-live="polite">Checking sign-in…</p>
+  <div class="ai-thread" id="ai-thread" aria-live="polite" aria-label="Conversation"><div class="ai-empty"><span>✦</span><strong>Your answers will appear here</strong><p>Sign in, choose a tool above, then type or upload your material.</p></div></div>
+  <form class="ai-composer" id="ai-form" novalidate>
+    <div class="ai-options">
+      <label class="ai-option" data-for="chat"><input id="ai-web-search" type="checkbox" checked> Search the web and check links</label>
+      <label class="ai-option ai-option-wide" data-for="case">Case name or citation <input id="ai-case-query" type="text" maxlength="500" placeholder="e.g. Carlill v Carbolic Smoke Ball Co, or leave blank and upload textbook pages"></label>
+      <label class="ai-option ai-option-wide" data-for="notes">Topic <input id="ai-topic" type="text" maxlength="300" placeholder="e.g. Offer and acceptance"></label>
+      <label class="ai-option" data-for="notes"><input id="ai-allow-research" type="checkbox"> Allow outside research</label>
+      <label class="ai-option" data-for="notes"><input id="ai-question-bank" type="checkbox"> Include a question bank</label>
+      <label class="ai-option" data-for="notes questions">Course <select id="ai-course-select"><option value="auto">Detect automatically</option></select></label>
+      <label class="ai-option" data-for="questions">Questions <input id="ai-question-count" type="number" min="1" max="20" placeholder="Like a real paper"></label>
+    </div>
+    <label class="sr-only" for="ai-input">Your message</label>
+    <textarea id="ai-input" maxlength="60000" rows="4" placeholder="Ask a question, or paste your notes…"></textarea>
+    <div class="ai-files" id="ai-files" aria-live="polite"></div>
+    <div class="ai-composer-bottom">
+      <label class="button soft ai-attach">📎 Add notes, photos or PDF<input id="ai-file-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf,text/plain,.txt,.heic,.heif" multiple hidden></label>
+      <span id="ai-allowance-inline" class="ai-allowance-inline"></span>
+      <button class="button primary" id="ai-send" type="submit">Send</button>
+    </div>
+  </form>
+  <p class="ai-privacy-note"><strong>Before you upload:</strong> answers come from Google Gemini (with free backup models). On the free service Google may use what you send to improve its products, so do not upload personal details. AI can be wrong: always open the verification links and check your lecturer&rsquo;s notes.</p>
+</section>
 <section class="integration-card research-panel" aria-labelledby="research-title">
   <div class="eyebrow">VERIFIED SOURCE RETRIEVAL · NOT AI GENERATION</div><h2 id="research-title">Search trusted sources</h2><p>Search approved materials, verified cases, statutes and exact archived questions in Neon. Queries stay within FIRE COUNSEL; no AI provider or external web search is called.</p>
   <form class="research-search-form" id="research-search-form"><label for="research-query">Topic, case citation or legal phrase<input id="research-query" type="search" minlength="3" maxlength="500" required placeholder="e.g. consideration in contract law"></label><button class="button primary" id="research-search-button" type="submit">Search sources</button></form>
@@ -98,7 +127,7 @@
 </section>
 <div class="ai-studio-bottom">
   <article class="card ai-source-card"><div class="ai-card-heading"><span class="ai-card-icon ai-source-icon">§</span><div><h2>Built on trusted materials</h2><p>A clear path from source to answer.</p></div></div><div class="ai-source-steps"><div><span>01</span><strong>Course materials</strong><small>Approved notes, cases and statutes first.</small></div><div><span>02</span><strong>Exact archive</strong><small>Retrieve past questions as published.</small></div><div><span>03</span><strong>Sound reasoning</strong><small>Use the rubric; be clear when evidence is missing.</small></div></div></article>
-  <article class="card ai-account-card"><div class="ai-card-heading"><span class="ai-card-icon ai-account-icon">◷</span><div><h2>My AI allowance</h2><p>Your personal use at a glance.</p></div><span class="ai-preview-badge">ACCOUNT PREVIEW</span></div><div class="ai-account-metrics"><div><small>YOUR PLAN</small><strong>Plan not connected</strong></div><div><small>AI USE</small><strong>— <i>/ —</i></strong></div></div><div class="ai-account-meter"><span></span></div><p class="ai-account-hint">Your plan, feature limits and any extra allowance will appear here after account access is connected.</p><button class="ai-account-link" data-go="profile" type="button">My student profile <span>→</span></button></article>
+  <article class="card ai-account-card" id="ai-allowance-card"><div class="ai-card-heading"><span class="ai-card-icon ai-account-icon">◷</span><div><h2>My AI allowance</h2><p>Resets every midnight (Lagos time).</p></div><span class="ai-preview-badge" id="ai-allowance-badge">SIGN IN</span></div><div class="ai-allowance-list" id="ai-allowance-list"><p class="ai-account-hint">Sign in to see how many AI chats, case analyses, notes and question sets you have left today.</p></div><p class="ai-account-hint" id="ai-allowance-hint">Need more? Ask the FIRE COUNSEL administrator to raise your daily limit.</p><button class="ai-account-link" data-go="profile" type="button">My student profile <span>→</span></button></article>
 </div>
 </div>
 </section>
@@ -182,6 +211,8 @@
 <script type="module" src="./study-materials.mjs"></script>
 <script type="module" src="./research-search.mjs"></script>
 <script type="module" src="./student-profile.mjs"></script>
+<script type="module" src="./ai-studio.mjs"></script>
+<script type="module" src="./presence.mjs"></script>
 
 </body>
 </html>
