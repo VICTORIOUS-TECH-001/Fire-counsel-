@@ -107,8 +107,28 @@ The Gemini key field, AI/OCR operations, slideshow cloud uploads/deletes, quotas
 - The project owner previously confirmed the existing Firebase Blaze plan; no billing change or Firebase deployment is made here. Proposed Storage rules cover public slide reads and admin-claim-only writes, a 10 MiB per-file limit and no photo-count cap. This is not a spending limit or a live upload feature.
 - Administrator-chosen Free/paid per-feature counts, reset periods and individual adjustments are previews only. No preset live quotas are imposed.
 - Archived questions must be exact verified questions, not generated variants. New practice scenarios must be separately labelled and grounded in approved material.
-- Nigeria was selected, but additional jurisdictions and school-approved source domains remain to be specified. External legal-web fallback stays off.
+- Nigeria was selected, but additional jurisdictions and school-approved source domains remain to be specified. External legal-web fallback stays off. During testing it stays off even if a domain is named later: the owner supplies the materials, and a missing source is reported as not found. See [Testing materials](#testing-materials--owner-supplied-only).
 - Paystack and the supplied ₦2,000 price remain future choices; paid-plan duration and activation are unresolved and disabled.
 - A one-browser-installation-per-profile policy is implemented behind the staging setup gate. A different installation cannot reuse the existing profile; there is no automatic transfer or self-service recovery. IP changes do not create an account. A PWA cannot reliably identify physical hardware, and the marker can be cleared/copied; do not describe this as physical-device attestation. Review the lockout consequences before real-user rollout.
 
 Brand artwork, photograph credits and source links are in [assets/images/README.md](assets/images/README.md). No live Firebase/Neon writes, rule deployment, account creation, admin-claim change, AI call, cloud upload/delete, payment, billing change or deployment was performed during the local status check.
+
+## Testing materials — owner supplied only
+
+This stage only records the testing rule. It does not add a fetcher, copy files from another repository, or change IndexedDB, Neon, Firebase, or the student-profile installation marker.
+
+- Do not fetch, scrape, or search the public web for notes, cases, statutes, or past questions while this app is being tested.
+- The owner will give each test item, with its course name and type: note, case, statute, exact past question, or rubric.
+- If that supplied material does not support an answer, say it was not found. Do not invent a citation and do not fill the gap online.
+- Personal flashcards and local files stay in `lexmaster-ai-stage1`. Do not rename that database or migrate it in this stage.
+
+These other repositories are separate products. Do not merge their auth, tables, or pages into FIRE COUNSEL to avoid a schema conflict:
+
+| Repository | What it already is | Leave it alone because |
+| --- | --- | --- |
+| [legalhub](https://github.com/VICTORIOUS-TECH-001/legalhub) | Supabase login, `users.reg_number`, `is_admin`, a `materials` approval table, Cloudflare R2 | FIRE COUNSEL uses Firebase Auth and Neon, not Supabase or R2 |
+| [articles](https://github.com/VICTORIOUS-TECH-001/articles) | Static HTML question pages for 2019, 2020, 2021, 2023 and 2025 | Copy a page only after the owner marks that exact page as a supplied past question |
+| [past_questions](https://github.com/VICTORIOUS-TECH-001/past_questions) | Placeholder README | Nothing to import |
+| [Cases-package](https://github.com/VICTORIOUS-TECH-001/Cases-package) | Empty repository | Nothing to import |
+| [legal-aid](https://github.com/VICTORIOUS-TECH-001/legal-aid) | Short README and a submodule pointer | Not this app's database |
+
