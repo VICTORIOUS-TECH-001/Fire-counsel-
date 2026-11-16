@@ -58,3 +58,12 @@ test("website mode keeps API routes, strict API headers and CORS for the service
   assert.equal(foreign.status, 403);
   assert.equal((await fetch(`${base}/healthz`)).status, 200);
 });
+
+test("website redirects friendly sign-in addresses to the sign-in page", async t => {
+  const base = await serve(t, { SERVE_WEBSITE: "true" });
+  for (const path of ["/login", "/login/", "/signin", "/sign-in", "/sign-in/"]) {
+    const response = await fetch(`${base}${path}`, { redirect: "manual" });
+    assert.equal(response.status, 301, path);
+    assert.equal(response.headers.get("location"), "/auth.html", path);
+  }
+});

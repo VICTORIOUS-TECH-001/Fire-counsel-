@@ -18,6 +18,8 @@ export const PUBLIC_FILES = new Set([
   "firebase/client.mjs", "firebase/auth-client.mjs",
   "firebase/firebase-config.mjs", "firebase/firebase-config.example.mjs"
 ]);
+// Friendly sign-in addresses (mirrors the Netlify _redirects file).
+export const REDIRECTS = new Map(["/login", "/login/", "/signin", "/sign-in", "/sign-in/"].map((from) => [from, "/auth.html"]));
 const ASSET_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico"]);
 
 export function resolvePublicFile(urlPath) {
@@ -52,6 +54,8 @@ export function createWebsiteHandler({ root = DEFAULT_WEBSITE_ROOT } = {}) {
   return function serveWebsite(req, res, next) {
     if (req.method !== "GET" && req.method !== "HEAD") return next();
     if (req.path === "/api" || req.path.startsWith("/api/") || req.path === "/healthz") return next();
+    const redirect = REDIRECTS.get(req.path);
+    if (redirect) return res.redirect(301, redirect);
     const file = resolvePublicFile(req.path);
     if (!file) return next();
     websiteHeaders(req, res, () => {
