@@ -64,6 +64,17 @@ async function main() {
     console.log(`\n${rows.length} public tables, ${totalColumns} columns (documented: 27 tables, 232 columns).`);
     console.log(missing.length ? `Missing vs documented schema: ${missing.join(", ")}` : "All 27 documented tables are present.");
     if (extra.length) console.log(`Extra tables not in documented schema: ${extra.join(", ")}`);
+
+    // In GitHub Actions, also publish the result as a run annotation so it is
+    // visible on the run summary page (no secrets are included).
+    if (process.env.GITHUB_ACTIONS === "true") {
+      const lines = rows.map((r, i) => `${i + 1}. ${r.table_name} — ${r.columns} columns, ~${Number(r.est_rows)} rows`);
+      lines.push(`${rows.length} tables, ${totalColumns} columns.`);
+      if (missing.length) lines.push(`Missing: ${missing.join(", ")}`);
+      if (extra.length) lines.push(`Extra: ${extra.join(", ")}`);
+      const escaped = lines.join("\n").replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+      console.log(`::notice title=Neon tables (${info.db})::${escaped}`);
+    }
   } finally {
     client.release();
     await pool.end();
