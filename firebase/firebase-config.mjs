@@ -5,7 +5,7 @@
 // → SDK setup and configuration → Config. Never put a service-account JSON,
 // OAuth client secret, or Gemini key here.
 export const firebaseConfig = Object.freeze({
-  apiKey: "REPLACE_WITH_FIREBASE_WEB_API_KEY",
+  apiKey: "AIzaSyA8dUZ2F2cMVVxN8j9DoplnOqDBaCi0-gg",
   authDomain: "fire-counsel.firebaseapp.com",
   projectId: "fire-counsel",
   storageBucket: "fire-counsel.firebasestorage.app",
