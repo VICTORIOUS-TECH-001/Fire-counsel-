@@ -224,6 +224,42 @@ test("a delayed profile save cannot replace the next account's profile", async (
   await expect(page.locator("#student-email")).toHaveValue("next@example.invalid");
 });
 
+test("profile loading, creation, security and signed-out views fit small screens", async ({ page }) => {
+  const identity = { ...student, displayName: "A".repeat(120) };
+  await stubAuth(page, { user: identity });
+  await profileApi(page, { initial: null, identity });
+  let release, started;
+  const blocked = new Promise(resolve => { release = resolve; });
+  const requestStarted = new Promise(resolve => { started = resolve; });
+  await page.route("**/api/v1/profile", async route => {
+    if (route.request().method() === "GET") { started(); await blocked; }
+    await route.fallback();
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/study.html#profile");
+  await requestStarted;
+  await expect(page.locator("#student-profile-status")).toContainText("Checking");
+  await expectNoHorizontalOverflow(page);
+  release();
+  await expect(page.locator("#profile-installation-consent")).toBeVisible();
+
+  const checkWidths = async () => {
+    for (const width of [320, 390, 768, 1024]) {
+      await page.setViewportSize({ width, height: 844 });
+      await expectNoHorizontalOverflow(page);
+    }
+  };
+  await checkWidths();
+  await page.locator("#accept-installation-policy").check();
+  await page.locator("#profile-save").click();
+  await expect(page.locator("#profile-security")).toBeVisible();
+  await expect(page.locator("#student-profile-title")).toHaveText(identity.displayName);
+  await checkWidths();
+  await page.locator("#profile-signout").click();
+  await expect(page.locator("#profile-signin")).toBeVisible();
+  await checkWidths();
+});
+
 test("profile editing and sign-out preserve local recall records, session count and the installation marker", async ({ page }) => {
   await stubAuth(page, { user: student });
   await profileApi(page);

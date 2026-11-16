@@ -16,7 +16,10 @@ export const test = base.extend({
 export { expect };
 
 export async function expectNoHorizontalOverflow(page) {
-  const layout = await page.evaluate(() => {
+  // Resize/navigation can expose the new innerWidth before all responsive styles
+  // have settled. Recheck the actual layout, not a fixed sleep or a test retry.
+  // A persistent overflow still fails and reports the offending element bounds.
+  await expect.poll(() => page.evaluate(() => {
     const viewport = window.innerWidth;
     const overflowing = [...document.querySelectorAll("body *")].flatMap(element => {
       const rect = element.getBoundingClientRect();
@@ -24,9 +27,9 @@ export async function expectNoHorizontalOverflow(page) {
         ? [{ element: element.id ? `#${element.id}` : element.tagName.toLowerCase(), right: Math.round(rect.right), width: Math.round(rect.width) }]
         : [];
     }).slice(0, 12);
-    return { viewport, width: document.documentElement.scrollWidth, overflowing };
-  });
-  expect(layout.width, `Horizontal layout: ${JSON.stringify(layout)}`).toBeLessThanOrEqual(layout.viewport);
+    const width = document.documentElement.scrollWidth;
+    return { fits: width <= viewport, viewport, width, overflowing };
+  }), { message: "Responsive layout fits the viewport without horizontal overflow" }).toMatchObject({ fits: true });
 }
 
 export const student = { uid: "synthetic-student", email: "student@example.invalid", displayName: "Synthetic Student", emailVerified: true, providerData: [{ providerId: "password" }] };
