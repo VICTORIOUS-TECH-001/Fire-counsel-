@@ -18,6 +18,7 @@ async function serveRouter(t, router) {
 function makeRouter(pool, rows = [{ id: MATERIAL_ID, title: "Contract Law Notes" }], configured = () => true) {
   return createStudentMaterialsRouter({
     configured,
+    installationGate: (_req, _res, next) => next(),
     poolProvider: () => pool,
     verifyToken(req, _res, next) {
       req.user = { uid: "student-firebase-uid", email: "student@example.invalid", admin: false };

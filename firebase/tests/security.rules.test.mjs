@@ -103,7 +103,9 @@ test("Storage allows public slide reads and admin-only valid image uploads", asy
   await assertSucceeds(uploadBytes(ref(adminStorage, path), pngBytes, { contentType: "image/png" }));
 
   const downloaded = await assertSucceeds(getBytes(ref(anonymousStorage, path)));
-  assert.deepEqual([...downloaded], [...pngBytes]);
+  // The Storage SDK returns an ArrayBuffer, which is not itself iterable.
+  assert.equal(downloaded.byteLength, pngBytes.byteLength);
+  assert.deepEqual([...new Uint8Array(downloaded)], [...pngBytes]);
 });
 
 test("Storage rejects non-image types, oversized images, and non-slide paths", async () => {
@@ -131,12 +133,19 @@ test("Storage permits deletion only by an admin custom claim", async () => {
   const path = `site/slides/rules-test-${randomUUID()}.png`;
   const studentStorage = testEnv.authenticatedContext("test-student").storage();
   const adminStorage = testEnv.authenticatedContext("test-admin", { admin: true }).storage();
+  const anonymousStorage = testEnv.unauthenticatedContext().storage();
+  const pngBytes = new Uint8Array([1, 2, 3]);
 
   await testEnv.withSecurityRulesDisabled(async (context) => {
-    await uploadBytes(ref(context.storage(), path), new Uint8Array([1, 2, 3]), { contentType: "image/png" });
+    await uploadBytes(ref(context.storage(), path), pngBytes, { contentType: "image/png" });
   });
 
   await assertFails(deleteObject(ref(studentStorage, path)));
+  await assertFails(deleteObject(ref(anonymousStorage, path)));
+  const retained = await assertSucceeds(getBytes(ref(anonymousStorage, path)));
+  assert.deepEqual([...new Uint8Array(retained)], [...pngBytes]);
   await assertSucceeds(deleteObject(ref(adminStorage, path)));
-  await assertFails(getBytes(ref(testEnv.unauthenticatedContext().storage(), path)));
+  // Public reads remain allowed; a successfully deleted object is missing,
+  // not permission-denied. assertFails deliberately accepts permission errors only.
+  await assert.rejects(getBytes(ref(anonymousStorage, path)), { code: "storage/object-not-found" });
 });

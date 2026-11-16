@@ -1,3 +1,5 @@
+import { createRequestScope } from "./request-scope.mjs";
+
 const form = document.querySelector("#research-search-form");
 const input = document.querySelector("#research-query");
 const button = document.querySelector("#research-search-button");
@@ -5,6 +7,7 @@ const status = document.querySelector("#research-search-status");
 const results = document.querySelector("#research-search-results");
 let authClient;
 let currentUser = null;
+const searchScope = createRequestScope();
 
 function setStatus(message, state = "") {
   status.textContent = message;
@@ -17,12 +20,6 @@ function addText(parent, tag, text, className = "") {
   if (className) node.className = className;
   parent.append(node);
   return node;
-}
-
-function displayDateOrText(value) {
-  if (!value) return "";
-  if (typeof value === "string" && value.length > 260) return `${value.slice(0, 257)}…`;
-  return String(value);
 }
 
 function resultCard(type, titleText, description, sourceId, fullText = "") {
@@ -86,14 +83,14 @@ function renderSearchResults(data) {
       item.case_name || "Case memory summary",
       [item.citation, item.memory_trigger].filter(Boolean).join(" · "),
       item.id,
-      [item.full_summary, item.revision_summary, item.exam_ready_summary, item.key_principle].filter(Boolean).join("\\n\\n")
+      [item.full_summary, item.revision_summary, item.exam_ready_summary, item.key_principle].filter(Boolean).join("\n\n")
     )],
     ["Verified marking rubrics", data.rubrics || [], (item) => resultCard(
       "marking rubric",
       item.title,
       [item.course_title, item.total_marks != null ? `${item.total_marks} marks` : ""].filter(Boolean).join(" · "),
       item.id,
-      [item.question_text, item.instructions, ...(Array.isArray(item.criteria) ? item.criteria.map((criterion) => `${criterion.criterion} (${criterion.marks} marks)${criterion.description ? `: ${criterion.description}` : ""}`) : [])].filter(Boolean).join("\\n\\n")
+      [item.question_text, item.instructions, ...(Array.isArray(item.criteria) ? item.criteria.map((criterion) => `${criterion.criterion} (${criterion.marks} marks)${criterion.description ? `: ${criterion.description}` : ""}`) : [])].filter(Boolean).join("\n\n")
     )]
   ];
   let count = 0;
@@ -119,6 +116,7 @@ function renderSearchResults(data) {
 
 async function search(event) {
   event.preventDefault();
+  const isCurrent = searchScope.begin();
   results.replaceChildren();
   const query = input.value.trim();
   if (query.length < 3) {
@@ -138,13 +136,15 @@ async function search(event) {
     });
     let body = {};
     try { body = await response.json(); } catch { /* use a safe fallback below */ }
+    if (!isCurrent()) return;
     if (!response.ok) throw new Error(body.error || `Search is unavailable (${response.status}).`);
     const count = renderSearchResults(body.data || {});
     setStatus(`${count} source result${count === 1 ? "" : "s"}. Search was performed within FIRE COUNSEL; no prompt was sent to Gemini.`);
   } catch (error) {
+    if (!isCurrent()) return;
     setStatus(error.message || "Neon source search could not be completed.", "error");
   } finally {
-    button.disabled = false;
+    if (isCurrent()) button.disabled = false;
   }
 }
 
@@ -153,10 +153,19 @@ form.addEventListener("submit", search);
 try {
   authClient = await import("./firebase/auth-client.mjs");
   authClient.onAuthStateChanged(authClient.firebaseAuth, (user) => {
+    searchScope.invalidate();
+    results.replaceChildren();
+    button.disabled = false;
     currentUser = user;
     if (!user) setStatus("Sign in to search published and verified Neon sources.");
     else setStatus("Ready to search approved materials, cases, statutes and exact past questions.");
-  }, () => setStatus("Firebase Auth could not verify this session.", "error"));
+  }, () => {
+    searchScope.invalidate();
+    currentUser = null;
+    results.replaceChildren();
+    button.disabled = false;
+    setStatus("Firebase Auth could not verify this session.", "error");
+  });
 } catch (error) {
   setStatus("Firebase client configuration is not available. No search request was sent.", "error");
   console.warn("Legal source search unavailable:", error.message);

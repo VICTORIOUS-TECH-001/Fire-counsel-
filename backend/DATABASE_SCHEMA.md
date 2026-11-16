@@ -51,3 +51,17 @@ The schema is well suited to a future source-grounded research pipeline: retriev
 ## Live integration prerequisite
 
 Set the Neon pooled connection URL privately in the ignored `backend/.env` as `DATABASE_URL` when ready; do not paste it into chat. The API enforces TLS certificate/hostname validation. Before write routes run against Neon, compare this snapshot against the live schema, take a backup, test routes on disposable/staging data, and document the chosen object-storage provider for file uploads. No database migration, live write, deletion, or Firebase change was made by this schema review.
+
+## Additive self-service student-profile proposal
+
+Student profile read/create/name-edit routes now use only the known `app_users`
+identity/profile columns. `migrations/001_student_profiles.sql` proposes one new
+`student_account_installations` table for a UID-scoped hashed browser marker,
+registration/last-sync timestamps and the latest observed connection IP/source.
+It is **not part of the supplied 27-table export** and has not been applied to
+Neon. Review the actual UUID keys, uniqueness/default/status constraints and
+privacy/lockout consequences before manually applying it to disposable staging.
+The default feature flag is off; no server startup migration occurs. No profile
+operation assigns a role, membership, course enrollment, payment or entitlement.
+Google photos/current email are read from Firebase; passwords remain Firebase
+credentials, never added to this schema. See [STUDENT_PROFILES.md](STUDENT_PROFILES.md).

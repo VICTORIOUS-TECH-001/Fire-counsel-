@@ -1,3 +1,5 @@
+import { createRequestScope } from "./request-scope.mjs";
+
 const $ = (selector) => document.querySelector(selector);
 const title = $("#admin-auth-title");
 const message = $("#admin-auth-message");
@@ -5,6 +7,7 @@ const statusCard = $("#admin-auth-status");
 const signInLink = $("#admin-auth-link");
 const signOutButton = $("#admin-signout");
 let authClient;
+const sessionScope = createRequestScope();
 
 function setStatus(state, heading, detail) {
   statusCard.dataset.state = state;
@@ -13,14 +16,16 @@ function setStatus(state, heading, detail) {
 }
 
 async function verifyAdmin(user) {
+  const isCurrent = sessionScope.capture();
   signInLink.hidden = true;
   signOutButton.hidden = false;
   setStatus("checking", "Checking administrator permission…", user.email || "Checking this Firebase account with the API.");
 
   try {
     const response = await authClient.apiRequest("/api/v1/admin/me");
+    if (!isCurrent()) return;
     if (response.ok) {
-      setStatus("verified", "Server verified administrator access", `${user.email || "Signed-in user"}. Live content editing is still disabled until Neon and admin routes are configured.`);
+      setStatus("verified", "Server verified administrator access", `${user.email || "Signed-in user"}. Database editing additionally requires a healthy Neon connection. AI, uploads, quotas and account adjustments remain disabled.`);
       return;
     }
     if (response.status === 403) {
@@ -29,6 +34,7 @@ async function verifyAdmin(user) {
     }
     setStatus("offline", "Admin API is not ready", "Firebase sign-in succeeded, but the same-origin API did not verify admin access. No live admin action is enabled.");
   } catch {
+    if (!isCurrent()) return;
     setStatus("offline", "Admin API is not connected", "Firebase sign-in succeeded, but /api/v1/admin/me is unavailable on this origin. The panel remains a local preview.");
   }
 }
@@ -36,6 +42,7 @@ async function verifyAdmin(user) {
 try {
   authClient = await import("./firebase/auth-client.mjs");
   authClient.onAuthStateChanged(authClient.firebaseAuth, (user) => {
+    sessionScope.invalidate();
     if (user) verifyAdmin(user).catch(() => {});
     else {
       signInLink.hidden = false;
@@ -43,6 +50,7 @@ try {
       setStatus("signed-out", "Admin permission not verified", "Sign in to check the server-issued administrator claim. Local drafts remain local.");
     }
   }, (error) => {
+    sessionScope.invalidate();
     signInLink.hidden = false;
     signOutButton.hidden = true;
     setStatus("offline", "Firebase Auth could not load", error.message || "Check the local Firebase configuration.");

@@ -1,8 +1,12 @@
+import { createRequestScope } from "./request-scope.mjs";
+
 const status = document.querySelector("#server-materials-status");
 const list = document.querySelector("#server-material-list");
 const refreshButton = document.querySelector("#refresh-server-materials");
 let authClient;
 let currentUser = null;
+const sessionScope = createRequestScope();
+const listScope = createRequestScope();
 
 function setStatus(message, error = false) {
   status.textContent = message;
@@ -63,14 +67,17 @@ function materialCard(material) {
       content.textContent = "Sign in again to read this material.";
       return;
     }
+    const isCurrent = sessionScope.capture();
     content.textContent = "Loading approved text…";
     try {
       const response = await authClient.apiRequest(`/api/v1/materials/${encodeURIComponent(material.id)}`);
       const body = await readJson(response);
+      if (!isCurrent()) return;
       if (!response.ok) throw new Error(body.error || `Request failed (${response.status}).`);
       content.textContent = body.data?.extracted_text || "No text version is available for this material yet.";
       loaded = true;
     } catch (error) {
+      if (!isCurrent()) return;
       content.textContent = error.message || "Material could not be loaded.";
     }
   });
@@ -79,6 +86,8 @@ function materialCard(material) {
 }
 
 async function loadMaterials() {
+  const isCurrent = listScope.begin();
+  refreshButton.disabled = false;
   if (!currentUser || !authClient) {
     setStatus("Sign in to load materials approved for your account.");
     clearList("Published Neon materials appear here only when your course or institution access allows them.");
@@ -89,6 +98,7 @@ async function loadMaterials() {
   try {
     const response = await authClient.apiRequest("/api/v1/materials?limit=25");
     const body = await readJson(response);
+    if (!isCurrent()) return;
     if (!response.ok) throw new Error(body.error || `Materials API is not ready (${response.status}).`);
     const materials = Array.isArray(body.data) ? body.data : [];
     list.replaceChildren();
@@ -100,22 +110,34 @@ async function loadMaterials() {
     for (const material of materials) list.append(materialCard(material));
     setStatus(`${materials.length} published material${materials.length === 1 ? "" : "s"} available. Your personal files remain local to this device.`);
   } catch (error) {
+    if (!isCurrent()) return;
     setStatus(error.message || "The Neon materials API could not be reached.", true);
     clearList("This does not affect your local documents or IndexedDB study data.");
   } finally {
-    refreshButton.disabled = false;
+    if (isCurrent()) refreshButton.disabled = false;
   }
 }
 
 refreshButton.addEventListener("click", loadMaterials);
+window.addEventListener("fire-counsel-profile-ready", event => {
+  if (currentUser && event.detail?.uid === currentUser.uid) {
+    sessionScope.invalidate();
+    loadMaterials();
+  }
+});
 
 try {
   authClient = await import("./firebase/auth-client.mjs");
   authClient.onAuthStateChanged(authClient.firebaseAuth, (user) => {
+    sessionScope.invalidate();
     currentUser = user;
+    clearList("Checking access for this session…");
     loadMaterials();
   }, () => {
+    sessionScope.invalidate();
+    listScope.invalidate();
     currentUser = null;
+    refreshButton.disabled = false;
     setStatus("Firebase Auth could not verify this session.", true);
     clearList("Reload or sign in again to check course materials.");
   });

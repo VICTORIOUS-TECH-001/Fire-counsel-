@@ -1,0 +1,108 @@
+/* Shared, namespaced styles for authenticated content; no existing study UI is replaced. */
+.integration-card{min-width:0;margin:18px 0;padding:22px;border:1px solid #e3ddec;border-radius:16px;background:#fff;color:#2c2438;box-shadow:0 6px 24px #30204705}
+.integration-card h2{margin:5px 0 9px;font-size:20px;line-height:1.25;letter-spacing:-.025em}
+.integration-card p{margin:8px 0;color:#70677d;font-size:12px;line-height:1.65}
+.integration-heading,.database-form-heading,.admin-auth-card{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
+.integration-heading .button{flex:none}
+.integration-actions{display:flex;flex-wrap:wrap;align-items:center;gap:9px}
+.integration-status{overflow-wrap:anywhere}
+.integration-status[data-kind="error"],.integration-status[data-state="error"]{color:#a13748}
+.integration-status[data-kind="ok"]{color:#157459}
+.integration-state-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.integration-state{margin:0;padding:13px 16px;border:1px solid #e3ddec;border-radius:12px;background:#fff;font-size:11px;color:#746780}
+.integration-state[data-state="ready"]{background:#edf9f2;border-color:#bfe4cf;color:#17613c}
+.admin-auth-card[data-state="verified"]{border-color:#9dceb8}
+.admin-auth-card h2{font-size:16px}
+.admin-auth-card p{font-size:11px}
+.admin-auth-card .integration-actions{flex-shrink:0}
+.database-toolbar{display:flex;align-items:flex-end;flex-wrap:wrap;gap:12px}
+.database-toolbar label{flex:1;min-width:160px}
+.database-toolbar label,.database-field{display:grid;gap:6px;color:#5e536c;font-size:12px;font-weight:600}
+.database-toolbar input,.database-toolbar select,.database-field input:not([type="checkbox"]),.database-field select,.database-field textarea{width:100%;min-width:0;padding:10px 12px;border:1px solid #dcd4e5;border-radius:8px;background:#fbfafc;color:#31283d;font:inherit;font-weight:400}
+.database-field textarea{resize:vertical;line-height:1.6}
+.database-field small{color:#7e7389;font-size:10px;font-weight:400;line-height:1.6}
+.database-fields{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:20px 0}
+.database-field.is-wide{grid-column:1/-1}
+.database-table-wrap{width:100%;overflow:auto;border:1px solid #ece7f1;border-radius:10px}
+.database-table{width:100%;border-collapse:collapse;text-align:left;font-size:11px}
+.database-table th,.database-table td{padding:12px;border-bottom:1px solid #ece7f1;max-width:300px;overflow-wrap:anywhere;vertical-align:top}
+.database-table th{background:#f8f5fb;color:#74677f;font-size:10px;white-space:nowrap}
+.database-table-actions{display:flex;gap:6px}
+.database-table-actions .button{min-height:30px}
+.database-empty{padding:26px!important;text-align:center;color:#8c8197}
+.database-pagination{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;color:#7b7085;font-size:11px}
+.database-version-list{display:grid;gap:8px;margin:16px 0}
+.database-version-item{padding:10px 12px;border:1px solid #e8e0f0;border-radius:8px;background:#faf8fd;font-size:11px;color:#71617e}
+.checkbox-row{display:flex;align-items:center;gap:8px}
+.integration-card button:disabled,.database-toolbar :disabled,.database-field :disabled{opacity:.5;cursor:not-allowed}
+.integration-card [hidden]{display:none!important}
+.student-signin-link{display:block;margin:12px 18px;padding:10px 12px;border:1px solid var(--line,#e1d9ec);border-radius:9px;background:var(--surface,#fff);color:#7454a3;font-size:11px}
+body[data-theme="dark"] .student-signin-link{color:#e7d8ff}
+#student-profile-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The study shell does not load the public site's stylesheet. */
+.app~.site-footer{margin-left:var(--sidebar,252px);padding:28px 34px 22px;border-top:1px solid var(--line);color:var(--muted);font-size:11px;line-height:1.7}
+.app~.site-footer .footer-main{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:24px}
+.app~.site-footer .site-brand{display:flex;align-items:center;gap:10px;color:var(--ink)}
+.app~.site-footer .brand-image-wrap{display:block;flex:none;width:40px;height:40px;overflow:hidden;border-radius:12px}
+.app~.site-footer .brand-image-wrap img{width:100%;height:100%;object-fit:cover}
+.app~.site-footer .footer-brand p{max-width:270px;font-size:11px}
+.app~.site-footer .footer-column{display:grid;align-content:start;gap:7px}
+.app~.site-footer h3{margin:0 0 4px;color:var(--ink);font-size:11px}
+.app~.site-footer a:hover{text-decoration:underline}
+.app~.site-footer .footer-disclaimer{margin-top:24px;padding-top:17px;border-top:1px solid var(--line);font-size:10px}
+.app~.site-footer .footer-bottom{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-top:14px;font-size:10px}
+@media(max-width:1100px){.app~.site-footer .footer-main{grid-template-columns:1fr 1fr}.app~.site-footer .footer-brand{grid-column:1/-1}}
+@media(max-width:900px){.app~.site-footer{margin-left:0;padding:24px 22px}}
+@media(max-width:480px){.app~.site-footer .footer-main{gap:18px}.app~.site-footer .footer-bottom{align-items:flex-start;flex-direction:column}}
+.server-material-list,.research-search-results{display:grid;gap:12px}
+.server-material-empty{padding:22px;border:1px dashed #d8cde4;border-radius:11px;background:#fbf9fd;color:#82738d;font-size:12px;line-height:1.7}
+.server-material-card,.research-result-card{min-width:0;padding:18px;border:1px solid #e5dcee;border-radius:12px;background:#fcfaff}
+.server-material-card h3,.research-result-card h3{margin:0;font-size:15px;overflow-wrap:anywhere}
+.server-material-meta{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.server-material-meta span,.research-result-type{display:inline-block;padding:4px 7px;border-radius:6px;background:#eee6fb;color:#735798;font-size:10px}
+.server-material-content summary,.research-result-card summary{margin-top:12px;color:#7352ae;font-size:12px;font-weight:600;cursor:pointer}
+.server-material-content pre,.research-result-card pre{max-height:500px;overflow:auto;padding:14px;border-radius:8px;background:#f3edf9;color:#40314e;font:12px/1.8 ui-monospace,SFMono-Regular,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.research-search-form{display:flex;align-items:flex-end;gap:12px;margin:18px 0}
+.research-search-form label{display:grid;flex:1;gap:7px;color:#6a587d;font-size:12px;font-weight:600}
+.research-search-form input{width:100%;min-width:0;padding:12px;border:1px solid #d8c9e8;border-radius:9px;background:#fcfaff;color:#433052;font:inherit}
+.research-panel{margin-bottom:24px}
+.research-result-card header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.research-result-type{flex:none}
+.research-results-heading{margin:14px 0 0;font-size:14px}
+.research-result-source{font-size:10px!important;overflow-wrap:anywhere}
+body[data-theme="dark"] .server-materials,body[data-theme="dark"] .research-panel{background:#241c30;border-color:#453450;color:#f1e8fc}
+body[data-theme="dark"] .integration-card p{color:#c1b0d0}
+/* Student-owned profiles are independent of academic and administrative forms. */
+.student-profile-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.9fr);gap:20px;align-items:start}
+.student-profile-grid>.integration-card{margin:0}
+.student-profile-heading{display:flex;align-items:center;gap:16px;margin-bottom:17px}
+.student-profile-heading>div:last-child{min-width:0}
+.student-profile-heading h2,.student-profile-heading p{overflow-wrap:anywhere}
+.student-profile-picture{position:relative;display:grid;place-items:center;flex:none;width:64px;height:64px;overflow:hidden;border-radius:20px;background:#eee5fb;color:#7352a9;font-size:22px;font-weight:800}
+.student-profile-picture img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#eee5fb}
+.student-profile-form{display:grid;gap:17px;margin-top:23px}
+.student-profile-form .button{justify-self:start}
+.student-profile-form input:focus-visible{outline:3px solid #e3d8f6;outline-offset:2px}
+.student-profile-form input[readonly]{background:#f1eef5;color:#756b80}
+.student-profile-form h3{margin:0;font-size:14px}
+.profile-policy{display:flex;align-items:flex-start;gap:10px;padding:14px;border:1px solid #e5d8bc;border-radius:10px;background:#fffaf0;color:#796344;font-size:11px;line-height:1.75}
+.profile-policy input{flex:none;margin:4px 0 0;accent-color:#8060b7}
+.profile-policy strong{display:block;color:#655034}
+.profile-privacy{margin-top:24px!important;padding-top:17px;border-top:1px solid #ece6f2;font-size:11px!important}
+.profile-device-details{display:grid;gap:7px;margin:22px 0;font-size:12px;line-height:1.6}
+.profile-device-details dt{margin-top:7px;color:#94839f;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.profile-device-details dd{margin:0;overflow-wrap:anywhere;color:#5d496d}
+.student-security-card{grid-column:1/-1}
+.profile-security-forms{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:20px}
+.profile-security-forms>div{padding-top:20px}
+.profile-security-forms h3{font-size:14px}
+.profile-verification{margin:18px 0;padding:16px;border:1px solid #e6d9b7;border-radius:10px;background:#fffbf0}
+body[data-theme="dark"] .student-profile-grid>.integration-card{background:#241c30;border-color:#453450;color:#f1e8fc}
+body[data-theme="dark"] .student-profile-form label{color:#c1b0d0}
+body[data-theme="dark"] .profile-device-details dd{color:#dacbe6}
+body[data-theme="dark"] .student-profile-form .profile-policy,body[data-theme="dark"] .profile-verification{background:#352b21;border-color:#69543b;color:#dfcba0}
+body[data-theme="dark"] .profile-policy strong{color:#efd5a3}
+body[data-theme="dark"] .student-profile-grid .integration-status[data-kind="error"]{color:#ff9eae}
+body[data-theme="dark"] .student-profile-grid .integration-status[data-kind="ok"]{color:#7edaba}
+@media(max-width:760px){.student-profile-grid,.profile-security-forms{grid-template-columns:1fr}.profile-security-forms{gap:15px}.student-security-card{grid-column:auto}.student-profile-heading{gap:12px}}
+@media(max-width:760px){.admin-auth-card{flex-direction:column}.integration-state-grid,.database-fields{grid-template-columns:1fr}.integration-card{padding:17px}.integration-heading{flex-wrap:wrap}.research-search-form{align-items:stretch;flex-direction:column}.research-result-card header{flex-wrap:wrap}.database-pagination{align-items:flex-start;flex-direction:column}}

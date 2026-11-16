@@ -77,7 +77,7 @@
     $("#scrim").classList.remove("show");
   }
   function showPage(name, updateHash = true) {
-    const studentPages = ["dashboard", "ai-chat", "subjects", "library", "memory", "exams"];
+    const studentPages = ["dashboard", "ai-chat", "subjects", "library", "memory", "exams", "profile"];
     const valid = studentPages.includes(name) ? name : "dashboard";
     $$(".page").forEach(page => page.classList.toggle("active-page", page.id === `${valid}-page`));
     const studentNav = $("#student-nav");
@@ -85,9 +85,8 @@
     $$("#student-nav .nav-link").forEach(link => link.classList.toggle("active", link.dataset.page === valid));
     $("#workspace-label").textContent = "Student workspace";
     $("#breadcrumb-workspace").textContent = "Student";
-    $("#page-breadcrumb").textContent = ({dashboard:"Overview","ai-chat":"Fire Counsel AI",subjects:"My courses",library:"Study library",memory:"Case flashcards",exams:"Past questions"})[valid];
+    $("#page-breadcrumb").textContent = ({dashboard:"Overview","ai-chat":"Fire Counsel AI",subjects:"My courses",library:"Study library",memory:"Case flashcards",exams:"Past questions",profile:"My profile"})[valid];
     $("#mode-label").textContent = "LOCAL STUDY";
-    $("#profile-role").textContent = "Local-first workspace";
     closeSidebar();
     if (updateHash && location.hash !== `#${valid}`) history.replaceState(null, "", `#${valid}`);
     window.scrollTo({top:0, behavior:"smooth"});

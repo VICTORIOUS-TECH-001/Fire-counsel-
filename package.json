@@ -1,0 +1,25 @@
+{
+  "name": "fire-counsel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local development and regression checks for the FIRE COUNSEL PWA",
+  "engines": {
+    "node": ">=22.17.0"
+  },
+  "scripts": {
+    "dev": "python3 tools/dev_server.py",
+    "dev:admin": "python3 tools/admin_preview_server.py",
+    "check": "node tools/check.mjs && npm --prefix backend run check",
+    "test": "npm run check && npm run test:frontend && npm run test:proxy && npm --prefix backend test && npm --prefix firebase run test:local",
+    "test:frontend": "node --test tests/frontend/*.test.mjs",
+    "test:proxy": "python3 -m unittest discover -s tools/tests -v",
+    "test:browser": "playwright test",
+    "test:rules": "npm --prefix firebase run test:rules",
+    "test:all": "npm test && npm run test:browser && npm run test:rules"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@sparticuz/chromium": "153.0.0"
+  }
+}
