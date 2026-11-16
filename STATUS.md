@@ -4,24 +4,31 @@
 
 **Branch:** `arena/15cb68b6-fire-counsel`
 
-**Scope:** code review/repairs, self-service student profiles and installation authorization, dependency checks, local SQL/API/proxy tests, synthetic browser tests and local preview. No live-project verification or deployment.
+**Scope:** code review/repairs, self-service student profiles and installation authorization, dependency checks, local SQL/API/proxy tests, synthetic browser tests, GitHub Actions demo-project rule emulators and local preview. No live-project verification or deployment.
 
 ## Results
 
 | Check | Result | What this establishes |
 | --- | --- | --- |
 | Backend tests | **62/62 passed** | Firebase verification, profile SQL/migration against in-memory PGlite, UID/installation/status isolation, first-binding races/rollback, stale-email and unknown-field rejection, content authorization, allowlisted CRUD/text versions, readiness, CORS and JSON limits |
-| Frontend / service-worker / request-state tests | **37/37 passed** | Actual Auth/API helper logic against a stub SDK, installation persistence/storage failures, DOM/assets, navigation, cache boundaries and stale-session guards |
+| Frontend / service-worker / request-state / CI-reporting tests | **40/40 passed** | Actual Auth/API helper logic against a stub SDK, installation persistence/storage failures, DOM/assets, navigation, cache boundaries, stale-session guards and failure-reporting exit-code preservation |
 | Python preview/proxy tests | **14/14 passed** | Restricted files/assets, API methods/auth/installation headers, replacement of client IP assertions, body/framing limits, HEAD and unavailable-upstream responses |
 | Legacy study-data compatibility checks | **3/3 passed** | Existing IndexedDB identity/version/stores, localStorage key and non-destructive cache cleanup remain intact |
-| Headless Chromium browser tests | **26/26 passed** | Existing public/local/offline/admin flows plus registration, Google-prefilled profile creation, consent, safe name edits, Firebase security UI, changed-installation denial, delayed profile replies and preserved local records |
-| JavaScript/Python syntax | **Passed** | 51 JavaScript modules plus Python development/test tools parse successfully |
+| Headless Chromium browser tests | **27/27 passed** | Existing public/local/offline/admin flows plus registration, Google-prefilled profile creation, consent, safe name edits, Firebase security UI, changed-installation denial, delayed profile replies, preserved local records and responsive profile states |
+| JavaScript/Python syntax | **Passed** | 52 JavaScript modules plus Python development/test tools parse successfully |
 | `git diff --check` | **Passed** | No patch whitespace errors |
-| Firebase Firestore/Storage rules suite | **BLOCKED — not passed** | Emulator startup stops because Java is unavailable. The six security-rule scenarios have not executed here. |
+| Firebase Firestore/Storage rule scenarios | **6/6 passed in GitHub Actions** | Java 21 demo-project emulators exercised actual public/admin/student access rules, slide type/size/path restrictions, denied deletions preserving bytes, and successful admin deletion. Java remains unavailable in this sandbox; this is a CI emulator pass, not live-project verification. |
 
-**Total runnable regression tests: 142 passed.** This excludes the blocked security-rule scenarios and all live Firebase/Neon checks.
+**Local regression tests: 146 passed** (`npm test`: 119; browser: 27). **Six additional security-rule scenarios passed in CI**, for **152 distinct checks** across those suites. The emulator command also reruns the three compatibility tests already counted above. All live Firebase/Neon checks remain unverified.
 
 Browser tests use isolated disposable profiles, synthetic users and stubbed authenticated replies. External browser requests are blocked. They do not validate real Firebase tokens, create accounts, send reset email, connect to Neon, or access anyone's existing browser profile.
+
+## GitHub Actions failures corrected
+
+- **Storage download comparison:** Firebase `getBytes()` returns an ArrayBuffer, not an iterable. Tests now compare its byte length and Uint8Array contents.
+- **Deleted public objects:** `assertFails()` is for permission denials, not `storage/object-not-found`. The suite still requires student and anonymous deletion denials, verifies that the original bytes remain, then requires admin deletion and the exact missing-object error. The rules themselves were not changed.
+- **Responsive-layout timing:** the mobile browser assertion sometimes read the new viewport while footer styles retained the preceding desktop layout. A new regression reproduces profile loading, consent, security and signed-out states at 320, 390, 768 and 1024 pixels, including a 120-character name. A web-first layout assertion waits for the actual width condition; persistent overflow still fails with element bounds. No arbitrary sleeps, skipped tests or whole-test retries were added.
+- **Unavailable downloadable logs:** `tools/ci_check.sh` preserves command/tee failures while publishing bounded excerpts in check annotations and step summaries. Three local tests cover success, nonzero exit propagation, escaping and output limits.
 
 ## Regressions found and corrected
 
@@ -61,12 +68,12 @@ See [backend/STUDENT_PROFILES.md](backend/STUDENT_PROFILES.md) for the exact flo
 | Neon connection/schema | `DATABASE_URL` is absent. No live Neon reads/writes, schema compatibility, memberships, CRUD or full-text search have been verified. Profile SQL/migration tests use in-memory PGlite with known identity columns; other SQL/UI tests use injected providers/stubs. |
 | Academic content | Allowlisted content CRUD and pasted-text versions/chunks are implemented. Academic-material **file uploads are not implemented**. |
 | Student materials/search | Verified email + active bound profile now precede existing approved/published/institution/enrollment checks. Disabled/unreviewed profile setup blocks these APIs instead of bypassing the device restriction. All live access/retrieval still needs disposable staging testing. No AI/external search runs. |
-| Firestore/Storage rules | Local proposals only; no emulator pass, current-live-rule review or deployment. Java 21+ and emulator download access are required. |
+| Firestore/Storage rules | Six security-rule scenarios passed in Java 21 GitHub Actions demo-project emulators. Java remains absent locally. The live settings/current rules have not been reviewed and nothing was deployed. |
 | AI/Gemini, OCR and quotas | Provider key entry and operations remain disabled. No provider calls or quota enforcement. |
 | Slideshow uploads/deletes | Browser-local temporary photo previews only; no cloud upload/delete. |
 | Accounts/payments/publishing | Account adjustments are synthetic local drafts only. No account listing, administrator-set passwords, payment/activation or global publishing endpoint. Students' own Firebase security/profile flows are implemented separately; administrator account adjustment remains disabled. |
 | Deployment | Render blueprint remains staging-only; nothing deployed. No real student data, prompts, payments or production secrets should be configured on Render Free. |
-| GitHub checks | No existing PR or workflow runs were found for this working branch during the check. A local/browser workflow and separate Java-enabled emulator job were added; their remote execution and branch-protection status are **not verified**. |
+| GitHub checks | **Both jobs passed** for code commit `2931160` in [run 43781545600](https://github.com/VICTORIOUS-TECH-001/Fire-counsel-/actions/runs/43781545600): local/API/proxy/browser/audits and Java-enabled Firestore/Storage emulators. Branch-protection settings have not been reviewed; a green run does not authorize deployment or merge. |
 
 ## Dependency audit
 
@@ -74,7 +81,7 @@ See [backend/STUDENT_PROFILES.md](backend/STUDENT_PROFILES.md) for the exact flo
 - **Backend (including the pinned PGlite test dependency):** `npm audit` reports **0 vulnerabilities**.
 - **Firebase development tooling:** `npm audit` reports **10 moderate**, **0 high**, **0 critical** advisories. Affected paths involve the CLI's OpenTelemetry, glob/minimatch, archiver and gaxios/uuid dependencies. These are test/development tools, not a newly enabled production feature.
 - `npm ls` also identifies **three inherited `glob@14.0.6` resolutions outside their dependants' declared ranges** in the Firebase lockfile (`firebase-tools`, `exegesis`, `rimraf`). `npm ci` succeeds, but that does not establish compatibility.
-- Those Firebase dependency issues are **not resolved** in this pass. No forced major-version downgrade/override was applied without an emulator run. Review the upstream dependency graph, choose supported patched versions, then rerun Java-enabled rules tests before trusting the toolchain for deployment. The workflow reports moderate audit warnings and fails on high/critical audit findings; it is not an assertion of a clean Firebase audit.
+- Those Firebase dependency issues are **not resolved** in this pass. No forced major-version downgrade/override was applied. The Java-enabled emulator pass establishes the tested scenarios, not dependency remediation. Review the upstream graph, choose supported patched versions, then rerun all gates before trusting the toolchain for deployment. The workflow reports moderate audit warnings and fails on high/critical audit findings; it is not an assertion of a clean Firebase audit.
 
 ## Reproduce
 
@@ -92,10 +99,10 @@ Start the local API with `npm --prefix backend start` and the restricted website
 
 ## Next release gates
 
-1. Resolve Firebase toolchain dependency warnings; run the rules suite in Java 21+ and confirm the new CI jobs actually pass.
+1. Resolve Firebase toolchain dependency warnings and rerun all gates after dependency changes. Both CI jobs now pass; action-runtime deprecation/runner-image warnings remain maintenance work, not live-project approval.
 2. Review the existing Firebase project settings, current deployed rules/App Check, authorized domains/providers and intended administrator UID/claim. Review the real Neon schema before connecting it.
 3. Supply credentials **privately** in ignored local/backend configuration or a trusted staging secret store. Never paste keys, service-account JSON or database URLs into chat.
 4. Review and manually apply the proposed student-installation migration only to disposable staging, then enable profiles there. Test real registration/Google, profile creation/editing, email verification/change/reset, password changes, first binding and second-installation denial, suspended/revoked users, admin denial, Neon CRUD/rollback, content access and search. Review ingress/IP provenance and lockout/recovery behavior. Confirm personal browser study data remains unchanged.
 5. Keep AI, uploads, quotas, administrative account management, automatic device transfers, payments and production deployment disabled until their authorization, privacy/provider terms and integration tests are settled.
 
-No live Firebase/Neon write, schema migration, rule deployment, admin-claim change, account creation, provider-key setup, AI request, cloud upload/delete, payment, billing change, commit, push or deployment was performed for this verification pass.
+Implementation and CI fixes were committed and pushed to the working branch as requested. No live Firebase/Neon write, schema migration, rule deployment, admin-claim change, real account creation, provider-key setup, AI request, cloud upload/delete, payment, billing change, merge or deployment was performed. Emulator writes used only disposable demo-project fixtures.

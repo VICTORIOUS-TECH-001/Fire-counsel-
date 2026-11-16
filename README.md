@@ -56,7 +56,7 @@ npm run test:all             # all of the above; fails if any gate cannot run
 
 The browser suite starts isolated servers on ports 8081/4001 with backend cloud credentials blank. External browser requests are blocked; authenticated UI scenarios use synthetic users and stubbed replies. It never signs into Firebase, sends email, calls Neon, invokes AI, or reads real browser study data. Profile SQL/migration tests use in-memory PGlite with a synthetic model of known identity columns; no Neon schema is automatically migrated. Linux uses a pinned Chromium binary and supporting libraries supplied through npm; other platforms can install Playwright Chromium or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
 
-The GitHub Actions workflow runs local/browser checks and a **separate Java-enabled rules gate**. Adding a workflow does not mean it has already run on GitHub. No deployment is configured by that workflow.
+The GitHub Actions workflow runs local/browser checks and a **separate Java-enabled rules gate**. Both jobs have passed remotely; see [STATUS.md](STATUS.md) for the verified run and remaining release gates. Rules tests use only demo-project emulators, not the live Firebase project. No deployment is configured by that workflow. Failed browser/rules commands preserve their exit status and publish bounded diagnostics in the check annotations and step summary.
 
 Dependency audits can be checked separately:
 

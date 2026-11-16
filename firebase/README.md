@@ -140,13 +140,20 @@ flows. Browser stubs do not test live Firebase sign-in, real provider linking or
 verification/reset/change-email delivery. The profile SQL tests use in-memory
 PGlite, not Neon; no tests automatically run the migration against a live database.
 
-The rules suite is prepared but has **not** passed in this workspace: the Firebase
-Emulator Suite could not start because Java 21+ is not installed (`Could not spawn
-java -version`). Do not deploy the proposed rules or enable Firebase Storage
-uploads until `npm run test:rules` passes in a Java-enabled environment and the
-active project's settings/current rules have been reviewed.
+The six security-rule scenarios **passed in the Java 21 GitHub Actions job**
+against the demo-project emulators. The emulator command also reruns three local
+study-compatibility tests. Java 21+ is still absent from this sandbox, so the
+rules command cannot start here; the successful emulator run is remote CI,
+not verification of the active Firebase project.
 
-The Java-enabled GitHub Actions rules job is a separate proposed release gate,
-not an executed/deployed Firebase change. Known Firebase development dependency
-advisories and inherited lockfile inconsistencies are listed in `../STATUS.md`;
-they still need review rather than an untested forced major upgrade.
+Storage download tests compare the SDK's ArrayBuffer through a Uint8Array.
+Deletion tests require student/anonymous permission denials, confirm that those
+denials preserve the original bytes, then require admin deletion and the exact
+`storage/object-not-found` result. A missing public object is not a permission
+denial. No rule or authorization assertion was relaxed to obtain a passing job.
+
+The Java-enabled GitHub Actions rules job is an executed regression gate, **not
+a deployment**. Review the active project's settings/current rules and the known
+Firebase development dependency advisories/lockfile inconsistencies in
+[STATUS.md](../STATUS.md) before considering deployment. Storage uploads remain
+disabled; do not force untested major dependency upgrades to hide warnings.
