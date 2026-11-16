@@ -15,6 +15,20 @@ export const test = base.extend({
 });
 export { expect };
 
+export async function expectNoHorizontalOverflow(page) {
+  const layout = await page.evaluate(() => {
+    const viewport = window.innerWidth;
+    const overflowing = [...document.querySelectorAll("body *")].flatMap(element => {
+      const rect = element.getBoundingClientRect();
+      return rect.width > 0 && rect.right > viewport + 0.5
+        ? [{ element: element.id ? `#${element.id}` : element.tagName.toLowerCase(), right: Math.round(rect.right), width: Math.round(rect.width) }]
+        : [];
+    }).slice(0, 12);
+    return { viewport, width: document.documentElement.scrollWidth, overflowing };
+  });
+  expect(layout.width, `Horizontal layout: ${JSON.stringify(layout)}`).toBeLessThanOrEqual(layout.viewport);
+}
+
 export const student = { uid: "synthetic-student", email: "student@example.invalid", displayName: "Synthetic Student", emailVerified: true, providerData: [{ providerId: "password" }] };
 export const admin = { uid: "synthetic-admin", email: "admin@example.invalid" };
 export const rowId = "223e4567-e89b-42d3-a456-426614174000";

@@ -1,4 +1,4 @@
-import { test, expect, stubAuth, student, json, rowId } from "./fixtures.mjs";
+import { test, expect, expectNoHorizontalOverflow, stubAuth, student, json, rowId } from "./fixtures.mjs";
 
 const installationKey = "fire-counsel-installation-v1";
 const baseProfile = {
@@ -248,5 +248,5 @@ test("profile editing and sign-out preserve local recall records, session count 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/study.html#profile");
   await expect(page.locator("#profile-page")).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await expectNoHorizontalOverflow(page);
 });
