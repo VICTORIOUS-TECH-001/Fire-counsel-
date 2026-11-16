@@ -4,7 +4,7 @@ One Render web service serves both the public website and the `/api/` routes,
 because the website only calls the API on its own address.
 
 1. Open the Blueprint link:
-   https://dashboard.render.com/blueprint/new?repo=https://github.com/VICTORIOUS-TECH-001/Fire-counsel-
+   https://render.com/deploy?repo=https://github.com/VICTORIOUS-TECH-001/Fire-counsel-
    Sign in with GitHub and allow access to `Fire-counsel-`. Pick the branch that
    contains this `render.yaml` (`main` once the pull request is merged).
 2. Fill the secret boxes Render asks for:
