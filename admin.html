@@ -8,6 +8,7 @@
   <link rel="icon" href="./assets/fire-counsel-192.png" type="image/png">
   <link rel="stylesheet" href="./admin.css">
   <link rel="stylesheet" href="./integrations.css">
+  <link rel="stylesheet" href="./ai-studio.css">
 </head>
 <body>
   <header class="admin-topbar">
@@ -21,22 +22,22 @@
       <button class="admin-tab" type="button" data-panel="database"><span>▦</span>Database data</button>
       <button class="admin-tab" type="button" data-panel="content"><span>▤</span>Pages & JSON</button>
       <button class="admin-tab" type="button" data-panel="media"><span>▧</span>Slides & images</button>
-      <button class="admin-tab" type="button" data-panel="ai"><span>✦</span>AI provider</button>
-      <button class="admin-tab" type="button" data-panel="plans"><span>◷</span>AI quotas & users</button>
+      <button class="admin-tab" type="button" data-panel="ai"><span>✦</span>AI studio &amp; prompts</button>
+      <button class="admin-tab" type="button" data-panel="plans"><span>◷</span>Users &amp; AI limits</button>
       <div class="sidebar-bottom"><span class="lock-icon">⌑</span><p>Neon editing requires Firebase sign-in and a server-verified admin claim.</p><a href="./index.html">← Back to FIRE COUNSEL</a></div>
     </aside>
     <section class="admin-main">
-      <div class="security-warning"><span class="warning-icon">!</span><div><strong>Local previews and protected content tools — staging only.</strong><p>Site drafts and quota examples stay in this browser. Only the Database data panel can write Neon content, after server authorization and database setup. Uploads, AI, account management and quota enforcement remain disabled. Do not use real student data or paste provider keys here.</p></div></div>
+      <div class="security-warning"><span class="warning-icon">!</span><div><strong>Staging admin studio.</strong><p>Database data, AI settings, prompts and user limits are saved on the server only after it verifies your administrator account. Site content and slideshow drafts still stay in this browser. Never paste API keys here: they belong in Render&rsquo;s Environment settings.</p></div></div>
 
       <section class="integration-card admin-auth-card" id="admin-auth-status" data-state="checking" aria-labelledby="admin-auth-title">
         <div><span class="eyebrow">FIREBASE · SERVER AUTHORIZATION</span><h2 id="admin-auth-title">Checking administrator setup…</h2><p id="admin-auth-message" role="status" aria-live="polite">Local drafts do not grant database access.</p></div>
-        <div class="integration-actions"><a class="button button-light" id="admin-auth-link" href="./auth.html?next=admin.html">Sign in as administrator</a><button class="button button-light" id="admin-signout" type="button" hidden>Sign out</button></div>
+        <div class="integration-actions"><a class="button button-light" id="admin-auth-link" href="./auth.html?next=admin.html">Sign in as administrator</a><button class="button button-primary" id="admin-claim" type="button" hidden>Make this account the administrator</button><button class="button button-light" id="admin-signout" type="button" hidden>Sign out</button></div>
       </section>
 
       <section class="admin-panel is-visible" id="panel-overview" aria-labelledby="admin-title">
         <div class="admin-heading"><div><span class="eyebrow">FIRE COUNSEL · ADMIN STUDIO</span><h1 id="admin-title">Your study platform, in one place.</h1><p>Preview the controls for site content, slideshow images, AI settings, plan limits and individual student access.</p></div><a class="button button-primary" href="./index.html?draft=1" target="_blank" rel="noopener">Open website preview ↗</a></div>
-        <div class="admin-stat-grid"><article class="admin-stat"><span>01</span><strong>Website content</strong><small>JSON draft & local preview</small></article><article class="admin-stat"><span>02</span><strong>Slideshow images</strong><small>Add/remove preview controls</small></article><article class="admin-stat"><span>03</span><strong>AI provider</strong><small>Google key slot · locked safely</small></article><article class="admin-stat"><span>04</span><strong>Student allowances</strong><small>Feature and account controls</small></article></div>
-        <div class="admin-card next-card"><div><span class="eyebrow">ADMIN WORKSPACE</span><h2>Set the rules. Give each student the right access.</h2><p>Configure feature-by-feature AI allowances, review account usage and make an individual adjustment. In this preview, the controls create only a local draft; a secure API must be connected before changes affect students.</p><button class="button button-primary" type="button" data-switch="plans">Open quotas & student accounts →</button></div><div class="step-stack"><span><b>1</b> Set Free and paid-plan allowances</span><span><b>2</b> Adjust a student account</span><span><b>3</b> Apply changes through a secure server</span></div></div>
+        <div class="admin-stat-grid"><article class="admin-stat"><span>01</span><strong>Website content</strong><small>JSON draft & local preview</small></article><article class="admin-stat"><span>02</span><strong>Slideshow images</strong><small>Add/remove preview controls</small></article><article class="admin-stat"><span>03</span><strong>AI studio</strong><small>Key status · private prompts</small></article><article class="admin-stat"><span>04</span><strong>Users &amp; limits</strong><small>Active badges · daily allowances</small></article></div>
+        <div class="admin-card next-card"><div><span class="eyebrow">ADMIN WORKSPACE</span><h2>Set the rules. Give each student the right access.</h2><p>Set the default daily AI limits, see who is active right now, and give any account more or less. Changes apply to students immediately.</p><button class="button button-primary" type="button" data-switch="plans">Open users &amp; AI limits →</button></div><div class="step-stack"><span><b>1</b> Add courses, cases and past questions in Database data</span><span><b>2</b> Upload your private prompts in AI studio</span><span><b>3</b> Adjust any account&rsquo;s daily limits</span></div></div>
       </section>
 
       <section class="admin-panel" id="panel-database" aria-labelledby="database-title" hidden>
@@ -84,61 +85,80 @@
       </section>
 
       <section class="admin-panel" id="panel-ai" aria-labelledby="ai-title" hidden>
-        <div class="admin-heading"><div><span class="eyebrow">GOOGLE GEMINI · SERVER SECRET</span><h1 id="ai-title">AI provider settings.</h1><p>There is a dedicated slot for your Google Gemini key. It stays locked until secure administrator sign-in and a server-side secret endpoint exist.</p></div><span class="panel-status">KEY NOT CONNECTED</span></div>
-        <div class="admin-ai-grid">
-          <section class="provider-card ai-provider-card" aria-label="Google Gemini provider key">
-            <div class="provider-head"><span class="provider-icon">✦</span><div><strong>Google Gemini</strong><small>Provider connection · key entry reserved for an authenticated admin</small></div><span class="provider-state">NOT CONFIGURED</span></div>
-            <label class="field-label" for="provider-key">Google Gemini API key</label>
-            <div class="secret-input-wrap"><span aria-hidden="true">⌑</span><input id="provider-key" type="password" placeholder="Locked until secure admin setup" disabled aria-disabled="true" autocomplete="new-password"></div>
-            <button class="button button-disabled" id="save-provider-key" type="button" disabled aria-disabled="true">Save key securely · server setup required</button>
-            <div class="security-note"><strong>Do not paste the key into this preview or this chat.</strong><p>This provider panel has no secret-storage endpoint. A real key must go directly to an authenticated HTTPS API and be stored as a server-side secret, never in browser code, localStorage, a website JSON file or a public Firestore document. The key field here is deliberately disabled.</p></div>
+        <div class="admin-heading"><div><span class="eyebrow">GEMINI FIRST · OPENROUTER BACKUP · PRIVATE PROMPTS</span><h1 id="ai-title">AI studio settings.</h1><p>See which AI keys the server has, test the connection, and upload your private prompts. Keys are never typed here: they live in Render&rsquo;s Environment settings.</p></div><span class="panel-status" id="ai-panel-status">SIGN IN AS ADMIN</span></div>
+        <div class="fc-admin-grid">
+          <section class="fc-admin-card" aria-labelledby="ai-providers-title">
+            <span class="eyebrow">AI PROVIDERS</span><h2 id="ai-providers-title">Connection status</h2>
+            <div id="ai-provider-status"><p>Sign in as an administrator to load the status.</p></div>
+            <div class="fc-row"><button class="button button-primary" id="ai-test-button" type="button" disabled>Test AI connection</button><label><input id="ai-test-search" type="checkbox"> also test web search</label></div>
+            <p class="fc-status" id="ai-test-result" role="status" aria-live="polite"></p>
+            <p><strong>To add or change a key:</strong> open <a href="https://dashboard.render.com" target="_blank" rel="noopener">dashboard.render.com</a> → your <b>fire-counsel</b> service → <b>Environment</b> → add <code>GEMINI_API_KEY</code> (from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>) and <code>OPENROUTER_API_KEY</code> (from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>) → <b>Save</b>. Render restarts the site automatically.</p>
           </section>
-          <aside class="provider-card provider-steps-card"><span class="eyebrow">SAFE CONNECTION FLOW</span><h2>Keep the secret on the server.</h2><div class="provider-step"><b>01</b><div><strong>Verify the admin</strong><small>Firebase ID token and server-checked admin claim.</small></div></div><div class="provider-step"><b>02</b><div><strong>Store the key privately</strong><small>Use a host secret such as <code>GEMINI_API_KEY</code>; never expose it to students.</small></div></div><div class="provider-step"><b>03</b><div><strong>Check student-use terms</strong><small>Confirm Google eligibility and data-retention terms before sending student work.</small></div></div><div class="provider-terms-note">Adults-only was selected, but age checking and provider approval are not connected. Do not use Gemini Free for student work.</div></aside>
+          <section class="fc-admin-card" aria-labelledby="ai-today-title">
+            <span class="eyebrow">TODAY</span><h2 id="ai-today-title">AI use across all students</h2>
+            <div id="ai-today"><p>—</p></div>
+            <p>Failed requests are shown separately and never count against a student&rsquo;s allowance.</p>
+          </section>
         </div>
-        <div class="info-card"><span class="info-mark">i</span><p>Your Google API key is sensitive. Keep it private and do not send it here. The provider is not called from this preview; no student prompt or file is sent.</p></div>
+        <section class="fc-admin-card" aria-labelledby="ai-prompts-title">
+          <span class="eyebrow">PRIVATE PROMPTS · STORED IN NEON, NOT IN GITHUB</span><h2 id="ai-prompts-title">Your AI instructions</h2>
+          <p>Paste the full text of your prompt (for example the Master Case Research prompt for <b>Case research &amp; analysis</b>, and the Exam-Ready Legal Note prompt for <b>Exam-ready notes</b>), then press Save. Until you save one, a short built-in version is used. A <code>.txt</code> file can be loaded directly; for a PDF, open it, copy all the text and paste it here.</p>
+          <div class="fc-row"><label for="ai-prompt-kind"><b>Prompt</b></label><select id="ai-prompt-kind"><option value="case_research">Case research &amp; analysis</option><option value="exam_note">Exam-ready notes</option><option value="question_setter">Question setter</option><option value="chat">Fire Counsel AI chat</option></select><span class="fc-state" id="ai-prompt-state">—</span><label class="button button-light">Load .txt file<input id="ai-prompt-file" type="file" accept=".txt,.md,text/plain" hidden></label></div>
+          <label class="sr-only" for="ai-prompt-text">Prompt text</label>
+          <textarea id="ai-prompt-text" maxlength="200000" placeholder="Sign in as an administrator to load the prompt." disabled></textarea>
+          <div class="fc-row"><button class="button button-primary" id="ai-prompt-save" type="button" disabled>Save prompt</button><button class="button button-light" id="ai-prompt-reset" type="button" disabled>Go back to the built-in prompt</button><span class="fc-status" id="ai-prompt-status" role="status" aria-live="polite"></span></div>
+        </section>
+        <section class="fc-admin-card" aria-labelledby="ai-extract-title" style="margin-top:16px">
+          <span class="eyebrow">COURSE MATERIAL HELPER</span><h2 id="ai-extract-title">Turn a PDF or photo into text</h2>
+          <p>Use this when adding course materials, statutes or past questions in <b>Database data</b>: upload a page, check the text, then copy it into the record.</p>
+          <div class="fc-row"><input id="ai-extract-file" type="file" accept="image/jpeg,image/png,image/webp,image/heic,application/pdf,text/plain"><button class="button button-primary" id="ai-extract-button" type="button" disabled>Extract text</button><span class="fc-status" id="ai-extract-status" role="status" aria-live="polite"></span></div>
+          <label class="sr-only" for="ai-extract-output">Extracted text</label>
+          <textarea id="ai-extract-output" readonly placeholder="The extracted text will appear here."></textarea>
+        </section>
       </section>
 
       <section class="admin-panel" id="panel-plans" aria-labelledby="plans-title" hidden>
-        <div class="admin-heading"><div><span class="eyebrow">FEATURE LIMITS · STUDENT ACCOUNTS</span><h1 id="plans-title">Set every AI allowance.</h1><p>Configure Free and paid-plan limits for each feature, then give an individual student more access or reduce it. Exact counts and periods are yours to set here.</p></div><span class="panel-status">LOCAL DRAFT · NOT ENFORCED</span></div>
-        <div class="quota-callout"><span class="quota-callout-icon">◷</span><div><strong>One control panel for all AI use</strong><p>Set a count and reset period for each feature. Blank limits remain unset. The preview saves these values only in this browser; a verified server must apply them before students are affected.</p></div><span class="demo-data-chip">PREVIEW ONLY</span></div>
-        <section class="quota-policy-card" aria-labelledby="policy-heading">
-          <div class="quota-section-head"><div><span class="eyebrow">DEFAULT PLAN ALLOWANCES</span><h2 id="policy-heading">Choose limits by feature</h2><p>Use zero to turn a feature off. Leave blank until you decide a limit.</p></div><span class="quota-policy-badge">5 FEATURES</span></div>
-          <div class="quota-table-wrap"><table class="quota-policy-table"><thead><tr><th scope="col">AI feature</th><th scope="col">Free uses</th><th scope="col">Free reset</th><th scope="col">Paid uses</th><th scope="col">Paid reset</th></tr></thead><tbody>
-            <tr><th scope="row"><strong>AI explanations</strong><small>Explain course topics and principles</small></th><td><label class="sr-only" for="q-free-explanations">Free AI explanations</label><input id="q-free-explanations" type="number" min="0" max="1000000" step="1" placeholder="Not set" data-quota-count data-plan="free" data-feature="explanations"></td><td><label class="sr-only" for="p-free-explanations">Free explanation reset</label><select id="p-free-explanations" data-quota-period data-plan="free" data-feature="explanations"><option value="">Choose period</option><option value="day">Daily</option><option value="week">Weekly</option><option value="month">Monthly</option><option value="term">School term</option><option value="year">12 months</option><option value="once">One-time</option></select></td><td><label class="sr-only" for="q-paid-explanations">Paid AI explanations</label><input id="q-paid-explanations" type="number" min="0" max="1000000" step="1" placeholder="Not set" data-quota-count data-plan="paid" data-feature="explanations"></td><td><label class="sr-only" for="p-paid-explanations">Paid explanation reset</label><select id="p-paid-explanations" data-quota-period data-plan="paid" data-feature="explanations"><option value="">Choose period</option><option value="day">Daily</option><option value="week">Weekly</option><option value="month">Monthly</option><option value="term">School term</option><option value="year">12 months</option><option value="once">One-time</option></select></td></tr>
-            <tr><th scope="row"><strong>Exact archived questions</strong><small>Retrieve published past questions, no generated variants</small></th><td><label class="sr-only" for="q-free-past">Free archived questions</label><input id="q-free-past" type="number" min="0" max="1000000" step="1" placeholder="Not set" data-quota-count data-plan="free" data-feature="pastQuestions"></td><td><label class="sr-only" for="p-free-past">Free archived-question reset</label><select id="p-free-past" data-quota-period data-plan="free" data-feature="pastQuestions"><option value="">Choose period</option><option value="day">Daily</option><option value="week">Weekly</option><option value="month">Monthly</option><option value="term">School term</option><option value="year">12 months</option><option value="once">One-time</option></select></td><td><label class="sr-only" for="q-paid-past">Paid archived questions</label><input id="q-paid-past" type="number" min="0" max="1000000" step="1" placeholder="Not set" data-quota-count data-plan="paid" data-feature="pastQuestions"></td><td><label class="sr-only" for="p-paid-past">Paid archived-question reset</label><select id="p-paid-past" data-quota-period data-plan="paid" data-feature="pastQuestions"><option value="">Choose period</option><option value="day">Daily</option><option value="week">Weekly</option><option value="month">Monthly</option><option value="term">School term</option><option value="year">12 months</option><option value="once">One-time</option></select></td></tr>
-            <tr><th scope="row"><strong>Rubric-based marking</strong><small>Feedback grounded in an approved marking rubric</small></th><td><label class="sr-only" for="q-free-marking">Free marking uses</label><input id="q-free-marking" type="number" min="0" max="1000000" step="1" placeholder="Not set" data-quota-count data-plan="free" data-feature="marking"></td><td><label class="sr-only" for="p-free-marking">Free marking reset</label><select id="p-free-marking" data-quota-period data-plan="free" data-feature="marking"><option value="">Choose period</option><option value="day">Daily</option><option value="week">Weekly</option><option value="month">Monthly</option><option value="term">School term</option><option value="year">12 months</option><option value="once">One-time</option></select></td><td><label class="sr-only" for="q-paid-marking">Paid marking uses</label><input id="q-paid-marking" type="number" min="0" max="1000000" step="1" placeholder="Not set" data-quota-count data-plan="paid" data-feature="marking"></td><td><label class="sr-only" for="p-paid-marking">Paid marking reset</label><select id="p-paid-marking" data-quota-period data-plan="paid" data-feature="marking"><option value="">Choose period</option><option value="day">Daily</option><option value="week">Weekly</option><option value="month">Monthly</option><option value="term">School term</option><option value="year">12 months</option><option value="once">One-time</option></select></td></tr>
-            <tr><th scope="row"><strong>OCR text extraction</strong><small>Extract text from a chosen study image</small></th><td><label class="sr-only" for="q-free-ocr">Free OCR uses</label><input id="q-free-ocr" type="number" min="0" max="1000000" step="1" placeholder="Not set" data-quota-count data-plan="free" data-feature="ocr"></td><td><label class="sr-only" for="p-free-ocr">Free OCR reset</label><select id="p-free-ocr" data-quota-period data-plan="free" data-feature="ocr"><option value="">Choose period</option><option value="day">Daily</option><option value="week">Weekly</option><option value="month">Monthly</option><option value="term">School term</option><option value="year">12 months</option><option value="once">One-time</option></select></td><td><label class="sr-only" for="q-paid-ocr">Paid OCR uses</label><input id="q-paid-ocr" type="number" min="0" max="1000000" step="1" placeholder="Not set" data-quota-count data-plan="paid" data-feature="ocr"></td><td><label class="sr-only" for="p-paid-ocr">Paid OCR reset</label><select id="p-paid-ocr" data-quota-period data-plan="paid" data-feature="ocr"><option value="">Choose period</option><option value="day">Daily</option><option value="week">Weekly</option><option value="month">Monthly</option><option value="term">School term</option><option value="year">12 months</option><option value="once">One-time</option></select></td></tr>
-            <tr><th scope="row"><strong>Practice scenarios</strong><small>Generic new scenarios from approved course materials</small></th><td><label class="sr-only" for="q-free-scenarios">Free practice scenarios</label><input id="q-free-scenarios" type="number" min="0" max="1000000" step="1" placeholder="Not set" data-quota-count data-plan="free" data-feature="practiceScenarios"></td><td><label class="sr-only" for="p-free-scenarios">Free scenario reset</label><select id="p-free-scenarios" data-quota-period data-plan="free" data-feature="practiceScenarios"><option value="">Choose period</option><option value="day">Daily</option><option value="week">Weekly</option><option value="month">Monthly</option><option value="term">School term</option><option value="year">12 months</option><option value="once">One-time</option></select></td><td><label class="sr-only" for="q-paid-scenarios">Paid practice scenarios</label><input id="q-paid-scenarios" type="number" min="0" max="1000000" step="1" placeholder="Not set" data-quota-count data-plan="paid" data-feature="practiceScenarios"></td><td><label class="sr-only" for="p-paid-scenarios">Paid scenario reset</label><select id="p-paid-scenarios" data-quota-period data-plan="paid" data-feature="practiceScenarios"><option value="">Choose period</option><option value="day">Daily</option><option value="week">Weekly</option><option value="month">Monthly</option><option value="term">School term</option><option value="year">12 months</option><option value="once">One-time</option></select></td></tr>
-          </tbody></table></div>
-          <div class="quota-policy-footer"><span id="quota-policy-status" role="status" aria-live="polite">No quota policy is saved in this browser.</span><div><button class="button button-light" id="clear-quota-policy" type="button">Clear local draft</button><button class="button button-primary" id="save-quota-policy" type="button">Save local quota draft</button></div></div>
-          <div class="quota-security-note"><strong>Important:</strong> these settings do not debit usage or stop requests. The server must atomically check a user's plan, per-feature counter and any account override before every AI/OCR operation.</div>
-        </section>
-
-        <section class="accounts-card" aria-labelledby="accounts-heading">
-          <div class="quota-section-head accounts-section-head"><div><span class="eyebrow">ACCOUNT-BY-ACCOUNT ACCESS</span><h2 id="accounts-heading">Student accounts</h2><p>Find an account, view its current usage and grant or reduce an allowance.</p></div><span class="demo-data-chip">SAMPLE ACCOUNTS · NOT REAL USERS</span></div>
-          <div class="account-toolbar"><label for="account-search">Find a preview account</label><input id="account-search" type="search" placeholder="Search sample IDs"></div>
-          <div class="accounts-table-wrap"><table class="accounts-table"><thead><tr><th scope="col">Student account</th><th scope="col">Plan</th><th scope="col">AI access</th><th scope="col">Personal adjustment</th><th scope="col">Action</th></tr></thead><tbody id="student-account-rows"><tr><td colspan="5">Loading sample accounts…</td></tr></tbody></table></div>
-          <form class="account-adjustment-form" id="account-adjustment-form">
-            <div class="adjustment-form-heading"><div><span class="eyebrow">ADMIN ADJUSTMENT</span><h3>Change this account's AI access</h3><p>Choose whether they inherit the plan, receive free AI access or are paused. Add a per-feature increase or reduction.</p></div><span class="adjustment-account-pill" id="adjustment-account-pill">Select an account</span></div>
-            <div class="adjustment-grid">
-              <label>Preview account ID<input id="quota-account-id" type="text" readonly placeholder="Choose an account above"></label>
-              <label>AI access<select id="quota-account-access"><option value="inherit">Use plan defaults</option><option value="grant-free">Grant free AI access</option><option value="pause">Pause AI access</option></select></label>
-              <label>Feature<select id="quota-adjust-feature"><option value="explanations">AI explanations</option><option value="pastQuestions">Exact archived questions</option><option value="marking">Rubric-based marking</option><option value="ocr">OCR text extraction</option><option value="practiceScenarios">Practice scenarios</option></select></label>
-              <label>Allowance adjustment<input id="quota-adjust-count" type="number" min="-100000" max="100000" step="1" placeholder="+ add · − reduce"></label>
-              <label>Reset period<select id="quota-adjust-period"><option value="">Use feature's period</option><option value="day">Daily</option><option value="week">Weekly</option><option value="month">Monthly</option><option value="term">School term</option><option value="year">12 months</option><option value="once">One-time</option></select></label>
-              <label>Admin note<input id="quota-adjust-reason" type="text" maxlength="140" placeholder="Optional reason for audit"></label>
+        <div class="admin-heading"><div><span class="eyebrow">DAILY LIMITS · STUDENT ACCOUNTS</span><h1 id="plans-title">Users and AI allowances.</h1><p>Every account gets the default daily limits. Give any account more or fewer, or pause it. Limits reset at midnight, Lagos time.</p></div><span class="panel-status" id="plans-panel-status">SIGN IN AS ADMIN</span></div>
+        <section class="fc-admin-card" aria-labelledby="policy-heading">
+          <span class="eyebrow">DEFAULT DAILY LIMITS (EVERY ACCOUNT)</span><h2 id="policy-heading">Default limits</h2>
+          <form id="default-limits-form">
+            <div class="fc-limits">
+              <label>AI chat messages<input id="limit-chat" type="number" min="0" max="100000" step="1" required></label>
+              <label>Case analyses<input id="limit-case" type="number" min="0" max="100000" step="1" required></label>
+              <label>Exam-ready notes<input id="limit-notes" type="number" min="0" max="100000" step="1" required></label>
+              <label>Question sets<input id="limit-questions" type="number" min="0" max="100000" step="1" required></label>
             </div>
-            <div class="adjustment-footer"><span id="account-adjustment-status" role="status" aria-live="polite">Select a sample account to preview an adjustment.</span><button class="button button-primary" id="save-account-adjustment" type="submit">Save local account adjustment</button></div>
+            <div class="fc-row"><button class="button button-primary" id="save-default-limits" type="submit" disabled>Save default limits</button><span class="fc-status" id="default-limits-status" role="status" aria-live="polite">Use 0 to switch a feature off for everyone.</span></div>
           </form>
-          <div class="quota-security-note"><strong>Account privacy:</strong> this list contains synthetic sample IDs only. Real account search, usage history and quota changes require server-verified admin permission and an audit trail; students must only receive their own account summary.</div>
+        </section>
+        <section class="fc-admin-card" aria-labelledby="accounts-heading" style="margin-top:16px">
+          <span class="eyebrow">ALL ACCOUNTS</span><h2 id="accounts-heading">Users</h2>
+          <div class="fc-row"><label class="sr-only" for="account-search">Search accounts</label><input id="account-search" type="search" placeholder="Search name or email"><button class="button button-light" id="refresh-accounts" type="button" disabled>Refresh</button><span class="fc-status" id="accounts-summary" role="status" aria-live="polite">Sign in as an administrator to load accounts.</span></div>
+          <div class="fc-users-wrap"><table class="fc-users"><thead><tr><th scope="col">Account</th><th scope="col">Status</th><th scope="col">Used today</th><th scope="col">Limits</th><th scope="col">Action</th></tr></thead><tbody id="student-account-rows"><tr><td colspan="5">No accounts loaded.</td></tr></tbody></table></div>
+          <form class="fc-adjust" id="account-adjustment-form" hidden>
+            <span class="eyebrow">CHANGE THIS ACCOUNT</span><h3 id="adjustment-account-pill">—</h3>
+            <p>Leave a box empty to use the default. Type a bigger number to give more, a smaller one to give less, or 0 to block that feature.</p>
+            <input id="quota-account-id" type="hidden">
+            <div class="fc-limits">
+              <label>AI chats / day<input id="user-limit-chat" type="number" min="0" max="100000" step="1"></label>
+              <label>Case analyses / day<input id="user-limit-case" type="number" min="0" max="100000" step="1"></label>
+              <label>Exam notes / day<input id="user-limit-notes" type="number" min="0" max="100000" step="1"></label>
+              <label>Question sets / day<input id="user-limit-questions" type="number" min="0" max="100000" step="1"></label>
+            </div>
+            <div class="fc-row"><label><input id="user-paused" type="checkbox"> Pause all AI for this account</label></div>
+            <div class="fc-row"><label for="user-note">Note</label><input id="user-note" type="text" maxlength="280" placeholder="Optional, e.g. exam week extra" style="flex:1"></div>
+            <div class="fc-row"><button class="button button-primary" id="save-account-adjustment" type="submit">Save for this account</button><button class="button button-light" id="cancel-account-adjustment" type="button">Close</button><span class="fc-status" id="account-adjustment-status" role="status" aria-live="polite"></span></div>
+          </form>
         </section>
       </section>
 
-      <footer class="admin-footer"><span>FIRE COUNSEL · admin studio preview</span><span>Local drafts · protected Neon content · AI and uploads disabled</span></footer>
+      <footer class="admin-footer"><span>FIRE COUNSEL · admin studio</span><span>Server-verified admin · Neon content · AI settings</span></footer>
     </section>
   </main>
   <script src="./admin.js" defer></script>
   <script type="module" src="./admin-auth.mjs"></script>
   <script type="module" src="./admin-database.mjs"></script>
+  <script type="module" src="./admin-ai.mjs"></script>
+  <script type="module" src="./presence.mjs"></script>
 </body>
 </html>

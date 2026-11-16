@@ -7,8 +7,8 @@ const root = resolve(import.meta.dirname, "../..");
 const read = path => readFileSync(resolve(root, path), "utf8");
 const pages = ["index.html", "study.html", "admin.html", "auth.html"];
 const integrations = [
-  ["study.html", ["study-materials.mjs", "research-search.mjs", "student-profile.mjs"]],
-  ["admin.html", ["admin-auth.mjs", "admin-database.mjs"]],
+  ["study.html", ["study-materials.mjs", "research-search.mjs", "student-profile.mjs", "ai-studio.mjs", "presence.mjs"]],
+  ["admin.html", ["admin-auth.mjs", "admin-database.mjs", "admin-ai.mjs", "presence.mjs"]],
   ["auth.html", ["auth-page.mjs"]]
 ];
 
@@ -47,13 +47,30 @@ test("every admin navigation item has exactly one panel, with one initially visi
   assert.ok(tabs.includes("database"));
 });
 
-test("disabled provider/publishing controls cannot collect secrets or imply live quotas", () => {
+test("admin AI panels never collect API keys and no longer show sample accounts or local quota drafts", () => {
   const html = read("admin.html");
-  for (const id of ["provider-key", "save-provider-key", "publish-site"]) {
-    assert.match(html, new RegExp(`<[^>]*id="${id}"[^>]*\\bdisabled\\b`));
-  }
-  assert.match(html, /LOCAL DRAFT · NOT ENFORCED/);
-  assert.match(html, /SAMPLE ACCOUNTS · NOT REAL USERS/);
+  const admin = read("admin.js");
+  assert.match(html, /<[^>]*id="publish-site"[^>]*\bdisabled\b/);
+  assert.doesNotMatch(html, /id="provider-key"|type="password"/, "keys are set in Render, never typed into the page");
+  assert.match(html, /GEMINI_API_KEY/);
+  assert.match(html, /OPENROUTER_API_KEY/);
+  assert.doesNotMatch(html, /SAMPLE ACCOUNTS|LOCAL DRAFT · NOT ENFORCED/);
+  assert.doesNotMatch(admin, /DEMO_USERS|quota-preview/);
+  const module = read("admin-ai.mjs");
+  assert.doesNotMatch(module, /localStorage|sessionStorage/);
+  assert.match(module, /\/api\/v1\/admin\/ai\/users/);
+});
+
+test("student AI studio talks only to the same-origin AI API and renders answers safely", async () => {
+  const source = read("ai-studio.mjs");
+  assert.doesNotMatch(source, /generativelanguage|openrouter\.ai\/api|localhost|AIza[0-9A-Za-z_-]{20}|sk-or-/i);
+  assert.match(source, /\/api\/v1\/ai\/messages/);
+  const { renderMarkdown, safeHref } = await import(resolve(root, "ai-markdown.mjs"));
+  const html = renderMarkdown("**b** <script>alert(1)</script> [x](javascript:alert(1)) [ok](https://example.org/a)\n\n| a |\n|---|\n| <img src=x onerror=alert(1)> |");
+  assert.doesNotMatch(html, /<script|<img|javascript:/i);
+  assert.match(html, /<a href="https:\/\/example\.org\/a" target="_blank" rel="noopener noreferrer">ok<\/a>/);
+  assert.match(html, /<table>/);
+  assert.equal(safeHref("data:text/html,x"), null);
 });
 
 test("browser API helper enforces same-origin calls and does not embed a backend localhost URL", () => {

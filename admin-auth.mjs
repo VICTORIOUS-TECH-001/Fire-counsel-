@@ -6,6 +6,7 @@ const message = $("#admin-auth-message");
 const statusCard = $("#admin-auth-status");
 const signInLink = $("#admin-auth-link");
 const signOutButton = $("#admin-signout");
+const claimButton = $("#admin-claim");
 let authClient;
 const sessionScope = createRequestScope();
 
@@ -13,6 +14,9 @@ function setStatus(state, heading, detail) {
   statusCard.dataset.state = state;
   title.textContent = heading;
   message.textContent = detail;
+  if (claimButton && state !== "claimable") claimButton.hidden = true;
+  // Other admin panels (AI studio, users) load their data once verified.
+  document.dispatchEvent(new CustomEvent("fire-counsel:admin-state", { detail: { state } }));
 }
 
 async function verifyAdmin(user) {
@@ -25,11 +29,19 @@ async function verifyAdmin(user) {
     const response = await authClient.apiRequest("/api/v1/admin/me");
     if (!isCurrent()) return;
     if (response.ok) {
-      setStatus("verified", "Server verified administrator access", `${user.email || "Signed-in user"}. Database editing additionally requires a healthy Neon connection. AI, uploads, quotas and account adjustments remain disabled.`);
+      setStatus("verified", "Server verified administrator access", `${user.email || "Signed-in user"}. You can edit database content, AI settings, prompts and user limits.`);
+      return;
+    }
+    let body = {};
+    try { body = await response.json(); } catch { /* not JSON */ }
+    if (!isCurrent()) return;
+    if (response.status === 403 && body.code === "ADMIN_CLAIM_AVAILABLE") {
+      setStatus("claimable", "This account can become the administrator", `${user.email} is on the server's ADMIN_EMAILS list. Press the button once to turn on administrator access for this account.`);
+      claimButton.hidden = false;
       return;
     }
     if (response.status === 403) {
-      setStatus("denied", "This account is not an administrator", "A trusted project owner must grant the Firebase admin custom claim. The browser cannot grant itself access.");
+      setStatus("denied", "This account is not an administrator", "To make it one, add this email to ADMIN_EMAILS in Render (Environment), wait for the restart, then reload this page. The browser cannot grant itself access.");
       return;
     }
     setStatus("offline", "Admin API is not ready", "Firebase sign-in succeeded, but the same-origin API did not verify admin access. No live admin action is enabled.");
@@ -68,5 +80,23 @@ signOutButton.addEventListener("click", async () => {
     await authClient.signOut(authClient.firebaseAuth);
   } catch (error) {
     setStatus("offline", "Could not sign out", error.message || "Try again.");
+  }
+});
+
+claimButton?.addEventListener("click", async () => {
+  if (!authClient?.firebaseAuth.currentUser) return;
+  claimButton.disabled = true;
+  try {
+    const response = await authClient.apiRequest("/api/v1/admin/claim", { method: "POST" });
+    let body = {};
+    try { body = await response.json(); } catch { /* not JSON */ }
+    if (!response.ok) throw new Error(body.error || `The server refused (${response.status}).`);
+    // Fetch a fresh token so it carries the new admin claim.
+    await authClient.firebaseAuth.currentUser.getIdToken(true);
+    await verifyAdmin(authClient.firebaseAuth.currentUser);
+  } catch (error) {
+    setStatus("denied", "Could not turn on administrator access", error.message || "Try again.");
+  } finally {
+    claimButton.disabled = false;
   }
 });

@@ -11,7 +11,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
-MAX_PROXY_BODY = 2 * 1024 * 1024
+# AI uploads (photos/PDFs as base64) can be up to about 26 MB.
+MAX_PROXY_BODY = 26 * 1024 * 1024
 PUBLIC_FILES = {
     "index.html", "study.html", "admin.html", "auth.html",
     "site.css", "styles.css", "admin.css", "auth.css", "integrations.css",
@@ -19,6 +20,7 @@ PUBLIC_FILES = {
     "auth-page.mjs", "admin-auth.mjs", "admin-database.mjs",
     "study-materials.mjs", "research-search.mjs", "request-scope.mjs",
     "student-profile.mjs", "installation.mjs",
+    "ai-studio.css", "ai-studio.mjs", "ai-markdown.mjs", "admin-ai.mjs", "presence.mjs",
     "data/site-content.json",
     "firebase/client.mjs", "firebase/auth-client.mjs",
     "firebase/firebase-config.mjs", "firebase/firebase-config.example.mjs",

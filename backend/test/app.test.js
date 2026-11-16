@@ -81,12 +81,29 @@ test("oversized JSON returns 413 and never reaches a protected route", async t =
   assert.equal((await response.json()).code, "BODY_TOO_LARGE");
 });
 
-test("unimplemented AI, uploads, account changes and payment routes stay absent", async t => {
+test("unimplemented uploads, account changes and payment routes stay absent", async t => {
   const base = await serve(t);
-  for (const path of ["/api/v1/ai", "/api/v1/uploads", "/api/v1/admin/accounts", "/api/v1/payments"]) {
+  for (const path of ["/api/v1/uploads", "/api/v1/admin/accounts", "/api/v1/payments"]) {
     const response = await fetch(`${base}${path}`, { method: "POST" });
     assert.equal(response.status, 404, path);
   }
+});
+
+test("AI, presence and admin AI routes require a Firebase sign-in", async t => {
+  const base = await serve(t);
+  for (const [method, path] of [["POST", "/api/v1/ai/messages"], ["GET", "/api/v1/ai/me"], ["POST", "/api/v1/presence"], ["GET", "/api/v1/admin/ai/status"], ["POST", "/api/v1/admin/claim"]]) {
+    const response = await fetch(`${base}${path}`, { method });
+    assert.equal(response.status, 401, path);
+  }
+});
+
+test("AI message uploads may exceed the normal 2 MiB body limit but stay capped", async t => {
+  const base = await serve(t);
+  const big = JSON.stringify({ text: "x".repeat(3 * 1024 * 1024) });
+  const ai = await fetch(`${base}/api/v1/ai/messages`, { method: "POST", headers: { "Content-Type": "application/json" }, body: big });
+  assert.equal(ai.status, 401, "large AI body reaches authentication");
+  const other = await fetch(`${base}/api/v1/profile`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: big });
+  assert.equal(other.status, 413);
 });
 
 test("approved cross-origin student API calls may send the installation header", async t => {

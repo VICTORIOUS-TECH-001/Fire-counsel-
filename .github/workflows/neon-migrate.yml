@@ -1,0 +1,32 @@
+name: Neon AI tables migration
+
+# Creates the Fire Counsel AI tables in Neon (additive and safe to re-run:
+# existing tables and data are never changed or deleted).
+# Run it from: Actions -> "Neon AI tables migration" -> Run workflow.
+# Uses the DATABASE_URL repository secret.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-migrate
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm --prefix backend ci --omit=dev
+      - name: Apply AI tables migration
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm --prefix backend run db:migrate
