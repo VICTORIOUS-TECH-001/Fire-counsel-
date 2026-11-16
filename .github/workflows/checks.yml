@@ -29,7 +29,8 @@ jobs:
       - run: npm --prefix backend ci
       - run: npm --prefix firebase ci
       - run: npm test
-      - run: npm run test:browser
+      - name: Browser regression tests
+        run: bash tools/ci_check.sh browser npm run test:browser
       - name: Audit frontend test and backend dependencies
         run: |
           npm audit --audit-level=moderate
@@ -58,4 +59,5 @@ jobs:
           java-version: '21'
       - run: npm --prefix firebase ci
       # Demo project + local emulators only; no Firebase credentials or deployment.
-      - run: npm --prefix firebase run test:rules
+      - name: Firestore and Storage rule tests
+        run: bash tools/ci_check.sh firebase-rules npm --prefix firebase run test:rules
