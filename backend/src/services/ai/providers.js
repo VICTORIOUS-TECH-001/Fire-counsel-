@@ -34,7 +34,7 @@ export function aiConfig(env = process.env) {
   const openrouterKey = (env.OPENROUTER_API_KEY || "").trim();
   return {
     gemini: { configured: Boolean(geminiKey), key: geminiKey, models: list(env.GEMINI_MODELS, DEFAULT_GEMINI_MODELS), searchModels: list(env.GEMINI_SEARCH_MODELS, DEFAULT_GEMINI_SEARCH_MODELS) },
-    openrouter: { configured: Boolean(openrouterKey), key: openrouterKey, models: list(env.OPENROUTER_MODELS, DEFAULT_OPENROUTER_MODELS), referer: env.RENDER_EXTERNAL_URL || "https://fire-counsel.onrender.com" },
+    openrouter: { configured: Boolean(openrouterKey), key: openrouterKey, models: list(env.OPENROUTER_MODELS, DEFAULT_OPENROUTER_MODELS), referer: env.RENDER_EXTERNAL_URL || (env.PUBLIC_HOST ? `https://${env.PUBLIC_HOST}` : "https://fire-counsel.onrender.com") },
     timeoutMs: Math.min(Math.max(Number(env.AI_TIMEOUT_MS) || 240_000, 10_000), 600_000),
     configured: Boolean(geminiKey || openrouterKey)
   };
