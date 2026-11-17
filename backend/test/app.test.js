@@ -115,3 +115,44 @@ test("approved cross-origin student API calls may send the installation header",
   assert.equal(response.status, 204);
   assert.match(response.headers.get("access-control-allow-headers"), /X-Fire-Counsel-Installation/);
 });
+
+test("pasted database URLs are cleaned and failures get a secret-free reason", async t => {
+  const { normalizeDatabaseUrl, databaseErrorCode } = await import("../src/config/database.js");
+  const clean = "postgresql://u:p@ep-x-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
+  for (const pasted of [clean, ` ${clean} `, `"${clean}"`, `'${clean}'`, `psql '${clean}'`, `DATABASE_URL=${clean}`, `DATABASE_URL="${clean}"`]) {
+    assert.equal(normalizeDatabaseUrl(pasted), clean, pasted);
+  }
+  assert.equal(databaseErrorCode(new Error("DATABASE_URL must be a valid PostgreSQL URL.")), "invalid_url");
+  assert.equal(databaseErrorCode(Object.assign(new Error("password authentication failed for user \"u\""), { code: "28P01" })), "wrong_password_or_user");
+  assert.equal(databaseErrorCode(Object.assign(new Error("getaddrinfo ENOTFOUND ep-x"), { code: "ENOTFOUND" })), "host_not_found");
+  assert.equal(databaseErrorCode(new Error("Connection terminated due to connection timeout")), "timeout");
+  assert.equal(databaseErrorCode(Object.assign(new Error("database \"x\" does not exist"), { code: "3D000" })), "database_not_found");
+  assert.equal(databaseErrorCode(new Error("something else")), "connection_failed");
+  const { getPool } = await import("../src/config/database.js");
+  const saved = process.env.DATABASE_URL;
+  process.env.DATABASE_URL = "postgresql://neondb_owner:****@ep-x.neon.tech/neondb?sslmode=require";
+  try {
+    assert.throws(() => getPool(), error => databaseErrorCode(error) === "password_hidden_copy_again");
+  } finally {
+    if (saved === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = saved;
+  }
+
+  const base = await serve(t, { env: { DATABASE_URL: "x", SERVE_WEBSITE: "\"true\"", GEMINI_API_KEY: "k" }, databaseCheck: async () => {
+    throw Object.assign(new Error("password authentication failed for user \"neondb_owner\" secret-detail"), { code: "28P01" });
+  } });
+  const response = await fetch(`${base}/api/health`);
+  const body = await response.json();
+  assert.equal(response.status, 503);
+  assert.equal(body.database, "unavailable");
+  assert.equal(body.database_error, "wrong_password_or_user");
+  assert.deepEqual(body.setup, { website: true, firebase_admin_key: false, gemini_key: true, openrouter_key: false, admin_emails: false });
+  assert.doesNotMatch(JSON.stringify(body), /neondb_owner|secret-detail/);
+});
+
+test("SERVE_WEBSITE accepts true however it was typed, and nothing else", async t => {
+  for (const [value, served] of [["true", true], [" TRUE ", true], ["'true'", true], ["\"true\"", true], ["1", true], ["false", false], ["", false], ["truthy", false]]) {
+    const base = await serve(t, { env: { SERVE_WEBSITE: value } });
+    const response = await fetch(`${base}/`);
+    assert.equal(response.status === 200, served, `SERVE_WEBSITE=${JSON.stringify(value)}`);
+  }
+});
