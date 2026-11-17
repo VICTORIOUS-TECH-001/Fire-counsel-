@@ -263,6 +263,10 @@ test("admin sections navigate correctly and a student cannot unlock database con
     ? json(route, { database: "connected" }) : json(route, { error: "Administrator permission required." }, 403));
   await page.goto("/admin.html");
   await expect(page.locator("#admin-auth-status")).toHaveAttribute("data-state", "denied");
+  // The local website-content editor and slideshow load the public JSON.
+  await expect(page.locator("#editor-status")).toHaveText("Default website content loaded");
+  await expect(page.locator("#json-editor")).toHaveValue(/"brand"/);
+  await expect(page.locator(".slide-card")).not.toHaveCount(0);
   for (const name of ["content", "media", "ai", "plans", "database", "overview"]) {
     await page.locator(`[data-panel=${name}]`).click();
     await expect(page.locator(`#panel-${name}`)).toBeVisible();
