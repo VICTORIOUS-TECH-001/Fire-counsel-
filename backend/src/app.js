@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
-import { checkDatabase } from "./config/database.js";
+import { checkDatabase, databaseErrorCode } from "./config/database.js";
 import { verifyFirebaseToken } from "./middleware/verifyFirebaseToken.js";
 import { requireAdmin } from "./middleware/requireAdmin.js";
 import { createAdminDatabaseRouter } from "./routes/adminDatabase.js";
@@ -38,7 +38,8 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
       // Ignore a malformed value; explicit CORS_ORIGINS still applies.
     }
   }
-  const serveWebsite = env.SERVE_WEBSITE === "true";
+  // Accept "true" however it was typed into a dashboard (quotes, spaces, TRUE).
+  const serveWebsite = /^\s*["']?\s*(true|1|yes)\s*["']?\s*$/i.test(String(env.SERVE_WEBSITE ?? ""));
 
   app.disable("x-powered-by");
   app.set("trust proxy", trustedProxyNetworks(env.TRUSTED_PROXY_CIDRS || ""));
@@ -94,13 +95,15 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
 
   app.get("/api/health", async (_req, res) => {
     let database = "not_configured";
+    let databaseError;
 
     if (env.DATABASE_URL) {
       try {
         database = await databaseCheck() ? "connected" : "unavailable";
       } catch (error) {
         database = "unavailable";
-        console.error("Database health check failed:", error.message);
+        databaseError = databaseErrorCode(error);
+        console.error(`Database health check failed (${databaseError}):`, error.message);
       }
     }
 
@@ -109,6 +112,16 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
       service: "FIRE COUNSEL API",
       status: healthy ? "ok" : "degraded",
       database,
+      ...(databaseError ? { database_error: databaseError } : {}),
+      // Setup checklist (yes/no only, never values) so the dashboard
+      // settings can be checked from a phone browser.
+      setup: {
+        website: serveWebsite,
+        firebase_admin_key: Boolean(String(env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim()),
+        gemini_key: Boolean(String(env.GEMINI_API_KEY || "").trim()),
+        openrouter_key: Boolean(String(env.OPENROUTER_API_KEY || "").trim()),
+        admin_emails: Boolean(String(env.ADMIN_EMAILS || "").trim())
+      },
       timestamp: new Date().toISOString()
     });
   });
