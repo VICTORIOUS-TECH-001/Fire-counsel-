@@ -135,6 +135,9 @@ function initStudio() {
     const { response, body } = await api(`/api/v1/ai/conversations?mode=${encodeURIComponent(mode)}`);
     if (mySession !== session || !response.ok) return;
     historySelect.innerHTML = `<option value="">New conversation</option>` + (body.data || []).map((c) => `<option value="${escapeHTML(c.id)}">${escapeHTML(c.title)} · ${escapeHTML(new Date(c.updated_at).toLocaleDateString())}</option>`).join("");
+    if (conversationId && ![...historySelect.options].some((o) => o.value === conversationId)) {
+      historySelect.insertAdjacentHTML("beforeend", `<option value="${escapeHTML(conversationId)}">Current conversation</option>`);
+    }
     historySelect.value = conversationId || "";
     $("#ai-delete-conversation").hidden = !conversationId;
   }
@@ -513,7 +516,7 @@ function initStudio() {
     $("#ai-workspace-title").textContent = info.title;
     $("#ai-mode-help").textContent = info.help;
     $("#fc-mode-name").textContent = task ? TASKS[task].title : MODE_NAMES[mode];
-    $("#fc-history-mode").textContent = MODES[mode].title;
+    $("#fc-history-mode").textContent = { chat: "Chat", case: "Case analysis", notes: "Exam notes", questions: "Question setter" }[mode];
     $("#fc-task").hidden = !task;
     $("#fc-task-label").textContent = task ? TASKS[task].label : "";
     input.placeholder = mode === "chat" && !task ? "Ask me anytime…" : info.placeholder;

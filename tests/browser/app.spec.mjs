@@ -136,7 +136,7 @@ test("AI studio sends a question, polls the background job and renders safe answ
     if (path === "/api/v1/ai/conversations") return json(route, { data: polls ? [{ ...conversation, updated_at: "2026-11-16T10:00:00Z" }] : [] });
     if (path === `/api/v1/ai/conversations/${conversation.id}`) {
       polls += 1;
-      return json(route, { data: { conversation, messages: [user, polls > 1 ? answer : { id: "2", role: "assistant", status: "pending", content: "", sources: [], meta: {} }] } });
+      return json(route, { data: { conversation, messages: [user, polls > 1 ? answer : { id: "2", role: "assistant", status: "pending", content: "", sources: [], meta: { stage: "searching" } }] } });
     }
     if (path === "/api/v1/ai/messages" && request.method() === "POST") {
       const body = request.postDataJSON();
@@ -150,14 +150,18 @@ test("AI studio sends a question, polls the background job and renders safe answ
     if (path === "/api/v1/ai/messages/2/export") return route.fulfill({ status: 200, contentType: "application/pdf", headers: { "content-disposition": 'attachment; filename="consideration.pdf"' }, body: "%PDF-1.4 synthetic" });
     return json(route, { error: "Not part of this fixture" }, 404);
   });
-  await readyStudy(page, "ai-chat");
+  await page.goto("/ai.html");
+  await expect(page.locator(".fc-home h1")).toHaveText("Hi! I'm Fire Counsel");
   await expect(page.locator("#ai-status")).toContainText("Ready");
   await expect(page.locator("#ai-allowance-list")).toContainText("19 of 20 left");
+  await expect(page.locator(".fc-signin").first()).toBeHidden();
   await page.locator("#ai-input").fill("What is consideration?");
   await page.locator("#ai-file-input").setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("Synthetic note") });
   await expect(page.locator("#ai-files")).toContainText("notes.txt");
   await page.locator("#ai-send").click();
   await expect(page.locator(".ai-pending")).toBeVisible();
+  await expect(page.locator(".fc-wait-title")).toHaveText("🔥 Fire is coming…");
+  await expect(page.locator(".fc-wait-stage")).toHaveText("Searching the web for trusted sources…", { timeout: 10_000 });
   await expect(page.locator(".ai-answer h3")).toHaveText("Consideration", { timeout: 15_000 });
   expect(posts[0]).toMatchObject({ mode: "chat", text: "What is consideration?", options: { webSearch: true } });
   expect(posts[0].attachments).toEqual([{ name: "notes.txt", mimeType: "text/plain", data: Buffer.from("Synthetic note").toString("base64") }]);
@@ -174,7 +178,10 @@ test("AI studio sends a question, polls the background job and renders safe answ
   await page.locator("[data-download='2'][data-format=pdf]").click();
   expect((await download).suggestedFilename()).toBe("consideration.pdf");
 
-  await page.locator("[data-ai-mode=questions]").click();
+  await page.locator("#fc-open-functions-top").click();
+  await expect(page.locator("#fc-functions")).toBeVisible();
+  await page.locator("#fc-functions [data-ai-mode=questions]").click();
+  await expect(page.locator("#fc-functions")).toBeHidden();
   await expect(page.locator("#ai-workspace-title")).toHaveText("Set exam questions");
   await expect(page.locator("#ai-course-select option")).toHaveCount(2);
   await page.locator("#ai-input").fill("Offer and acceptance notes");
@@ -182,8 +189,39 @@ test("AI studio sends a question, polls the background job and renders safe answ
   await page.locator(`[data-pick-course="${courseId}"]`).click();
   await expect(page.locator("#ai-status")).toContainText("used all 5 question sets");
   expect(posts.at(-1).options.courseId).toBe(courseId);
+
+  // Functions list: tabs and a chat study tool (mnemonics).
+  await page.locator("#fc-mode-switch").click();
+  await page.locator("#fc-tab-new").click();
+  await expect(page.locator("#fc-panel-new")).toBeVisible();
+  await expect(page.locator("#fc-panel-must")).toBeHidden();
+  await page.locator("#fc-tab-must").click();
+  await page.locator("#fc-panel-must [data-ai-task=mnemonics]").click();
+  await expect(page.locator("#fc-mode-name")).toHaveText("Create mnemonics");
+  await expect(page.locator("#fc-task")).toBeVisible();
+  await page.locator("#ai-input").fill("Elements of a valid contract");
+  await page.locator("#ai-send").click();
+  await expect.poll(() => posts.at(-1).options.task).toBe("mnemonics");
+  expect(posts.at(-1).mode).toBe("chat");
   await page.setViewportSize({ width: 390, height: 844 });
   await expectNoHorizontalOverflow(page);
+});
+
+test("the AI page shows a sign-in link when signed out and the study space links to it", async ({ page }) => {
+  await stubAuth(page, { user: null });
+  await page.goto("/ai.html");
+  await expect(page.locator("#ai-status")).toHaveText("Sign in to use Fire Counsel AI.");
+  await expect(page.locator(".fc-home .fc-signin")).toHaveAttribute("href", "./auth.html?next=ai.html");
+  await page.locator("#fc-menu").click();
+  await expect(page.locator("#fc-drawer")).toBeVisible();
+  await page.locator("#fc-open-research").click();
+  await expect(page.locator("#fc-research")).toBeVisible();
+  await expect(page.locator("#research-search-status")).toContainText("Sign in");
+  await page.locator("#fc-research-back").click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectNoHorizontalOverflow(page);
+  await readyStudy(page);
+  await expect(page.locator("#student-nav a[href='./ai.html']")).toBeVisible();
 });
 
 test("authenticated materials and verified source search render safe text from stubbed API replies", async ({ page }) => {
