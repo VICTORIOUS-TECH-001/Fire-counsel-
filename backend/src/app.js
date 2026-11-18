@@ -15,11 +15,25 @@ import { createAiRouter } from "./routes/ai.js";
 import { createAdminAiRouter } from "./routes/adminAi.js";
 import { createPresenceRouter } from "./routes/presence.js";
 import { describePastedKey, firebaseAdminStatus, getFirebaseAuth } from "./config/firebaseAdmin.js";
+import { createAdminDocumentsRouter } from "./routes/adminDocuments.js";
+import { createAdminSiteRouter, createPublicSiteHandlers } from "./routes/siteContent.js";
 
 // Emails allowed to give themselves the admin claim once (set ADMIN_EMAILS in
 // Render). The account must have a verified email. Nobody else can.
 export function adminBootstrapEmails(env) {
   return new Set(String(env.ADMIN_EMAILS || "").split(",").map((email) => email.trim().toLowerCase()).filter((email) => /^[^\s@]+@[^\s@]+$/.test(email)));
+}
+
+// Which proxies may set the visitor address (X-Forwarded-For). An explicit
+// TRUSTED_PROXY_CIDRS list always wins. On Render (RENDER=true is set
+// automatically) the platform proxy connects from a private address, so trust
+// private/loopback hops only: Express then uses the first public address that
+// Render's proxy appended, which visitors cannot forge. Without this, every
+// visitor shared one rate-limit bucket and admins were throttled.
+export function proxyTrust(env = process.env) {
+  if (String(env.TRUSTED_PROXY_CIDRS || "").trim()) return trustedProxyNetworks(env.TRUSTED_PROXY_CIDRS);
+  if (String(env.RENDER || "").trim().toLowerCase() === "true") return ["loopback", "linklocal", "uniquelocal"];
+  return false;
 }
 
 export function createApp({ env = process.env, databaseCheck = checkDatabase } = {}) {
@@ -42,7 +56,13 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
   const serveWebsite = /^\s*["']?\s*(true|1|yes)\s*["']?\s*$/i.test(String(env.SERVE_WEBSITE ?? ""));
 
   app.disable("x-powered-by");
-  app.set("trust proxy", trustedProxyNetworks(env.TRUSTED_PROXY_CIDRS || ""));
+  app.set("trust proxy", proxyTrust(env));
+  const databaseConfigured = () => Boolean(env.DATABASE_URL);
+  // Published homepage content and slideshow photos live in Neon. When nothing
+  // is published (or Neon is asleep/unset) the bundled data file is served.
+  const site = createPublicSiteHandlers({ configured: databaseConfigured });
+  app.get("/media/:file", site.media);
+  if (serveWebsite) app.get("/data/site-content.json", site.content);
   // Optional: serve the allowlisted public website from the same origin so its
   // same-origin /api/ calls reach this server (e.g. one Render web service).
   if (serveWebsite) app.use(createWebsiteHandler({ root: env.WEBSITE_ROOT || undefined }));
@@ -65,9 +85,10 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
   app.use(["/api/v1/ai/messages", "/api/v1/admin/ai/extract"], express.json({ limit: "26mb" }));
   app.use(["/api/v1/admin/ai/prompts"], express.json({ limit: "1mb" }));
   app.use(express.json({ limit: "2mb" }));
-  // AI, presence and admin-AI routes poll often (job status, heartbeats), so
-  // they get a looser per-connection limit plus per-account limits after sign-in.
-  const pollingPaths = (req) => /^\/api\/v1\/(ai|presence|admin\/ai)(\/|$)/.test(req.path);
+  // AI, presence and admin routes poll often (job status, heartbeats, upload
+  // progress), so they get a looser per-visitor limit. Admin routes still need
+  // a verified Firebase admin token.
+  const pollingPaths = (req) => /^\/api\/v1\/(ai|presence|admin)(\/|$)/.test(req.path);
   app.use(rateLimit({
     skip: (req) => !pollingPaths(req),
     windowMs: 15 * 60 * 1000,
@@ -176,6 +197,8 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
   app.use("/api/v1/presence", createPresenceRouter({ configured: () => Boolean(env.DATABASE_URL) }));
   app.use("/api/v1/ai", createAiRouter({ env, configured: () => Boolean(env.DATABASE_URL) }));
   app.use("/api/v1/admin/ai", createAdminAiRouter({ env, configured: () => Boolean(env.DATABASE_URL) }));
+  app.use("/api/v1/admin/documents", createAdminDocumentsRouter({ env, configured: databaseConfigured }));
+  app.use("/api/v1/admin/site", createAdminSiteRouter({ configured: databaseConfigured, onPublish: site.invalidate }));
 
   const studentSetup = {
     configured: () => Boolean(env.DATABASE_URL),
@@ -199,7 +222,7 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
       return res.status(400).json({ error: "Request body must be valid JSON.", code: "INVALID_JSON" });
     }
     if (error.type === "entity.too.large") {
-      return res.status(413).json({ error: "Request body is too large (2 MiB for data, about 18 MB of files for AI uploads).", code: "BODY_TOO_LARGE" });
+      return res.status(413).json({ error: "Request body is too large (2 MiB for data, about 18 MB of files for AI chat uploads, 25 MB per document upload).", code: "BODY_TOO_LARGE" });
     }
     console.error("Unhandled API error:", error);
     return res.status(500).json({ error: "An unexpected server error occurred." });

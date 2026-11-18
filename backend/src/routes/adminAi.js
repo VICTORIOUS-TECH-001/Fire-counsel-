@@ -9,6 +9,7 @@ import { BUILT_IN_PROMPTS, PROMPT_KINDS, clearPromptCache } from "../services/ai
 import { FEATURES, getDefaultLimits, timezone, validateLimit } from "../services/ai/quota.js";
 import { validateAttachments } from "../services/ai/attachments.js";
 import { publicAiError } from "./ai.js";
+import { DocumentError, extractDocument, pagesToText } from "../services/documents/extract.js";
 
 const UID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 const LIMIT_COLUMNS = Object.fromEntries(Object.entries(FEATURES).map(([key, feature]) => [key, feature.column]));
@@ -189,15 +190,18 @@ export function createAdminAiRouter({
     } catch (error) { publicAiError(res, error); }
   });
 
-  // Turn an uploaded PDF/photo of course material into text for the admin to
-  // review before saving it as a material version.
+  // Turn an uploaded PDF/photo/Word file into text for the admin to review.
+  // Digital PDFs are read locally (pdf.js, no AI); scans and photos use AI OCR.
   router.post("/extract", async (req, res) => {
     try {
       const [file] = validateAttachments(req.body?.attachment ? [req.body.attachment] : []);
       if (!file) throw new AiError(400, "Choose a PDF, photo or text file.", "VALIDATION_ERROR");
-      const result = await studioFactory({ db: poolProvider(), env, generate }).extractText(file);
-      res.json({ data: result });
-    } catch (error) { publicAiError(res, error); }
+      const result = await extractDocument({ buffer: Buffer.from(file.data, "base64"), mimeType: file.mimeType, name: file.name }, { env, generate });
+      res.json({ data: { text: pagesToText(result.pages), method: result.method, pages: result.pageCount, characters: result.characters, warnings: result.warnings, truncated: false } });
+    } catch (error) {
+      if (error instanceof DocumentError) return res.status(error.status).json({ error: error.message, code: error.code });
+      publicAiError(res, error);
+    }
   });
 
   return router;

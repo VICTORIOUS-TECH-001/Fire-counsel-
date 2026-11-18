@@ -43,6 +43,20 @@ function lengthNote(result) {
   return result.truncated ? "\n\n> ⚠ This answer reached the maximum length. Send **continue** in this conversation to get the rest." : "";
 }
 
+const STOP_WORDS = new Set("about above after again against also among another because been before being below between both cannot could does doing down during each explain from further have having here hers herself himself into itself just more most myself near once only other ought ourselves over same should some such than that their theirs them themselves then there these they this those through under until upon very what when where which while whom whose with within without would your yours yourself discuss answer question please tell give write case cases make note notes".split(" "));
+
+/** Distinct, safe search words for Postgres to_tsquery (letters/digits only). */
+export function librarySearchTerms(query, max = 12) {
+  const words = String(query || "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9\s]/g, " ").split(/\s+/);
+  const out = [];
+  for (const word of words) {
+    if (word.length < 4 || STOP_WORDS.has(word) || /^\d+$/.test(word) && word.length !== 4 || out.includes(word)) continue;
+    out.push(word);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 export function createStudio({ db, env = process.env, generate = defaultGenerate, verify = defaultVerify, fetchImpl } = {}) {
   const gen = (request) => generate(request, { env, fetchImpl });
 
@@ -126,6 +140,62 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     };
   }
 
+  // ---------------- uploaded library (Neon material_chunks) ----------------
+
+  const TYPE_LABEL = { lecture_note: "lecture note", textbook: "textbook", handout: "handout", case_material: "judgment / case material", statute: "statute", past_question: "past paper", marking_scheme: "marking scheme", course_outline: "course outline", model_answer: "model answer", other: "material" };
+
+  async function libraryExcerpts(query, { courseId = null, limit = 6, maxChars = 14_000 } = {}) {
+    const terms = librarySearchTerms(query);
+    if (!terms.length) return [];
+    try {
+      const result = await db.query(
+        `SELECT m.id AS material_id, m.title, m.material_type, chunk.page_number, chunk.content,
+                ts_rank_cd(to_tsvector('english', chunk.content), q.query) + CASE WHEN $2::uuid IS NOT NULL AND m.course_id = $2::uuid THEN 0.5 ELSE 0 END AS score
+           FROM material_chunks chunk
+           JOIN materials m ON m.id = chunk.material_id
+           CROSS JOIN (SELECT to_tsquery('english', $1) AS query) q
+          WHERE m.approval_status = 'approved' AND m.publication_status = 'published' AND m.access_scope IN ('platform', 'institution')
+            AND to_tsvector('english', chunk.content) @@ q.query
+            AND chunk.version_id = (SELECT v.id FROM material_versions v WHERE v.material_id = m.id ORDER BY v.version_number DESC LIMIT 1)
+          ORDER BY score DESC LIMIT $3`,
+        [terms.join(" | "), courseId, limit]);
+      const picked = [];
+      let used = 0;
+      for (const row of result.rows) {
+        const text = truncate(row.content, Math.max(0, Math.min(3_600, maxChars - used)));
+        if (!text) break;
+        used += text.length;
+        picked.push({ ...row, content: text });
+      }
+      return picked;
+    } catch {
+      return [];
+    }
+  }
+
+  async function materialText(materialId, maxChars = 12_000) {
+    if (!materialId) return "";
+    try {
+      const result = await db.query(
+        `SELECT chunk.page_number, chunk.content FROM material_chunks chunk
+          WHERE chunk.material_id = $1
+            AND chunk.version_id = (SELECT v.id FROM material_versions v WHERE v.material_id = $1 ORDER BY v.version_number DESC LIMIT 1)
+          ORDER BY chunk.chunk_number LIMIT 8`, [materialId]);
+      return truncate(result.rows.map((row) => `${row.page_number ? `[p. ${row.page_number}] ` : ""}${row.content}`).join("\n\n"), maxChars);
+    } catch {
+      return "";
+    }
+  }
+
+  function libraryCite(row) {
+    return `[Library: ${row.title}${row.page_number ? `, p. ${row.page_number}` : ""}]`;
+  }
+
+  function libraryBlock(excerpts) {
+    if (!excerpts.length) return "";
+    return `FIRE COUNSEL LIBRARY (course materials uploaded by the administrators). Use these where relevant and cite them as [Library: title, p. N]:\n${excerpts.map((row) => `#### ${libraryCite(row)} (${TYPE_LABEL[row.material_type] || "material"})\n${row.content}`).join("\n\n")}`;
+  }
+
   function courseLabel(course) {
     return [course.course_code, course.title, course.short_name || course.university].filter(Boolean).join(" · ");
   }
@@ -158,13 +228,15 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     const context = researchResult?.ok
       ? `\n\n---\nLIVE WEB RESEARCH NOTES (Google Search):\n${truncate(researchResult.notes, 20000)}\n\nCHECKED SOURCES (cite only these, as Markdown links):\n${sourceBlock(checked)}`
       : options.webSearch !== false ? "\n\n---\nLive web search was unavailable for this answer. Do not include URLs; tell the student the answer is not web-verified." : "";
-    const messages = [...history.slice(-12), { role: "user", text: `${text}${context}`, attachments }];
+    const library = await libraryExcerpts(text, { courseId: options.courseId || null });
+    const libraryContext = library.length ? `\n\n---\n${libraryBlock(library)}` : "";
+    const messages = [...history.slice(-12), { role: "user", text: `${text}${libraryContext}${context}`, attachments }];
     const answer = await gen({ system: composeSystem("chat", custom), messages, maxTokens: 8192 });
     return {
       content: answer.text + lengthNote(answer),
       sources: await finalSources(answer.text, checked, terms),
       provider: answer.provider, model: answer.model,
-      meta: { web_search: Boolean(researchResult?.ok), search_queries: researchResult?.queries || [], fallback: Boolean(answer.fallback) }
+      meta: { web_search: Boolean(researchResult?.ok), search_queries: researchResult?.queries || [], library_passages: library.length, fallback: Boolean(answer.fallback) }
     };
   }
 
@@ -192,6 +264,17 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       const r = await research(`Research this case/authority for a Nigerian law student${subject ? ` (subject: ${subject})` : ""}: ${item.name}${item.citation ? ` — citation as printed: ${item.citation}` : ""}${item.proposition ? `. The textbook cites it for: ${item.proposition}` : ""}.`);
       researched.push({ item, research: r });
     }
+    const library = [];
+    for (const item of selected) {
+      for (const row of await libraryExcerpts(item.name, { limit: 3, maxChars: 6_000 })) {
+        if (!library.some((r) => r.material_id === row.material_id && r.page_number === row.page_number && r.content === row.content)) library.push(row);
+      }
+    }
+    const judgments = [];
+    for (const row of records.filter((r) => r.source_material_id).slice(0, 3)) {
+      const judgment = await materialText(row.source_material_id, 12_000);
+      if (judgment) judgments.push({ name: row.case_name, text: judgment });
+    }
     const terms = termsFrom(...selected.map((item) => item.name));
     const allSources = researched.flatMap(({ research: r }) => r.sources);
     const checked = await verify(allSources, { terms, limit: 30 });
@@ -201,6 +284,8 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       subject ? `SUBJECT / TOPIC (from the uploaded material): ${subject}` : "",
       `EXTRACTION REGISTER (${register.length} case(s)/authorities):\n${register.map((item, i) => `${i + 1}. ${item.name}${item.citation ? ` | ${item.citation}` : ""}${item.page ? ` | page ${item.page}` : ""}${item.footnote ? ` | fn ${item.footnote}` : ""}${item.proposition ? ` | cited for: ${item.proposition}` : ""}${item.uncertain ? " | UNCONFIRMED reading" : ""}`).join("\n")}`,
       records.length ? `FIRE COUNSEL DATABASE RECORDS (entered by administrators; respect their verification_status):\n${records.map((row) => `#### ${row.case_name}\n${caseRecordText(row)}`).join("\n\n")}` : "FIRE COUNSEL DATABASE RECORDS: none matched.",
+      judgments.length ? `JUDGMENT TEXT FROM THE FIRE COUNSEL LIBRARY (uploaded by administrators; quote it with page numbers as [Library: case name, p. N]):\n${judgments.map((j) => `#### ${j.name}\n${j.text}`).join("\n\n")}` : "",
+      library.length ? libraryBlock(library) : "",
       `LIVE WEB RESEARCH NOTES PER CASE (Google Search):\n${researched.map(({ item, research: r }) => `#### ${item.name}\n${r.ok ? truncate(r.notes, 12000) : `Live web search failed (${r.error}). Mark this case UNVERIFIED and say no web source was obtained in this run.`}`).join("\n\n")}`,
       `CHECKED SOURCE LIST (server opened each link; cite only these):\n${sourceBlock(checked)}`,
       remaining.length ? `NOT PROCESSED IN THIS RUN (daily processing limit of ${limit} cases per run): ${remaining.map((item) => item.name).join("; ")}. Keep them in the register marked "pending — run again" and tell the student to send "continue" to process them.` : ""
@@ -211,7 +296,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       content: answer.text + lengthNote(answer),
       sources: await finalSources(answer.text, checked, terms),
       provider: answer.provider, model: answer.model,
-      meta: { cases: selected.map((item) => item.name), pending_cases: remaining.map((item) => item.name), database_matches: records.length, web_search: researched.some(({ research: r }) => r.ok), fallback: Boolean(answer.fallback) }
+      meta: { cases: selected.map((item) => item.name), pending_cases: remaining.map((item) => item.name), database_matches: records.length, library_passages: library.length + judgments.length, web_search: researched.some(({ research: r }) => r.ok), fallback: Boolean(answer.fallback) }
     };
   }
 
@@ -229,6 +314,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       researchResult = await research(`Find authoritative sources for these study notes${options.topic ? ` on ${options.topic}` : ""}: ${truncate(text, 3000)}`, attachments);
       if (researchResult.ok) checked = await verify(researchResult.sources, { terms, limit: 15 });
     }
+    const library = options.allowResearch ? await libraryExcerpts(options.topic || text, { courseId: course?.id || null, limit: 6, maxChars: 12_000 }) : [];
     const custom = await loadPrompt(db, "exam_note");
     const brief = [
       `STUDENT REQUEST: Build exam-ready notes${options.topic ? ` on: ${options.topic}` : ""} from the supplied material.`,
@@ -237,6 +323,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       `EXTERNAL RESEARCH AUTHORISED: ${options.allowResearch ? "YES — research notes below; label anything not from the student's material" : "NO — use only the supplied material"}`,
       text ? `STUDENT'S TYPED NOTES / LECTURER MATERIAL:\n${truncate(text, 60000)}` : "",
       questions.length ? `PAST EXAMINATION QUESTIONS SUPPLIED (from the FIRE COUNSEL database for this course):\n${formatProfile(questions).text}` : "PAST EXAMINATION PAPERS: none supplied — say so in that section; do not invent questions.",
+      library.length ? libraryBlock(library) : "",
       researchResult?.ok ? `RESEARCH NOTES:\n${truncate(researchResult.notes, 15000)}\n\nCHECKED SOURCES:\n${sourceBlock(checked)}` : ""
     ].filter(Boolean).join("\n\n");
     const answer = await gen({ system: composeSystem("exam_note", custom), messages: [...history.slice(-4), { role: "user", text: brief, attachments }], maxTokens: 32768, temperature: 0.2 });
@@ -244,7 +331,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       content: answer.text + lengthNote(answer),
       sources: checked.length || extractUrls(answer.text).length ? await finalSources(answer.text, checked, terms) : [],
       provider: answer.provider, model: answer.model,
-      meta: { course: course ? { id: course.id, label: courseLabel(course) } : null, past_questions: questions.length, research: Boolean(researchResult?.ok), fallback: Boolean(answer.fallback) }
+      meta: { course: course ? { id: course.id, label: courseLabel(course) } : null, past_questions: questions.length, research: Boolean(researchResult?.ok), library_passages: library.length, fallback: Boolean(answer.fallback) }
     };
   }
 
@@ -274,6 +361,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     const questions = course ? await pastQuestions(course.id, 30) : [];
     const profile = formatProfile(questions);
     const count = Math.min(Math.max(Number(options.count) || 0, 0), 20);
+    const library = course ? await libraryExcerpts(text, { courseId: course.id, limit: 4, maxChars: 8_000 }) : [];
     const custom = await loadPrompt(db, "question_setter");
     const brief = [
       course ? `COURSE: ${courseLabel(course)}${detection ? ` (auto-detected, confidence ${Math.round(detection.confidence * 100)}%: ${detection.reason})` : " (chosen by the student)"}` : "COURSE: none in the database yet.",
@@ -281,14 +369,15 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
         ? `PAST-QUESTION FORMAT PROFILE for this course: ${profile.papers} paper(s) (${profile.years.join(", ")}); about ${profile.questionsPerPaper} question(s) per paper; marks used: ${profile.marks.join(", ") || "not recorded"}; paper duration: ${profile.durations.map((d) => `${d} min`).join(", ") || "not recorded"}.\nCopy this format exactly (rubric/instructions, numbering, marks, time, essay vs problem mix, style and length of facts).\n\nPAST QUESTIONS FOR THIS COURSE (verbatim):\n${profile.text}`
         : "PAST QUESTIONS: none are stored for this course yet. Say so at the top, then use a standard Nigerian university law examination format and label it as a generic format.",
       count ? `NUMBER OF QUESTIONS REQUESTED: ${count}` : "NUMBER OF QUESTIONS: same as a typical paper above.",
-      `STUDENT'S NOTES / SOURCE MATERIAL TO SET QUESTIONS FROM:\n${truncate(text, 60000) || "(see attached files)"}`
-    ].join("\n\n");
+      `STUDENT'S NOTES / SOURCE MATERIAL TO SET QUESTIONS FROM:\n${truncate(text, 60000) || "(see attached files)"}`,
+      library.length ? `${libraryBlock(library)}\n(Use these course passages only to keep the questions within this course's syllabus.)` : ""
+    ].filter(Boolean).join("\n\n");
     const answer = await gen({ system: composeSystem("question_setter", custom), messages: [...history.slice(-4), { role: "user", text: brief, attachments }], maxTokens: 24576, temperature: 0.5 });
     return {
       content: answer.text + lengthNote(answer),
       sources: [],
       provider: answer.provider, model: answer.model,
-      meta: { course: course ? { id: course.id, label: courseLabel(course) } : null, detection, past_questions: questions.length, fallback: Boolean(answer.fallback) }
+      meta: { course: course ? { id: course.id, label: courseLabel(course) } : null, detection, past_questions: questions.length, library_passages: library.length, fallback: Boolean(answer.fallback) }
     };
   }
 
@@ -309,6 +398,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       return handler(input);
     },
     listCourses,
-    extractText
+    extractText,
+    libraryExcerpts
   };
 }

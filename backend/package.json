@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "check": "node --check src/server.js && node --check src/app.js && node --check src/config/database.js && node --check src/config/databaseCatalog.js && node --check src/config/firebaseAdmin.js && node --check src/middleware/verifyFirebaseToken.js && node --check src/middleware/requireAdmin.js && node --check src/routes/adminDatabase.js && node --check src/routes/studentMaterials.js && node --check src/routes/researchSearch.js && node --check src/services/materialAccess.js && node --check src/services/studentAccounts.js && node --check src/routes/studentProfile.js && node --check src/middleware/requireStudentInstallation.js && node --check src/config/trustedProxy.js && node --check scripts/list-tables.js && node --check src/website.js && node --check src/routes/ai.js && node --check src/routes/adminAi.js && node --check src/routes/presence.js && node --check src/services/ai/providers.js && node --check src/services/ai/linkCheck.js && node --check src/services/ai/prompts.js && node --check src/services/ai/quota.js && node --check src/services/ai/studio.js && node --check src/services/ai/attachments.js && node --check scripts/migrate.js && node --check src/services/ai/documents.js",
+    "check": "node --check src/server.js && node --check src/app.js && node --check src/config/database.js && node --check src/config/databaseCatalog.js && node --check src/config/firebaseAdmin.js && node --check src/middleware/verifyFirebaseToken.js && node --check src/middleware/requireAdmin.js && node --check src/routes/adminDatabase.js && node --check src/routes/studentMaterials.js && node --check src/routes/researchSearch.js && node --check src/services/materialAccess.js && node --check src/services/studentAccounts.js && node --check src/routes/studentProfile.js && node --check src/middleware/requireStudentInstallation.js && node --check src/config/trustedProxy.js && node --check scripts/list-tables.js && node --check src/website.js && node --check src/routes/ai.js && node --check src/routes/adminAi.js && node --check src/routes/presence.js && node --check src/services/ai/providers.js && node --check src/services/ai/linkCheck.js && node --check src/services/ai/prompts.js && node --check src/services/ai/quota.js && node --check src/services/ai/studio.js && node --check src/services/ai/attachments.js && node --check scripts/migrate.js && node --check src/services/ai/documents.js && node --check src/services/documents/extract.js && node --check src/services/documents/importer.js && node --check src/routes/adminDocuments.js && node --check src/routes/siteContent.js",
     "test": "node --test",
     "db:tables": "node scripts/list-tables.js",
     "db:migrate": "node scripts/migrate.js"
@@ -24,7 +24,10 @@
     "express-rate-limit": "^8.1.0",
     "firebase-admin": "^14.5.1",
     "helmet": "^8.1.0",
+    "mammoth": "^1.13.0",
     "marked": "^18.2.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.5.438",
     "pdfkit": "^0.20.2",
     "pg": "^8.16.3"
   },
