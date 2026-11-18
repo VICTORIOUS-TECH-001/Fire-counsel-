@@ -85,12 +85,16 @@ function renderVersions(versions = []) {
   holder.innerHTML = `<ol class="fc-version-list">${versions.map((version, index) => `<li><div><strong>${index === 0 ? "LIVE NOW · " : ""}${escapeHTML(when(version.created_at))}</strong><small>${escapeHTML(version.note || "No note")} · ${escapeHTML(version.published_by || "")}</small></div>${index === 0 ? "" : `<button class="button button-light" type="button" data-restore-version="${escapeHTML(version.id)}">Restore this version</button>`}</li>`).join("")}</ol>`;
 }
 
-async function loadSite(mySession = session) {
+// after: "publish" keeps the editor and message; "restore" shows the restored
+// live content in the editor but keeps the message.
+async function loadSite(mySession = session, after = "") {
   try {
     const { data } = await api("/api/v1/admin/site");
     if (mySession !== session) return;
     publishedContent = data.published?.content || null;
     renderVersions(data.versions);
+    if (after === "publish") return;
+    if (after === "restore") { if (publishedContent) writeEditor(publishedContent); return; }
     const draft = data.draft;
     const draftIsNewer = draft && (!data.published || new Date(draft.updated_at) > new Date(data.published.updated_at));
     if (draftIsNewer) {
@@ -150,7 +154,7 @@ $("#publish-site")?.addEventListener("click", async () => {
     await api("/api/v1/admin/site/publish", { method: "POST", body: JSON.stringify({ content, note }) });
     if ($("#publish-note")) $("#publish-note").value = "";
     editorStatus("Published! The live website now shows these changes.", "ok");
-    await loadSite();
+    await loadSite(session, "publish");
   } catch (error) {
     editorStatus(error.message, "error");
   } finally {
@@ -178,8 +182,8 @@ $("#site-versions")?.addEventListener("click", async (event) => {
   button.disabled = true;
   try {
     await api(`/api/v1/admin/site/versions/${encodeURIComponent(button.dataset.restoreVersion)}/restore`, { method: "POST" });
-    editorStatus("That version is live again.", "ok");
-    await loadSite();
+    editorStatus("That version is live again and is now in the editor.", "ok");
+    await loadSite(session, "restore");
   } catch (error) {
     editorStatus(error.message, "error");
     button.disabled = false;

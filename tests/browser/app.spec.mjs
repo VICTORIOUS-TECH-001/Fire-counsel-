@@ -263,11 +263,11 @@ test("admin sections navigate correctly and a student cannot unlock database con
     ? json(route, { database: "connected" }) : json(route, { error: "Administrator permission required." }, 403));
   await page.goto("/admin.html");
   await expect(page.locator("#admin-auth-status")).toHaveAttribute("data-state", "denied");
-  // The local website-content editor and slideshow load the public JSON.
-  await expect(page.locator("#editor-status")).toHaveText("Default website content loaded");
+  // The website-content editor and slideshow load the live public JSON.
+  await expect(page.locator("#editor-status")).toHaveText("Live website content loaded");
   await expect(page.locator("#json-editor")).toHaveValue(/"brand"/);
   await expect(page.locator(".slide-card")).not.toHaveCount(0);
-  for (const name of ["content", "media", "ai", "plans", "database", "overview"]) {
+  for (const name of ["content", "media", "uploads", "ai", "plans", "database", "overview"]) {
     await page.locator(`[data-panel=${name}]`).click();
     await expect(page.locator(`#panel-${name}`)).toBeVisible();
     await expect(page.locator(".admin-panel:visible")).toHaveCount(1);
@@ -280,6 +280,7 @@ test("admin sections navigate correctly and a student cannot unlock database con
   await expect(page.locator("#ai-prompt-save")).toBeDisabled();
   await expect(page.locator("#save-default-limits")).toBeDisabled();
   await expect(page.locator("#admin-claim")).toBeHidden();
+  for (const id of ["#publish-site", "#save-draft", "#add-slide-files", "#upload-submit", "#upload-files"]) await expect(page.locator(id)).toBeDisabled();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
@@ -494,4 +495,108 @@ test("administrator pasted-text version UI posts text, never a file (stubbed API
   await expect(page.locator("#database-version-panel")).toBeHidden();
   await expect(page.locator("#database-version-text")).toHaveValue("");
   await expect(page.locator("#database-version-list")).toBeEmpty();
+});
+
+// A tiny one-page PDF with real text (pdf.js rebuilds the cross-reference table).
+function syntheticPdf(text) {
+  const stream = `BT /F1 24 Tf 72 720 Td (${text}) Tj ET`;
+  return Buffer.from(`%PDF-1.4
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
+3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj
+4 0 obj << /Length ${stream.length} >> stream
+${stream}
+endstream endobj
+5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj
+trailer << /Root 1 0 R /Size 6 >>
+%%EOF
+`);
+}
+
+test("students can read a saved PDF in the built-in reader and close it with Back", async ({ page }) => {
+  await readyStudy(page, "library");
+  await page.locator("#file-input").setInputFiles({ name: "synthetic-judgment.pdf", mimeType: "application/pdf", buffer: syntheticPdf("Reader works offline") });
+  await expect(page.locator("#library-count")).toHaveText("1 file");
+  await page.locator("[data-open-doc]").click();
+  const reader = page.locator(".reader-overlay");
+  await expect(reader).toBeVisible();
+  await expect(reader.locator(".reader-title")).toHaveText("synthetic-judgment.pdf");
+  await expect(reader.locator(".reader-page canvas")).toHaveCount(1);
+  await expect(reader.locator(".reader-counter")).toHaveText("1 / 1");
+  await reader.getByRole("button", { name: "Show the text so you can copy it" }).click();
+  await expect(reader.locator(".reader-text")).toContainText("Reader works offline");
+  await reader.getByRole("button", { name: "Zoom in" }).click();
+  await page.goBack();
+  await expect(reader).toHaveCount(0);
+  await expect(page.locator("#document-list")).toContainText("synthetic-judgment.pdf");
+  // Plain-text notes open too.
+  await page.locator("#file-input").setInputFiles({ name: "note.txt", mimeType: "text/plain", buffer: Buffer.from("Ratio decidendi line") });
+  await page.locator("[data-open-doc]", { hasText: "note.txt" }).click();
+  await expect(page.locator(".reader-plain")).toHaveText("Ratio decidendi line");
+  await page.locator(".reader-close").click();
+  await expect(page.locator(".reader-overlay")).toHaveCount(0);
+});
+
+test("admin saves a website draft, previews it and publishes it to Neon", async ({ page, context }) => {
+  await stubAuth(page, { user: admin });
+  const base = await (await page.request.get("/data/site-content.json")).json();
+  const draft = { ...base, brand: { ...base.brand, name: "Draft Brand Name" } };
+  const calls = [];
+  await page.route("**/api/**", async route => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/health") return json(route, { database: "connected" });
+    if (path.endsWith("/database/catalog")) return json(route, { data: catalog });
+    if (path === "/api/v1/admin/site" && request.method() === "GET") {
+      return json(route, { data: { draft: { content: draft, updated_at: "2026-11-02T10:00:00Z" }, published: { content: base, updated_at: "2026-11-01T10:00:00Z" }, versions: [{ id: rowId, note: "First", published_by: "admin@example.invalid", created_at: "2026-11-01T10:00:00Z" }, { id: "323e4567-e89b-42d3-a456-426614174000", note: "Older", published_by: "admin@example.invalid", created_at: "2026-10-01T10:00:00Z" }] } });
+    }
+    if (path.startsWith("/api/v1/admin/site") || path.startsWith("/api/v1/admin/documents")) {
+      calls.push({ method: request.method(), path, type: request.headers()["content-type"], body: request.postData() });
+      if (path.endsWith("/usage")) return json(route, { data: { used_bytes: 1048576, budget_bytes: 367001600, files: 1, max_file_bytes: 26214400, ocr: { ai: true, ocr_space: false } } });
+      if (path === "/api/v1/admin/documents" && request.method() === "GET") return json(route, { data: [{ id: rowId, purpose: "material", file_name: "Contract notes.pdf", size_bytes: 2048, status: "saved", method: "pdf_text", page_count: 12, warnings: [], result: { title: "Contract notes", version_number: 1, chunks: 9 }, has_file: true }] });
+      if (path === "/api/v1/admin/documents" && request.method() === "POST") return json(route, { data: { id: rowId, status: "uploaded" } }, 202);
+      return json(route, { data: { saved: true } });
+    }
+    return json(route, { user: { ...admin, role: "admin" } });
+  });
+  page.on("dialog", dialog => dialog.accept());
+  await page.goto("/admin.html");
+  await expect(page.locator("#admin-auth-status")).toHaveAttribute("data-state", "verified");
+  await page.locator("[data-panel=content]").click();
+  await expect(page.locator("#editor-status")).toContainText("Unpublished draft loaded");
+  await expect(page.locator("#json-editor")).toHaveValue(/Draft Brand Name/);
+  await expect(page.locator("#site-versions")).toContainText("LIVE NOW");
+  await expect(page.locator("#publish-site")).toBeEnabled();
+
+  await page.locator("#save-draft").click();
+  await expect(page.locator("#editor-status")).toContainText("Draft saved");
+
+  const [preview] = await Promise.all([context.waitForEvent("page"), page.locator("#preview-site").click()]);
+  await expect(preview.locator("#preview-banner")).toContainText("PREVIEW");
+  await expect(preview.locator("body")).toContainText("Draft Brand Name");
+  await preview.close();
+
+  await page.locator("#publish-note").fill("New brand");
+  await page.locator("#publish-site").click();
+  await expect(page.locator("#editor-status")).toContainText("Published");
+  const publish = calls.find(call => call.path.endsWith("/publish"));
+  expect(JSON.parse(publish.body)).toMatchObject({ note: "New brand", content: { brand: { name: "Draft Brand Name" } } });
+  expect(JSON.parse(calls.find(call => call.path.endsWith("/draft")).body).content.brand.name).toBe("Draft Brand Name");
+
+  await page.locator("[data-restore-version]").click();
+  await expect.poll(() => calls.some(call => call.path.endsWith("/restore"))).toBe(true);
+
+  // Upload documents: the file is sent as-is with its own type.
+  await page.locator("[data-panel=uploads]").click();
+  await expect(page.locator("#upload-rows")).toContainText("Contract notes.pdf");
+  await expect(page.locator("#upload-rows")).toContainText("9 searchable parts");
+  await expect(page.locator("#upload-usage")).toContainText("Gemini");
+  await page.locator("#upload-files").setInputFiles({ name: "Torts.pdf", mimeType: "application/pdf", buffer: syntheticPdf("Torts") });
+  await page.locator("#upload-submit").click();
+  await expect(page.locator("#upload-status")).toContainText("1 file uploaded");
+  const upload = calls.find(call => call.method === "POST" && call.path === "/api/v1/admin/documents");
+  expect(upload.type).toBe("application/pdf");
+  expect(upload.body.startsWith("%PDF")).toBe(true);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
