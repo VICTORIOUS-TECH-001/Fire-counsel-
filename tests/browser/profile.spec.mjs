@@ -192,7 +192,7 @@ test("a delayed profile load cannot restore a signed-out user's details", async 
   await page.goto("/study.html#profile");
   await requestStarted;
   await page.locator("#profile-signout").click();
-  await expect(page.locator("#profile-signin")).toBeVisible();
+  await expect(page.locator("#ws-gate-signin")).toBeVisible();
   const returned = page.waitForResponse("**/api/v1/profile");
   release(); await finish(page, await returned);
   await expect(page.locator("#student-profile-form")).toBeHidden();
@@ -256,7 +256,7 @@ test("profile loading, creation, security and signed-out views fit small screens
   await expect(page.locator("#student-profile-title")).toHaveText(identity.displayName);
   await checkWidths();
   await page.locator("#profile-signout").click();
-  await expect(page.locator("#profile-signin")).toBeVisible();
+  await expect(page.locator("#ws-gate-signin")).toBeVisible();
   await checkWidths();
 });
 
@@ -275,8 +275,11 @@ test("profile editing and sign-out preserve local recall records, session count 
   await page.locator("#profile-save").click();
   await expect(page.locator("#student-profile-status")).toContainText("has been saved");
   await page.locator("#profile-signout").click();
-  await expect(page.locator("#profile-signin")).toBeVisible();
+  await expect(page.locator("#ws-gate-signin")).toBeVisible();
   await page.reload();
+  // The stubbed session is restored on reload (like Firebase persistence), so
+  // the gate unlocks — and the local study data must have survived.
+  await expect(page.locator("#ws-gate")).toBeHidden();
   await page.locator("#student-nav [data-page=memory]").click();
   await expect(page.locator("#recall-area")).toContainText("Preserved local question");
   await expect(page.locator("#stat-sessions")).toHaveText("7");
@@ -285,4 +288,36 @@ test("profile editing and sign-out preserve local recall records, session count 
   await page.goto("/study.html#profile");
   await expect(page.locator("#profile-page")).toBeVisible();
   await expectNoHorizontalOverflow(page);
+});
+
+test("workspace stays locked for a signed-out visitor and unlocks on sign-in", async ({ page }) => {
+  await stubAuth(page);
+  await page.goto("/study.html#dashboard");
+  // No preview: the shell is hidden behind the lock screen.
+  await expect(page.locator("#ws-gate")).toBeVisible();
+  await expect(page.locator("#ws-gate-signin")).toHaveAttribute("href", "./auth.html?next=study.html");
+  await expect(page.locator("#main-content")).toBeHidden();
+  await expect(page.locator("#sidebar")).toBeHidden();
+  // A late sign-in (e.g. redirect back from the auth page) unlocks it live.
+  await page.evaluate(u => window.__auth.setUser(u), student);
+  await expect(page.locator("#ws-gate")).toBeHidden();
+  await expect(page.locator("#main-content")).toBeVisible();
+  // Signing out locks it again and clears the offline-return marker.
+  await page.evaluate(() => window.__auth.setUser(null));
+  await expect(page.locator("#ws-gate")).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem("fire-counsel-workspace-session-v1"))).toBe(null);
+});
+
+test("workspace opens offline only for a browser that signed in before", async ({ page }) => {
+  // Firebase cannot load (offline/blocked): a fresh browser stays locked.
+  await page.route("**/firebase/auth-client.mjs", route => route.abort());
+  await page.goto("/study.html#dashboard");
+  await expect(page.locator("#ws-gate")).toBeVisible();
+  await expect(page.locator("#main-content")).toBeHidden();
+  // Mark a previous sign-in (what the gate stores after a real sign-in)…
+  await page.evaluate(() => localStorage.setItem("fire-counsel-workspace-session-v1", "synthetic-student"));
+  await page.reload();
+  // …and the local study tools open without a network.
+  await expect(page.locator("#ws-gate")).toBeHidden();
+  await expect(page.locator("#main-content")).toBeVisible();
 });

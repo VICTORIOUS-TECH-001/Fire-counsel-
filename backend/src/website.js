@@ -14,6 +14,7 @@ export const PUBLIC_FILES = new Set([
   "auth-page.mjs", "admin-auth.mjs", "admin-database.mjs",
   "study-materials.mjs", "research-search.mjs", "request-scope.mjs",
   "student-profile.mjs", "student-page.mjs", "student-page-view.mjs", "installation.mjs",
+  "workspace-gate.mjs",
   "ai-studio.css", "ai-page.css", "ai-studio.mjs", "ai-markdown.mjs", "admin-ai.mjs", "admin-courses.mjs", "presence.mjs",
   "admin-site.mjs", "admin-uploads.mjs", "pdf-reader.mjs",
   "preloader.css", "preloader.js", "workspace.css", "workspace.mjs", "workspace-config.mjs", "admin-workspace.mjs",

@@ -331,3 +331,22 @@ body.ws .site-footer .brand-copy small{color:var(--ws-sky)}
   body.ws .ws-mini-fire .em{opacity:.7}
   body.ws .ws-tile,body.ws .ws-cta{transition:none}
 }
+
+/* Workspace sign-in gate (workspace-gate.mjs). The shell stays hidden until
+   Firebase Auth confirms a student; a signed-in-before browser keeps local
+   tools offline. */
+body.ws[data-ws-auth="pending"] .app,body.ws[data-ws-auth="locked"] .app{display:none}
+body.ws .ws-gate{display:none}
+body.ws[data-ws-auth="pending"] .ws-gate,body.ws[data-ws-auth="locked"] .ws-gate{display:grid;place-items:center;position:fixed;inset:0;z-index:90;padding:22px;background:radial-gradient(circle at 50% 18%,rgba(37,99,235,.22),transparent 30rem),var(--ws-bg)}
+body.ws .ws-gate-card{display:grid;justify-items:center;gap:13px;width:min(100%,420px);padding:36px 30px 28px;border:1px solid var(--ws-border);border-radius:22px;background:var(--ws-card);box-shadow:var(--ws-glow);text-align:center}
+body.ws .ws-gate-brand{width:56px;height:56px;object-fit:cover;border-radius:15px;border:1px solid var(--ws-border)}
+body.ws .ws-gate-lock{display:grid;place-items:center;width:44px;height:44px;border-radius:13px;background:rgba(59,130,246,.16);border:1px solid var(--ws-border);color:var(--ws-sky)}
+body.ws .ws-gate-lock svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+body.ws .ws-gate-card h1{margin:0;font-size:23px;letter-spacing:-.03em;color:var(--ws-text)}
+body.ws .ws-gate-card p{margin:0;color:var(--ws-muted);font-size:12px;line-height:1.7}
+body.ws .ws-gate-signin{margin-top:6px;text-decoration:none}
+body.ws .ws-gate-home{color:var(--ws-sky);font-size:11px;font-weight:700;text-decoration:none}
+body.ws .ws-gate-home:hover{text-decoration:underline}
+body.ws .ws-gate-status{margin-top:2px;font-size:10px;color:var(--ws-muted)}
+body.ws .ws-gate-status:empty{display:none}
+body.ws[data-ws-auth="pending"] .ws-gate-lock,body.ws[data-ws-auth="pending"] .ws-gate-card h1,body.ws[data-ws-auth="pending"] #ws-gate-message,body.ws[data-ws-auth="pending"] .ws-gate-signin,body.ws[data-ws-auth="pending"] .ws-gate-home{display:none}

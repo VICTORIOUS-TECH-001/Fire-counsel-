@@ -60,6 +60,7 @@ function initStudio() {
   let authClient = null;
   let user = null;
   let session = 0;
+  let premiumBlocked = false;
   let mode = "chat";
   let conversationId = null;
   let messages = [];
@@ -98,12 +99,14 @@ function initStudio() {
       inline.textContent = "";
       return;
     }
-    badge.textContent = allowance.unlimited ? "ADMIN · UNLIMITED" : allowance.paused ? "PAUSED" : "TODAY";
+    badge.textContent = allowance.unlimited ? "ADMIN · UNLIMITED" : !allowance.premium ? "FREE PLAN" : allowance.paused ? "PAUSED" : "PREMIUM";
     list.innerHTML = Object.entries(allowance.features).map(([key, f]) => {
       const pct = f.limit ? Math.min(100, Math.round((f.used / f.limit) * 100)) : 0;
       const value = f.limit == null ? `${f.used} used · no limit` : `${f.remaining} of ${f.limit} left`;
       return `<div class="ai-allowance-row" data-feature="${escapeHTML(key)}"><div><strong>${escapeHTML(f.label)}</strong><span>${escapeHTML(value)}</span></div><div class="ai-meter"><span style="width:${f.limit == null ? 0 : pct}%"></span></div></div>`;
-    }).join("") + (allowance.paused ? `<p class="ai-paused-note">AI access is paused for this account. Contact the administrator.</p>` : "");
+    }).join("")
+      + (!allowance.unlimited && !allowance.premium ? `<p class="ai-paused-note">Free plan: Fire Counsel AI is a premium feature. Ask the FIRE COUNSEL administrator to enable premium on this account.</p>` : "")
+      + (allowance.paused ? `<p class="ai-paused-note">AI access is paused for this account. Contact the administrator.</p>` : "");
     const current = allowance.features[MODES[mode].feature];
     inline.textContent = !current ? "" : current.limit == null ? "No daily limit" : `${current.remaining} of ${current.limit} left today`;
   }
@@ -117,6 +120,15 @@ function initStudio() {
     }
     config = body.data;
     renderAllowance(body.data.allowance);
+    // The server enforces premium on every AI request; mirror it in the UI so
+    // free-plan students see why the composer is locked instead of an error.
+    premiumBlocked = !config.admin && !(config.allowance && config.allowance.premium === true);
+    input.disabled = premiumBlocked;
+    setBusy(false);
+    if (premiumBlocked) {
+      setStatus("Fire Counsel AI is a premium feature. Your account is on the free plan — ask the FIRE COUNSEL administrator to enable premium on it.", "error");
+      return;
+    }
     const webSearch = $("#ai-web-search");
     webSearch.disabled = !config.web_search;
     if (!config.web_search) webSearch.checked = false;
@@ -366,7 +378,7 @@ function initStudio() {
 
   // ------------------------------------------------------------ sending
   function setBusy(busy) {
-    sendButton.disabled = busy;
+    sendButton.disabled = busy || premiumBlocked;
     sendButton.dataset.busy = String(busy);
     sendButton.setAttribute("aria-label", busy ? "Working…" : "Send");
   }
@@ -919,6 +931,8 @@ function initStudio() {
       session += 1;
       resetWaiting();
       user = nextUser;
+      premiumBlocked = false;
+      input.disabled = false;
       document.body.dataset.signedIn = String(Boolean(user));
       conversationId = null;
       messages = [];

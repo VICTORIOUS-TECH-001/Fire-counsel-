@@ -120,7 +120,7 @@ test("AI studio sends a question, polls the background job and renders safe answ
   let polls = 0;
   const courseId = "323e4567-e89b-42d3-a456-426614174000";
   const conversation = { id: "423e4567-e89b-42d3-a456-426614174000", mode: "chat", title: "Synthetic question" };
-  const allowance = { unlimited: false, paused: false, timezone: "Africa/Lagos", features: {
+  const allowance = { unlimited: false, paused: false, premium: true, timezone: "Africa/Lagos", features: {
     chat: { label: "AI chat messages", used: 1, limit: 20, remaining: 19 },
     case: { label: "Case analyses", used: 0, limit: 3, remaining: 3 },
     notes: { label: "Exam-ready notes", used: 0, limit: 3, remaining: 3 },
@@ -226,7 +226,7 @@ test("timed mock exam: start, answer, auto-save, submit, score, and send essays 
   await page.route("**/api/**", route => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
-    if (path === "/api/v1/ai/me") return json(route, { data: { configured: true, web_search: true, email_verified: true, allowance: null } });
+    if (path === "/api/v1/ai/me") return json(route, { data: { configured: true, web_search: true, email_verified: true, admin: true, allowance: null } });
     if (path === `/api/v1/ai/conversations/${conversation.id}`) return json(route, { data: { conversation, messages: stage === "mock" ? [{ id: "u1", role: "user", status: "done", content: "Negligence", meta: {} }, mock] : [{ id: "u1", role: "user", status: "done", content: "Negligence", meta: {} }, mock, { id: "u2", role: "user", status: "done", content: "mark", meta: {} }, answer] } });
     if (path === "/api/v1/ai/messages" && request.method() === "POST") {
       const body = request.postDataJSON();
@@ -291,7 +291,7 @@ test("the answer appears word by word while the AI is still writing", async ({ p
   await page.route("**/api/**", route => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
-    if (path === "/api/v1/ai/me") return json(route, { data: { configured: true, web_search: true, email_verified: true, allowance: null } });
+    if (path === "/api/v1/ai/me") return json(route, { data: { configured: true, web_search: true, email_verified: true, admin: true, allowance: null } });
     if (path === `/api/v1/ai/conversations/${conversation.id}`) {
       polls += 1;
       const partial = polls === 1 ? "## Estoppel\n\nEstoppel stops a party" : "## Estoppel\n\nEstoppel stops a party from going back on a promise <img src=x onerror=alert(1)>";
@@ -610,6 +610,7 @@ test("offline PWA reload keeps the study page and personal flashcards", async ({
   page.on("pageerror", error => errors.push(error.message));
   try {
     await context.route("**/*", route => new URL(route.request().url()).origin === new URL(baseURL).origin ? route.continue() : route.abort());
+    await stubAuth(page, { user: student });
     await page.goto(`${baseURL}/study.html#memory`);
     await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
     await page.locator("#card-front").fill("Offline synthetic question");
@@ -820,6 +821,7 @@ test("students see the administrator's published courses next to their personal 
     { id: "c1", course_code: "LAW 241", title: "Contract Law", academic_level: "200 level", university: "UNN" },
     { id: "c2", course_code: "LAW 311", title: "Law of Evidence", academic_level: null, university: "UNN" }
   ];
+  await stubAuth(page, { user: student });
   await page.route("**/api/v1/courses", route => json(route, { data: official }));
   await page.goto("/study.html#subjects");
   // 2 official courses + 6 personal areas, minus the personal "Contract Law" duplicate.

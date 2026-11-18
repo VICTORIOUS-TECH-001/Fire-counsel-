@@ -235,7 +235,7 @@ function renderUsers() {
   const list = users.filter((u) => !query || [u.email, u.name, u.uid].some((v) => v && v.toLowerCase().includes(query)));
   if (!list.length) { holder.innerHTML = `<tr><td colspan="5">${users.length ? "No account matches that search." : "No accounts yet."}</td></tr>`; return; }
   holder.innerHTML = list.map((u) => {
-    const tags = [u.admin ? `<span class="fc-tag">ADMIN</span>` : "", u.paused ? `<span class="fc-tag warn">AI PAUSED</span>` : "", u.disabled ? `<span class="fc-tag warn">DISABLED</span>` : "", !u.email_verified ? `<span class="fc-tag warn">EMAIL NOT VERIFIED</span>` : ""].join("");
+    const tags = [u.admin ? `<span class="fc-tag">ADMIN</span>` : "", u.premium ? `<span class="fc-tag">PREMIUM</span>` : `<span class="fc-tag warn">FREE</span>`, u.paused ? `<span class="fc-tag warn">AI PAUSED</span>` : "", u.disabled ? `<span class="fc-tag warn">DISABLED</span>` : "", !u.email_verified ? `<span class="fc-tag warn">EMAIL NOT VERIFIED</span>` : ""].join("");
     const usage = FEATURES.map(([key, label]) => {
       const limit = u.admin ? "∞" : u.limits[key] ?? defaults?.[key] ?? "—";
       return `<span>${label}: ${u.usage_today[key] || 0} / ${limit}</span>`;
@@ -281,6 +281,7 @@ $("#student-account-rows")?.addEventListener("click", (event) => {
     input.value = user.limits[key] ?? "";
     input.placeholder = `Default ${defaults?.[key] ?? ""}`;
   }
+  $("#user-premium").checked = user.premium === true;
   $("#user-paused").checked = user.paused;
   $("#user-note").value = user.note || "";
   setText("#account-adjustment-status", "", "");
@@ -291,6 +292,7 @@ $("#account-adjustment-form")?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const uid = $("#quota-account-id").value;
   const body = Object.fromEntries(FEATURES.map(([key]) => [key, $(`#user-limit-${key}`).value.trim() === "" ? null : Number($(`#user-limit-${key}`).value)]));
+  body.premium = $("#user-premium").checked;
   body.paused = $("#user-paused").checked;
   body.note = $("#user-note").value.trim();
   try {
