@@ -100,8 +100,10 @@ exact HTTPS origin serving the PWA. Keep Gemini, Firebase service-account and
 Neon credentials exclusively in Render environment secrets.
 
 The Firebase web config in `firebase-client.mjs` is public client config,
-not a server secret. The Gemini API key and Neon connection string must never
-be placed in browser files.
+not a server secret. In Firebase Console, confirm Email/Password is enabled
+under Authentication and add the deployed frontend hostname under
+Authentication → Settings → Authorized domains. The Gemini API key and Neon
+connection string must never be placed in browser files.
 
 ## Tests
 
