@@ -35,8 +35,59 @@ export const CHAT_TASKS = {
   statute: { label: "Explain a section", instruction: "TASK — STATUTE EXPLAINER: Explain the statutory or constitutional provision in plain English: what it says (quote it if you are sure of the wording, otherwise say so), its elements, exceptions/limits, leading Nigerian cases interpreting it, and a short exam example." },
   essay: { label: "Essay plan", instruction: "TASK — ESSAY PLAN: Plan an essay answer: thesis, introduction points, 4–6 headed body sections each with the authorities to cite, counter-arguments, and a conclusion. Keep it in outline form the student can expand in the exam." },
   explain: { label: "Explain simply", instruction: "TASK — EXPLAIN SIMPLY: Explain the topic or the uploaded notes/photo step by step in simple language for a law student, with one everyday example, the leading authorities, and a 3-question quick check at the end." },
+  marker: { label: "Mark my answer", instruction: "TASK — MARK MY ANSWER: You are a strict but encouraging Nigerian university law lecturer marking an exam script. The student's message (or attached photo of a handwritten script) contains the question and their answer; it may also include marking points. Respond with: 1) **Score: X / Y** — use the marks stated in the question, otherwise mark out of 20 — and the grade band (A–F); 2) **What you did well**; 3) **What was missing or wrong** — issues not spotted, rules misstated, and the cases and statutes that should have been cited; 4) **Structure and technique** (IRAC for problem questions, argument flow for essays, use of authority, time management); 5) **Model answer outline** the student can learn from; 6) **Three specific tips** for the next attempt. Be fair and specific. If no answer is given, say so and ask for it instead of inventing one." },
+  mock: { label: "Mock exam", instruction: "TASK — MOCK EXAM (JSON)." },
   library: { label: "Course library", instruction: "TASK — COURSE LIBRARY ANSWER: Answer mainly from the FIRE COUNSEL LIBRARY passages supplied, citing each point as [Library: title, p. N]. If the library does not cover something, say so clearly before adding general knowledge." }
 };
+
+const MOCK_SETTER = `You set timed mock examinations for Nigerian law students. Use the student's notes, topic or uploaded pages (and any FIRE COUNSEL LIBRARY passages supplied) to set fair, exam-standard questions. Respond with JSON only:
+{"title":"short exam title","instructions":"one or two lines of rubric","questions":[
+ {"type":"mcq","question":"...","options":["...","...","...","..."],"answer":0,"explanation":"why this is right, citing the case or section","marks":1},
+ {"type":"essay","question":"essay or problem question (with facts for problem questions)","marks":10,"guide":"marking points: issues, rules and authorities a strong answer must cover"}
+]}
+Rules: "answer" is the 0-based index of the single correct option; give exactly 4 options for MCQs, with plausible distractors; do not repeat questions; never invent case names or citations — use only well-known authorities you are sure of.`;
+
+const clampInt = (value, min, max, fallback) => (Number.isFinite(Number(value)) ? Math.min(Math.max(Math.round(Number(value)), min), max) : fallback);
+
+/** Validates an AI-made mock exam so the page can always render it safely. */
+export function normalizeQuiz(raw, { type = "mcq", minutes = null, count = 10 } = {}) {
+  if (!raw || !Array.isArray(raw.questions)) return null;
+  const text = (value, max) => String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+  const questions = [];
+  for (const item of raw.questions.slice(0, 30)) {
+    const question = text(item?.question, 3000);
+    if (!question) continue;
+    const options = Array.isArray(item?.options) ? item.options.map((o) => text(o, 500)).filter(Boolean).slice(0, 6) : [];
+    const answer = Number.isInteger(item?.answer) ? item.answer : Number.isInteger(Number(item?.answer)) ? Number(item.answer) : -1;
+    if (item?.type !== "essay" && options.length >= 2 && answer >= 0 && answer < options.length) {
+      questions.push({ type: "mcq", question, options, answer, explanation: text(item.explanation, 1500), marks: clampInt(item.marks, 1, 10, 1) });
+    } else if (item?.type === "essay" || type !== "mcq") {
+      questions.push({ type: "essay", question, marks: clampInt(item?.marks, 1, 50, 10), guide: text(item?.guide, 3000) });
+    }
+  }
+  if (!questions.length) return null;
+  const limited = questions.slice(0, Math.max(count, 1));
+  const essays = limited.filter((q) => q.type === "essay").length;
+  const suggested = Math.round((limited.length - essays) * 1.5) + essays * 20;
+  return {
+    title: text(raw.title, 160) || "Mock exam",
+    instructions: text(raw.instructions, 600) || "Answer all questions.",
+    minutes: clampInt(minutes ?? suggested, 2, 180, 15),
+    total_marks: limited.reduce((sum, q) => sum + q.marks, 0),
+    questions: limited
+  };
+}
+
+function quizMarkdown(quiz) {
+  const letters = "ABCDEF";
+  const body = quiz.questions.map((q, i) => q.type === "mcq"
+    ? `**${i + 1}.** ${q.question} *(${q.marks} mark${q.marks === 1 ? "" : "s"})*\n\n${q.options.map((o, j) => `- ${letters[j]}. ${o}`).join("\n")}`
+    : `**${i + 1}.** ${q.question} *(${q.marks} marks)*`).join("\n\n");
+  const key = quiz.questions.map((q, i) => q.type === "mcq"
+    ? `${i + 1}. **${letters[q.answer]}** — ${q.explanation || ""}`
+    : `${i + 1}. Marking points: ${q.guide || "—"}`).join("\n");
+  return `## ${quiz.title}\n\n> ⏱ Time allowed: **${quiz.minutes} minutes** · Total: **${quiz.total_marks} marks**. ${quiz.instructions}\n\nTap **Start timed exam** to sit it with a countdown.\n\n${body}\n\n---\n\n### Answer key\n\n${key}`;
+}
 
 const MAX_CASES = (env) => Math.min(Math.max(Number(env.AI_MAX_CASES_PER_RUN) || 5, 1), 12);
 const truncate = (value, max) => (String(value || "").length > max ? `${String(value).slice(0, max)}…` : String(value || ""));
@@ -235,7 +286,31 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
   const CHAT_RESEARCH_MS = Math.min(Math.max(Number(env.AI_CHAT_RESEARCH_TIMEOUT_MS) || 60_000, 10_000), 240_000);
   const CHAT_WRITER_MS = Math.min(Math.max(Number(env.AI_CHAT_WRITER_TIMEOUT_MS) || 100_000, 10_000), 300_000);
 
+  async function mockExam({ text, attachments = [], options = {}, onProgress = () => {} }) {
+    const quiz = options.quiz || {};
+    const count = clampInt(quiz.count, 1, 30, 10);
+    const type = ["mcq", "essay", "mixed"].includes(quiz.type) ? quiz.type : "mcq";
+    onProgress("library");
+    const library = await libraryExcerpts(text || attachments.map((a) => a.name).join(" "), { courseId: options.courseId || null, limit: 4, maxChars: 8_000 });
+    const brief = [
+      `SET A MOCK EXAM: ${count} question(s); type: ${type === "mcq" ? "multiple-choice only" : type === "essay" ? "essay and problem questions only" : "a mix of multiple-choice and essay/problem questions"}.`,
+      `TOPIC / STUDENT MATERIAL:\n${truncate(text, 40000) || "(see the attached files)"}`,
+      library.length ? libraryBlock(library) : ""
+    ].filter(Boolean).join("\n\n");
+    onProgress("writing");
+    const answer = await gen({ json: true, system: MOCK_SETTER, messages: [{ role: "user", text: brief, attachments }], maxTokens: 12000, temperature: 0.5, timeoutMs: CHAT_WRITER_MS });
+    const parsed = normalizeQuiz(parseJsonReply(answer.text), { type, count, minutes: quiz.minutes ?? null });
+    if (!parsed) throw new AiError(502, "Fire Counsel AI could not build the mock exam this time. Please send it again — this was not counted.", "QUIZ_FAILED");
+    return {
+      content: quizMarkdown(parsed),
+      sources: [],
+      provider: answer.provider, model: answer.model,
+      meta: { task: "mock", quiz: parsed, library_passages: library.length, fallback: Boolean(answer.fallback) }
+    };
+  }
+
   async function chat({ history = [], text, attachments = [], options = {}, onProgress = () => {} }) {
+    if (options.task === "mock") return mockExam({ text, attachments, options, onProgress });
     const custom = await loadPrompt(db, "chat");
     const task = CHAT_TASKS[options.task] || null;
     let researchResult = null;

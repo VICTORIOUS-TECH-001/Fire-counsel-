@@ -33,6 +33,15 @@ function cleanOptions(mode, raw = {}) {
   if (mode === "chat") {
     options.webSearch = raw.webSearch !== false;
     if (typeof raw.task === "string" && Object.hasOwn(CHAT_TASKS, raw.task)) options.task = raw.task;
+    if (options.task === "mock") {
+      const quiz = raw.quiz && typeof raw.quiz === "object" ? raw.quiz : {};
+      options.webSearch = false;
+      options.quiz = {
+        count: Number.isInteger(quiz.count) ? Math.min(Math.max(quiz.count, 1), 30) : 10,
+        type: ["mcq", "essay", "mixed"].includes(quiz.type) ? quiz.type : "mcq",
+        minutes: Number.isInteger(quiz.minutes) ? Math.min(Math.max(quiz.minutes, 2), 180) : null
+      };
+    }
   }
   if (mode === "case" && typeof raw.caseQuery === "string") options.caseQuery = raw.caseQuery.trim().slice(0, 500);
   if (typeof raw.courseId === "string" && (raw.courseId === "auto" || UUID_RE.test(raw.courseId))) options.courseId = raw.courseId;

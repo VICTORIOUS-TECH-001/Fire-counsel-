@@ -558,3 +558,35 @@ test("AI jobs show live progress, stop at the deadline without counting, and ign
   await new Promise((resolve) => setTimeout(resolve, 50));
   assert.equal(seenOptions.at(-1).task, undefined);
 });
+
+test("mock exams are validated, timed and stored for the timed-exam screen", async () => {
+  const { normalizeQuiz } = await import("../src/services/ai/studio.js");
+  const quiz = normalizeQuiz({ title: "Contract", questions: [
+    { type: "mcq", question: "What is consideration?", options: ["Price for a promise", "A gift", "A deed", "An offer"], answer: 0, explanation: "Currie v Misa" },
+    { type: "mcq", question: "Bad answer index", options: ["a", "b"], answer: 5 },
+    { type: "essay", question: "Discuss offer and acceptance.", marks: 15, guide: "Carlill; Hyde v Wrench" },
+    { question: "" }
+  ] }, { type: "mixed", count: 10 });
+  assert.equal(quiz.questions.length, 3);
+  assert.deepEqual(quiz.questions.map((q) => q.type), ["mcq", "essay", "essay"]);
+  assert.equal(quiz.total_marks, 1 + 10 + 15);
+  assert.equal(normalizeQuiz({ questions: [] }), null);
+  assert.equal(normalizeQuiz({ questions: [{ question: "only mcq", options: ["a"], answer: 0 }] }, { type: "mcq" }), null);
+
+  const requests = [];
+  const studio = createStudio({ db: pool, env: {}, verify: async () => [], generate: async (request) => {
+    requests.push(request);
+    return { text: JSON.stringify({ title: "Torts mock", questions: [{ type: "mcq", question: "Duty of care case?", options: ["Donoghue v Stevenson", "Salomon", "Carlill", "Hadley"], answer: 0, explanation: "Neighbour principle" }] }), provider: "gemini", model: "m" };
+  } });
+  const result = await studio.run("chat", { text: "Negligence", options: { task: "mock", webSearch: false, quiz: { count: 5, type: "mcq", minutes: 7 } } });
+  assert.equal(requests[0].json, true);
+  assert.equal(result.meta.quiz.minutes, 7);
+  assert.equal(result.meta.quiz.questions[0].answer, 0);
+  assert.match(result.content, /Time allowed: \*\*7 minutes\*\*/);
+  assert.match(result.content, /Answer key/);
+  const broken = createStudio({ db: pool, env: {}, generate: async () => ({ text: "not json", provider: "gemini", model: "m" }) });
+  await assert.rejects(broken.run("chat", { text: "x", options: { task: "mock", quiz: {} } }), { code: "QUIZ_FAILED" });
+  // The marker task uses the lecturer-marking instruction.
+  await studio.run("chat", { text: "Q: ... A: ...", options: { task: "marker", webSearch: false } });
+  assert.match(requests.at(-1).system, /MARK MY ANSWER/);
+});

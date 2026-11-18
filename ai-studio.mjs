@@ -40,6 +40,8 @@ function initStudio() {
     library: { label: "📚 Course library", title: "Ask my course library", help: "Answers come mainly from the books and notes your administrator uploaded, cited as [Library: title, p. N].", placeholder: "Ask about something in your course materials…" },
     compare: { label: "⚔️ Compare cases", title: "Compare & distinguish cases", help: "Name two or more cases or doctrines. You get a comparison table and how they are reconciled or distinguished.", placeholder: "e.g. Compare Carlill v Carbolic with Partridge v Crittenden…" },
     statute: { label: "📜 Explain a section", title: "Explain a section or statute", help: "Name the section and the law (e.g. Section 36 of the 1999 Constitution).", placeholder: "e.g. Section 36 of the 1999 Constitution…" },
+    mock: { label: "⏱️ Mock exam", title: "Timed mock exam", help: "Type a topic or paste/upload your notes, choose the number and type of questions, then send. You sit the exam against a countdown and get your score at the end.", placeholder: "e.g. Law of Torts — negligence, or paste your notes…" },
+    marker: { label: "✅ Mark my answer", title: "Mark my answer", help: "Paste the exam question and your answer (or upload a photo of your handwritten script). You get a score, what was missing, and a model answer outline.", placeholder: "Paste the question, then your answer…" },
     essay: { label: "✍️ Essay plan", title: "Plan an essay answer", help: "Paste the essay question. You get a thesis, headed sections with authorities, counter-arguments and a conclusion.", placeholder: "Paste the essay question…" }
   };
   // Stop waiting (and offer a retry) a little after the server's own deadline.
@@ -66,6 +68,7 @@ function initStudio() {
   let lastRequest = null;
   let config = { configured: false, web_search: false };
   let task = null;
+  let speakingId = null;
   let tickTimer = null;
   const firstSeen = new Map();
   const stalled = new Set();
@@ -185,7 +188,16 @@ function initStudio() {
     if (typeof meta.past_questions === "number" && mode === "questions") notes.push(meta.past_questions ? `${meta.past_questions} past questions used as the format` : "No past questions stored yet for this course");
     if (meta.pending_cases?.length) notes.push(`${meta.pending_cases.length} more case(s) waiting — send “continue”`);
     const candidates = (meta.candidates || []).map((c) => `<button class="button soft" type="button" data-pick-course="${escapeHTML(c.id)}">Use ${escapeHTML(c.label)}</button>`).join("");
-    const downloads = meta.needs_course ? "" : `<div class="ai-downloads"><button class="button soft" type="button" data-download="${escapeHTML(message.id)}" data-format="pdf">⬇ PDF</button><button class="button soft" type="button" data-download="${escapeHTML(message.id)}" data-format="docx">⬇ Word</button><button class="button soft" type="button" data-copy="${escapeHTML(message.id)}">Copy</button></div>`;
+    const speakButton = `<button class="button soft" type="button" data-speak="${escapeHTML(message.id)}"${speakingId === message.id ? ' data-speaking="true"' : ""}>${speakingId === message.id ? "⏹ Stop" : "🔊 Listen"}</button>`;
+    const downloads = meta.needs_course ? "" : `<div class="ai-downloads">${meta.quiz ? "" : speakButton}<button class="button soft" type="button" data-download="${escapeHTML(message.id)}" data-format="pdf">⬇ PDF</button><button class="button soft" type="button" data-download="${escapeHTML(message.id)}" data-format="docx">⬇ Word</button><button class="button soft" type="button" data-copy="${escapeHTML(message.id)}">Copy</button></div>`;
+    if (meta.quiz?.questions?.length) {
+      const quiz = meta.quiz;
+      const saved = examState(message.id);
+      const result = examResult(message.id);
+      const left = saved ? Math.max(0, saved.endsAt - Date.now()) : 0;
+      const startLabel = saved && left > 0 ? `▶ Resume exam (${clock(left)} left)` : result ? "↻ Retake timed exam" : "▶ Start timed exam";
+      return `<div class="ai-msg ai-msg-ai"><span class="ai-avatar">FC</span><div class="ai-bubble ai-answer fc-mock-card"><span class="fc-eyebrow">MOCK EXAM</span><h3>${escapeHTML(quiz.title)}</h3><div class="fc-mock-facts"><span>⏱ ${escapeHTML(String(quiz.minutes))} min</span><span>${quiz.questions.length} question${quiz.questions.length === 1 ? "" : "s"}</span><span>${escapeHTML(String(quiz.total_marks))} marks</span></div>${result ? `<p class="fc-mock-score">Last attempt: ${escapeHTML(result)}</p>` : ""}<div><button class="button primary" type="button" data-start-exam="${escapeHTML(message.id)}">${escapeHTML(startLabel)}</button></div><details><summary>See all questions and the answer key (spoilers)</summary><div class="ai-markdown">${renderMarkdown(message.content)}</div></details>${downloads}</div></div>`;
+    }
     return `<div class="ai-msg ai-msg-ai"><span class="ai-avatar">FC</span><div class="ai-bubble ai-answer"><div class="ai-markdown">${renderMarkdown(message.content)}</div>${candidates ? `<div class="ai-candidates">${candidates}</div>` : ""}${sourcesHtml(message.sources)}${notes.length ? `<p class="ai-meta">${notes.map(escapeHTML).join(" · ")}</p>` : ""}${downloads}</div></div>`;
   }
 
@@ -274,6 +286,8 @@ function initStudio() {
           if (pending) return schedulePoll(mySession, id, Math.min(delay + 1000, 6000));
           setBusy(false);
           setStatus("Answer ready.", "ok");
+          const latest = messages.at(-1);
+          if (autoRead() && latest?.role === "assistant" && latest.status === "done" && !latest.meta?.quiz) speak(latest.id);
           loadMe(mySession).catch(() => {});
           return;
         }
@@ -349,6 +363,14 @@ function initStudio() {
     const result = {};
     if (mode === "chat") result.webSearch = $("#ai-web-search").checked;
     if (mode === "chat" && task) result.task = task;
+    if (mode === "chat" && task === "mock") {
+      const count = Number($("#ai-quiz-count").value);
+      const minutes = Number($("#ai-quiz-minutes").value);
+      result.quiz = { type: $("#ai-quiz-type").value };
+      if (Number.isInteger(count) && count > 0) result.quiz.count = Math.min(count, 30);
+      if (Number.isInteger(minutes) && minutes > 0) result.quiz.minutes = Math.min(Math.max(minutes, 2), 180);
+      delete result.webSearch;
+    }
     if (mode === "case") result.caseQuery = $("#ai-case-query").value.trim();
     if (mode === "notes") {
       result.topic = $("#ai-topic").value.trim();
@@ -440,6 +462,10 @@ function initStudio() {
       send({ ...lastRequest, options: { ...lastRequest.options, courseId: pick.dataset.pickCourse }, conversationId });
       return;
     }
+    const speakButton = event.target.closest("[data-speak]");
+    if (speakButton) { speak(speakButton.dataset.speak); return; }
+    const start = event.target.closest("[data-start-exam]");
+    if (start) { startExam(start.dataset.startExam); return; }
     if (event.target.closest("[data-check]")) {
       stalled.clear();
       setStatus("Checking again…");
@@ -510,7 +536,9 @@ function initStudio() {
     workspace.dataset.mode = mode;
     document.body.dataset.mode = mode;
     document.querySelectorAll("[data-ai-mode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.aiMode === mode && (b.dataset.aiTask || null) === task)));
-    document.querySelectorAll(".ai-option[data-for]").forEach((o) => { o.hidden = !o.dataset.for.split(" ").includes(mode); });
+    document.querySelectorAll(".ai-option[data-for]").forEach((o) => {
+      o.hidden = !o.dataset.for.split(" ").includes(mode) || (o.dataset.task && o.dataset.task !== task) || (o.dataset.notTask && o.dataset.notTask === task);
+    });
     const info = task ? TASKS[task] : MODES[mode];
     $("#ai-mode-eyebrow").textContent = task ? `FIRE COUNSEL AI · ${TASKS[task].label.replace(/^\S+\s/, "").toUpperCase()}` : MODES[mode].eyebrow;
     $("#ai-workspace-title").textContent = info.title;
@@ -571,6 +599,7 @@ function initStudio() {
   $("#fc-research-back").addEventListener("click", () => closeSheet(researchSheet));
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
+    if (!examSheet.hidden) { $("#fc-exam-close").click(); return; }
     if (!researchSheet.hidden) closeSheet(researchSheet);
     else if (!functionsSheet.hidden) closeSheet(functionsSheet);
     else if (!drawer.hidden) closeDrawer();
@@ -660,6 +689,199 @@ function initStudio() {
       recognizer.start();
     });
   }
+
+  // ------------------------------------------------------------ read aloud
+  const READ_KEY = "fire-counsel-ai-read-aloud";
+  const synth = window.speechSynthesis;
+  function autoRead() { try { return localStorage.getItem(READ_KEY) === "on"; } catch { return false; } }
+  function showReadState() {
+    const state = $("#fc-read-state");
+    state.textContent = autoRead() ? "On" : "Off";
+    state.dataset.on = String(autoRead());
+  }
+  function plainText(markdown) {
+    return String(markdown || "")
+      .replace(/```[\s\S]*?```/g, " ")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/https?:\/\/\S+/g, " ")
+      .replace(/^\s*\|?\s*:?-{2,}.*$/gm, " ")
+      .replace(/[|#>*_`~]/g, " ")
+      .replace(/\bv\.?\s(?=[A-Z])/g, "versus ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  function stopSpeaking() {
+    if (synth) synth.cancel();
+    const previous = speakingId;
+    speakingId = null;
+    if (previous) updateSpeakButtons();
+  }
+  function updateSpeakButtons() {
+    thread.querySelectorAll("[data-speak]").forEach((b) => {
+      const on = b.dataset.speak === speakingId;
+      b.dataset.speaking = String(on);
+      b.textContent = on ? "⏹ Stop" : "🔊 Listen";
+    });
+  }
+  function speak(id) {
+    if (!synth || typeof SpeechSynthesisUtterance !== "function") { setStatus("Read-aloud is not supported in this browser. Try Google Chrome.", "error"); return; }
+    if (speakingId === id) { stopSpeaking(); return; }
+    stopSpeaking();
+    const message = messages.find((m) => m.id === id);
+    const text = plainText(message?.content);
+    if (!text) return;
+    // Chrome on Android stops long utterances, so read in sentence-sized chunks.
+    const chunks = text.match(/[^.!?;:]+[.!?;:]*\s*/g)?.reduce((list, sentence) => {
+      const last = list.at(-1);
+      if (last && (last + sentence).length < 220) list[list.length - 1] = last + sentence; else list.push(sentence);
+      return list;
+    }, []) || [text];
+    const voices = synth.getVoices();
+    const voice = voices.find((v) => /en[-_]NG/i.test(v.lang)) || voices.find((v) => /en[-_]GB/i.test(v.lang)) || voices.find((v) => /^en/i.test(v.lang)) || null;
+    speakingId = id;
+    updateSpeakButtons();
+    chunks.forEach((chunk, index) => {
+      const utterance = new SpeechSynthesisUtterance(chunk.trim());
+      if (voice) utterance.voice = voice;
+      utterance.lang = voice?.lang || "en-GB";
+      utterance.rate = 1;
+      if (index === chunks.length - 1) utterance.onend = () => { if (speakingId === id) { speakingId = null; updateSpeakButtons(); } };
+      utterance.onerror = () => { if (speakingId === id) { speakingId = null; updateSpeakButtons(); } };
+      synth.speak(utterance);
+    });
+  }
+  showReadState();
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest("[data-toggle-read]")) return;
+    const next = autoRead() ? "off" : "on";
+    try { localStorage.setItem(READ_KEY, next); } catch { /* private mode */ }
+    showReadState();
+    setStatus(next === "on" ? "Read-aloud is on: new answers will be read to you. Tap 🔊 Listen on any answer too." : "Read-aloud is off. You can still tap 🔊 Listen on any answer.", "ok");
+    if (next === "off") stopSpeaking();
+  });
+  window.addEventListener("pagehide", stopSpeaking);
+
+  // ------------------------------------------------------------ timed mock exam
+  const examSheet = $("#fc-exam");
+  const examBody = $("#fc-exam-body");
+  const examTimer = $("#fc-exam-timer");
+  const examSubmit = $("#fc-exam-submit");
+  const LETTERS = "ABCDEF";
+  let exam = null;
+  let examInterval = null;
+  const examKey = (id) => `fire-counsel-exam-${id}`;
+  const resultKey = (id) => `fire-counsel-exam-result-${id}`;
+  function examState(id) { try { return JSON.parse(localStorage.getItem(examKey(id)) || "null"); } catch { return null; } }
+  function examResult(id) { try { return localStorage.getItem(resultKey(id)); } catch { return null; } }
+  function clock(ms) {
+    const total = Math.max(0, Math.ceil(ms / 1000));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const sec = String(total % 60).padStart(2, "0");
+    return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${String(m).padStart(2, "0")}:${sec}`;
+  }
+  function saveExam() {
+    if (!exam || exam.done) return;
+    try { localStorage.setItem(examKey(exam.id), JSON.stringify({ endsAt: exam.endsAt, answers: exam.answers })); } catch { /* storage full */ }
+  }
+  function updateProgress() {
+    const answered = exam.answers.filter((a) => a !== null && a !== "").length;
+    $("#fc-exam-progress").textContent = `${answered} of ${exam.quiz.questions.length} answered`;
+  }
+  function tickExam() {
+    if (!exam || exam.done) return;
+    const left = exam.endsAt - Date.now();
+    examTimer.textContent = clock(left);
+    examTimer.dataset.warn = String(left <= 60_000);
+    if (left <= 0) submitExam(true);
+  }
+  function startExam(id) {
+    const message = messages.find((m) => m.id === id);
+    const quiz = message?.meta?.quiz;
+    if (!quiz?.questions?.length) return;
+    stopSpeaking();
+    let saved = examState(id);
+    if (saved && saved.endsAt <= Date.now()) saved = null;
+    exam = { id, quiz, endsAt: saved?.endsAt || Date.now() + quiz.minutes * 60_000, answers: saved?.answers?.length === quiz.questions.length ? saved.answers : quiz.questions.map(() => null), done: false };
+    $("#fc-exam-title").textContent = quiz.title;
+    examBody.innerHTML = `<p class="fc-exam-rubric">⏱ ${escapeHTML(String(quiz.minutes))} minutes · ${escapeHTML(String(quiz.total_marks))} marks. ${escapeHTML(quiz.instructions)} Your answers are saved on this phone as you go; the exam submits itself when time runs out.</p>` +
+      quiz.questions.map((q, i) => q.type === "mcq"
+        ? `<fieldset class="fc-q" data-q="${i}"><legend>${i + 1}. ${escapeHTML(q.question)} <small>(${q.marks} mark${q.marks === 1 ? "" : "s"})</small></legend>${q.options.map((o, j) => `<label class="fc-opt"><input type="radio" name="fc-q-${i}" value="${j}"${exam.answers[i] === j ? " checked" : ""}><span><b>${LETTERS[j]}.</b> ${escapeHTML(o)}</span></label>`).join("")}</fieldset>`
+        : `<div class="fc-q" data-q="${i}"><label class="fc-q-head" for="fc-essay-${i}">${i + 1}. ${escapeHTML(q.question)} <small>(${q.marks} marks)</small></label><textarea id="fc-essay-${i}" data-essay="${i}" placeholder="Write your answer…">${escapeHTML(exam.answers[i] || "")}</textarea></div>`).join("");
+    examSubmit.hidden = false;
+    examSubmit.textContent = "Submit answers";
+    openSheet(examSheet);
+    updateProgress();
+    tickExam();
+    clearInterval(examInterval);
+    examInterval = setInterval(tickExam, 1000);
+    saveExam();
+  }
+  examBody.addEventListener("change", (event) => {
+    if (!exam || exam.done || event.target.type !== "radio") return;
+    exam.answers[Number(event.target.name.replace("fc-q-", ""))] = Number(event.target.value);
+    saveExam();
+    updateProgress();
+  });
+  examBody.addEventListener("input", (event) => {
+    if (!exam || exam.done || !event.target.dataset.essay) return;
+    exam.answers[Number(event.target.dataset.essay)] = event.target.value.slice(0, 12000);
+    saveExam();
+    updateProgress();
+  });
+  function submitExam(timeUp = false) {
+    if (!exam || exam.done) return;
+    if (!timeUp) {
+      const blank = exam.answers.filter((a) => a === null || a === "").length;
+      if (blank && !window.confirm(`${blank} question${blank === 1 ? " is" : "s are"} not answered. Submit anyway?`)) return;
+    }
+    exam.done = true;
+    clearInterval(examInterval);
+    examTimer.textContent = timeUp ? "Time up" : "Done";
+    examTimer.dataset.warn = "false";
+    const { quiz, answers } = exam;
+    const mcqs = quiz.questions.map((q, i) => ({ q, i })).filter(({ q }) => q.type === "mcq");
+    const essays = quiz.questions.map((q, i) => ({ q, i })).filter(({ q }) => q.type === "essay");
+    const got = mcqs.reduce((sum, { q, i }) => sum + (answers[i] === q.answer ? q.marks : 0), 0);
+    const possible = mcqs.reduce((sum, { q }) => sum + q.marks, 0);
+    const percent = possible ? Math.round((got / possible) * 100) : 0;
+    const summary = mcqs.length ? `${got}/${possible} objective marks (${percent}%)${essays.length ? ` + ${essays.length} essay${essays.length === 1 ? "" : "s"} to mark` : ""}` : `${essays.length} essay answer${essays.length === 1 ? "" : "s"} written`;
+    try { localStorage.removeItem(examKey(exam.id)); localStorage.setItem(resultKey(exam.id), summary); } catch { /* ignore */ }
+    const essayAnswered = essays.some(({ i }) => String(answers[i] || "").trim());
+    examBody.innerHTML = `<div class="fc-result-head"><span class="fc-eyebrow">${timeUp ? "TIME UP · AUTO-SUBMITTED" : "SUBMITTED"}</span><strong>${mcqs.length ? `${got} / ${possible}` : "✍️"}</strong><p>${escapeHTML(summary)}</p><div class="fc-result-actions">${essayAnswered ? `<button class="fc-btn" type="button" data-mark-essays="true">✅ Mark my essay answers with AI</button>` : ""}<button class="button soft" type="button" data-exam-retake="true">↻ Retake</button></div></div>` +
+      quiz.questions.map((q, i) => {
+        if (q.type === "mcq") {
+          const chosen = answers[i];
+          return `<div class="fc-q" data-result="${chosen === q.answer ? "right" : "wrong"}"><p class="fc-q-head">${i + 1}. ${escapeHTML(q.question)} <small>${chosen === q.answer ? `✔ +${q.marks}` : chosen === null ? "— not answered" : "✘ 0"}</small></p>${q.options.map((o, j) => `<div class="fc-opt"${j === q.answer ? ' data-correct="true"' : ""}${j === chosen && j !== q.answer ? ' data-chosen-wrong="true"' : ""}><span><b>${LETTERS[j]}.</b> ${escapeHTML(o)}</span></div>`).join("")}${q.explanation ? `<p class="fc-q-explain">💡 ${escapeHTML(q.explanation)}</p>` : ""}</div>`;
+        }
+        return `<div class="fc-q"><p class="fc-q-head">${i + 1}. ${escapeHTML(q.question)} <small>(${q.marks} marks)</small></p><p class="fc-q-answer">${escapeHTML(String(answers[i] || "").trim() || "(no answer)")}</p>${q.guide ? `<p class="fc-q-explain">📋 Marking points: ${escapeHTML(q.guide)}</p>` : ""}</div>`;
+      }).join("");
+    examSheet.scrollTop = 0;
+    examSubmit.hidden = true;
+    $("#fc-exam-progress").textContent = summary;
+    renderThread();
+  }
+  examSubmit.addEventListener("click", () => submitExam(false));
+  examBody.addEventListener("click", (event) => {
+    if (event.target.closest("[data-exam-retake]")) {
+      try { localStorage.removeItem(examKey(exam.id)); } catch { /* ignore */ }
+      startExam(exam.id);
+      return;
+    }
+    if (!event.target.closest("[data-mark-essays]")) return;
+    const { quiz, answers } = exam;
+    const parts = quiz.questions.map((q, i) => ({ q, i })).filter(({ q, i }) => q.type === "essay" && String(answers[i] || "").trim())
+      .map(({ q, i }) => `QUESTION ${i + 1} (${q.marks} marks): ${q.question}\n${q.guide ? `Examiner's marking points: ${q.guide}\n` : ""}MY ANSWER:\n${String(answers[i]).trim()}`);
+    const text = `Please mark my mock exam answers ("${quiz.title}"). Give a score for each question and a total.\n\n${parts.join("\n\n")}`.slice(0, 60000);
+    closeSheet(examSheet);
+    send({ mode: "chat", text, attachments: [], options: { webSearch: false, task: "marker" }, conversationId });
+  });
+  $("#fc-exam-close").addEventListener("click", () => {
+    if (exam && !exam.done && !window.confirm("Leave the exam? Your answers are saved and the timer keeps running.")) return;
+    clearInterval(examInterval);
+    closeSheet(examSheet);
+    renderThread();
+  });
 
   const params = new URLSearchParams(location.search);
   setMode(MODES[params.get("mode")] ? params.get("mode") : "chat", { task: params.get("task") });

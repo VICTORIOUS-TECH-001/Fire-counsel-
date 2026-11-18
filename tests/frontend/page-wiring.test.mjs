@@ -83,11 +83,13 @@ test("browser API helper enforces same-origin calls and does not embed a backend
 
 test("the AI page lists every function and links back from the study space", () => {
   const html = read("ai.html");
-  for (const task of ["mnemonics", "flashcards", "summary", "irac", "explain", "library", "compare", "statute", "essay"]) {
+  for (const task of ["mnemonics", "flashcards", "summary", "irac", "explain", "library", "compare", "statute", "essay", "mock", "marker"]) {
     assert.match(html, new RegExp(`data-ai-task="${task}"`), `${task} is listed`);
   }
   for (const mode of ["chat", "case", "notes", "questions"]) assert.match(html, new RegExp(`data-ai-mode="${mode}"`));
   for (const tab of ["Must-Try", "What's New", "Advanced"]) assert.ok(html.includes(tab), tab);
+  assert.match(html, /data-toggle-read="true"/, "read-aloud toggle is offered");
+  assert.match(html, /id="fc-exam-timer"/, "mock exams have a countdown");
   assert.match(html, /auth\.html\?next=ai\.html/);
   const study = read("study.html");
   assert.match(study, /href="\.\/ai\.html"/);

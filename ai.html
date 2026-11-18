@@ -68,7 +68,10 @@
   <form class="fc-composer" id="ai-form" novalidate>
     <div class="fc-task" id="fc-task" hidden><span id="fc-task-label">Mnemonics</span><button id="fc-task-clear" type="button" aria-label="Stop using this tool">×</button></div>
     <div class="ai-options fc-options" id="fc-options">
-      <label class="ai-option" data-for="chat"><input id="ai-web-search" type="checkbox" checked> Search the web &amp; check links</label>
+      <label class="ai-option" data-for="chat" data-not-task="mock"><input id="ai-web-search" type="checkbox" checked> Search the web &amp; check links</label>
+      <label class="ai-option" data-for="chat" data-task="mock">Questions <input id="ai-quiz-count" type="number" min="1" max="30" value="10"></label>
+      <label class="ai-option" data-for="chat" data-task="mock">Type <select id="ai-quiz-type"><option value="mcq">Objective (MCQ)</option><option value="essay">Essay / problem</option><option value="mixed">Mixed</option></select></label>
+      <label class="ai-option" data-for="chat" data-task="mock">Minutes <input id="ai-quiz-minutes" type="number" min="2" max="180" placeholder="Auto"></label>
       <label class="ai-option ai-option-wide" data-for="case">Case name or citation <input id="ai-case-query" type="text" maxlength="500" placeholder="e.g. Carlill v Carbolic Smoke Ball Co — or upload textbook pages"></label>
       <label class="ai-option ai-option-wide" data-for="notes">Topic <input id="ai-topic" type="text" maxlength="300" placeholder="e.g. Offer and acceptance"></label>
       <label class="ai-option" data-for="notes"><input id="ai-allow-research" type="checkbox"> Allow outside research</label>
@@ -140,10 +143,13 @@
       <button class="fc-row" type="button" data-ai-mode="case"><span class="fc-tile fc-t2">⚖️</span><span class="fc-row-text"><strong>Search &amp; analyse a case</strong><small>Master Case Research format: facts, issues, ratio, later treatment — with verification links.</small></span><span class="fc-chev">›</span></button>
       <button class="fc-row" type="button" data-ai-mode="notes"><span class="fc-tile fc-t3">📒</span><span class="fc-row-text"><strong>Make exam-ready notes</strong><small>Turn lecture notes or textbook photos into clean revision notes. Download as Word or PDF.</small></span><span class="fc-chev">›</span></button>
       <button class="fc-row" type="button" data-ai-mode="questions"><span class="fc-tile fc-t4">📝</span><span class="fc-row-text"><strong>Question setter</strong><small>Sets questions in your course's own past-question style: marks, time and format.</small></span><span class="fc-chev">›</span></button>
+      <button class="fc-row" type="button" data-ai-mode="chat" data-ai-task="mock"><span class="fc-tile fc-t3">⏱️</span><span class="fc-row-text"><strong>Timed mock exam</strong><small>The AI sets objective or essay questions, you sit them against a countdown, then see your score.</small></span><span class="fc-chev">›</span></button>
+      <button class="fc-row" type="button" data-ai-mode="chat" data-ai-task="marker" data-web-search="false"><span class="fc-tile fc-t4">✅</span><span class="fc-row-text"><strong>Mark my answer</strong><small>Paste or snap your exam answer. Get a score, what's missing, and a model answer outline.</small></span><span class="fc-chev">›</span></button>
       <button class="fc-row" type="button" data-ai-mode="chat" data-ai-task="mnemonics"><span class="fc-tile fc-t5">🧠</span><span class="fc-row-text"><strong>Create mnemonics</strong><small>Memorable acronyms and stories for elements, lists and cases — with a quick self-test.</small></span><span class="fc-chev">›</span></button>
       <button class="fc-row" type="button" data-open-research="true"><span class="fc-tile fc-t6">🔎</span><span class="fc-row-text"><strong>Search trusted sources</strong><small>Find approved materials, verified cases and exact past questions in the Fire Counsel library.</small></span><span class="fc-chev">›</span></button>
     </div>
     <div class="fc-panel" role="tabpanel" id="fc-panel-new" aria-labelledby="fc-tab-new" hidden>
+      <button class="fc-row" type="button" data-toggle-read="true"><span class="fc-tile fc-t1">🔊</span><span class="fc-row-text"><strong>Read answers aloud <span class="fc-switch" id="fc-read-state">Off</span></strong><small>Listen to every new answer — or tap 🔊 on any answer. Uses your phone's own voice, free.</small></span><span class="fc-chev">›</span></button>
       <button class="fc-row" type="button" data-ai-mode="chat" data-ai-task="flashcards"><span class="fc-tile fc-t5">🃏</span><span class="fc-row-text"><strong>Flashcards from my notes</strong><small>10–20 question-and-answer cards from your notes or a topic.</small></span><span class="fc-chev">›</span></button>
       <button class="fc-row" type="button" data-ai-mode="chat" data-ai-task="summary"><span class="fc-tile fc-t3">📄</span><span class="fc-row-text"><strong>Summarise a case or notes</strong><small>Facts, issues, holding and ratio in minutes — or short notes from long material.</small></span><span class="fc-chev">›</span></button>
       <button class="fc-row" type="button" data-ai-mode="chat" data-ai-task="irac"><span class="fc-tile fc-t2">🧩</span><span class="fc-row-text"><strong>Solve a problem question (IRAC)</strong><small>Issue, Rule, Application, Conclusion — the way examiners want it.</small></span><span class="fc-chev">›</span></button>
@@ -158,6 +164,17 @@
       <button class="fc-row" type="button" data-open-drawer="true"><span class="fc-tile fc-t6">◷</span><span class="fc-row-text"><strong>My AI allowance &amp; history</strong><small>See what you have left today and reopen saved conversations.</small></span><span class="fc-chev">›</span></button>
     </div>
   </div>
+</section>
+
+<!-- ======================= timed mock exam ======================= -->
+<section class="fc-sheet fc-exam" id="fc-exam" aria-labelledby="fc-exam-title" role="dialog" aria-modal="true" hidden>
+  <header class="fc-sheet-top fc-exam-top">
+    <button class="fc-round fc-light" id="fc-exam-close" type="button" aria-label="Leave the exam"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+    <h2 id="fc-exam-title">Mock exam</h2>
+    <span class="fc-timer" id="fc-exam-timer" role="timer" aria-live="off">00:00</span>
+  </header>
+  <div class="fc-sheet-body fc-exam-body" id="fc-exam-body"></div>
+  <footer class="fc-exam-foot"><span id="fc-exam-progress" class="fc-muted"></span><button class="fc-btn" id="fc-exam-submit" type="button">Submit answers</button></footer>
 </section>
 
 <!-- ======================= trusted-source search ======================= -->
