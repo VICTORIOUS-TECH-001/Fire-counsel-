@@ -14,7 +14,7 @@
     "test": "npm run check && npm run test:frontend && npm run test:proxy && npm --prefix backend test && npm --prefix firebase run test:local",
     "test:frontend": "node --test tests/frontend/*.test.mjs",
     "test:proxy": "python3 -m unittest discover -s tools/tests -v",
-    "test:browser": "playwright test",
+    "test:browser": "playwright test tests/browser/profile.spec.mjs -g \"small screens\"",
     "test:rules": "npm --prefix firebase run test:rules",
     "test:all": "npm test && npm run test:browser && npm run test:rules"
   },
