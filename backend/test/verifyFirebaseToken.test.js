@@ -102,3 +102,23 @@ test("recent-installation registration time comes only from the verified Firebas
   await createFirebaseTokenVerifier(() => auth)(req, res, () => {});
   assert.equal(req.user.authTime, 1_795_000_000);
 });
+
+test("reports a broken server key as a setup problem, not a bad sign-in", async () => {
+  const notReady = responseMock();
+  await createFirebaseTokenVerifier(() => { throw Object.assign(new Error("secret detail"), { reason: "private_key_damaged" }); })(requestMock("Bearer t"), notReady, () => {});
+  assert.equal(notReady.statusCode, 503);
+  assert.equal(notReady.body.code, "FIREBASE_ADMIN_NOT_READY");
+  assert.equal(notReady.body.reason, "private_key_damaged");
+  assert.doesNotMatch(JSON.stringify(notReady.body), /secret detail/);
+
+  const rejected = responseMock();
+  const auth = { async verifyIdToken() { throw Object.assign(new Error("invalid_grant: account not found"), { code: "app/invalid-credential" }); } };
+  await createFirebaseTokenVerifier(() => auth)(requestMock("Bearer t"), rejected, () => {});
+  assert.equal(rejected.statusCode, 503);
+  assert.equal(rejected.body.code, "FIREBASE_ADMIN_KEY_REJECTED");
+
+  const expired = responseMock();
+  const userAuth = { async verifyIdToken() { throw Object.assign(new Error("expired"), { code: "auth/id-token-expired" }); } };
+  await createFirebaseTokenVerifier(() => userAuth)(requestMock("Bearer t"), expired, () => {});
+  assert.equal(expired.statusCode, 401);
+});

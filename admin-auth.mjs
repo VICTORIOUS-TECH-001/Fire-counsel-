@@ -44,7 +44,15 @@ async function verifyAdmin(user) {
       setStatus("denied", "This account is not an administrator", "To make it one, add this email to ADMIN_EMAILS in Render (Environment), wait for the restart, then reload this page. The browser cannot grant itself access.");
       return;
     }
-    setStatus("offline", "Admin API is not ready", "Firebase sign-in succeeded, but the same-origin API did not verify admin access. No live admin action is enabled.");
+    if (body.code === "FIREBASE_ADMIN_KEY_REJECTED") {
+      setStatus("offline", "Firebase Admin key rejected", "Google rejected the server's key. In Firebase → Project settings → Service accounts, generate a new private key and paste the whole file into FIREBASE_SERVICE_ACCOUNT_JSON on Render.");
+      return;
+    }
+    if (body.code === "FIREBASE_ADMIN_NOT_READY") {
+      setStatus("offline", "Firebase Admin key not usable", `FIREBASE_SERVICE_ACCOUNT_JSON on Render needs fixing${body.reason ? ` (reason: ${body.reason})` : ""}. Open /api/health for details.`);
+      return;
+    }
+    setStatus("offline", "Admin API is not ready", `Firebase sign-in succeeded, but the same-origin API did not verify admin access (server reply ${response.status}). No live admin action is enabled.`);
   } catch {
     if (!isCurrent()) return;
     setStatus("offline", "Admin API is not connected", "Firebase sign-in succeeded, but /api/v1/admin/me is unavailable on this origin. The panel remains a local preview.");

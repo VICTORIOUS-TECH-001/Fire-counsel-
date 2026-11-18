@@ -137,7 +137,7 @@ test("pasted database URLs are cleaned and failures get a secret-free reason", a
     if (saved === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = saved;
   }
 
-  const base = await serve(t, { env: { DATABASE_URL: "x", SERVE_WEBSITE: "\"true\"", GEMINI_API_KEY: "k" }, databaseCheck: async () => {
+  const base = await serve(t, { env: { DATABASE_URL: "x", SERVE_WEBSITE: "\"true\"", GEMINI_API_KEY: "k", FIREBASE_SERVICE_ACCOUNT_JSON: "{\"apiKey\":\"AIza-hidden\",\"authDomain\":\"x\"}" }, databaseCheck: async () => {
     throw Object.assign(new Error("password authentication failed for user \"neondb_owner\" secret-detail"), { code: "28P01" });
   } });
   const response = await fetch(`${base}/api/health`);
@@ -146,7 +146,8 @@ test("pasted database URLs are cleaned and failures get a secret-free reason", a
   assert.equal(body.database, "unavailable");
   assert.equal(body.database_error, "wrong_password_or_user");
   assert.deepEqual(body.setup, { website: true, firebase_admin_key: false, gemini_key: true, openrouter_key: false, admin_emails: false });
-  assert.doesNotMatch(JSON.stringify(body), /neondb_owner|secret-detail/);
+  assert.equal(body.firebase_admin_error, "web_config_not_admin_key");
+  assert.doesNotMatch(JSON.stringify(body), /neondb_owner|secret-detail|AIza-hidden/);
 });
 
 test("SERVE_WEBSITE accepts true however it was typed, and nothing else", async t => {

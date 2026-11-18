@@ -89,6 +89,13 @@ function handleAuthError(error) {
   setMessage(authErrorText(error), "error");
 }
 
+// Plain-language reason when the server cannot check sign-ins (text only, never keys).
+function adminSetupProblem(status, body) {
+  if (body?.code === "FIREBASE_ADMIN_KEY_REJECTED") return "Signed in, but Google rejected the server's Firebase Admin key. Create a new key in Firebase → Service accounts and paste it into FIREBASE_SERVICE_ACCOUNT_JSON on Render.";
+  if (body?.code === "FIREBASE_ADMIN_NOT_READY") return `Signed in, but the server's Firebase Admin key (FIREBASE_SERVICE_ACCOUNT_JSON on Render) is not usable${body.reason ? ` (reason: ${body.reason})` : ""}. Open /api/health for details.`;
+  return `Signed in, but the admin API could not verify permission (server reply ${status}). Live admin actions remain disabled.`;
+}
+
 async function verifyServerAccess(user) {
   const isCurrent = sessionScope.capture();
   const userLabel = user.email || "your Firebase account";
@@ -97,9 +104,16 @@ async function verifyServerAccess(user) {
       const response = await authClient.apiRequest("/api/v1/admin/me");
       if (!isCurrent()) return null;
       if (!response.ok) {
+        let body = {};
+        try { body = await response.json(); } catch { /* not JSON */ }
+        if (!isCurrent()) return null;
+        if (response.status === 403 && body.code === "ADMIN_CLAIM_AVAILABLE") {
+          setMessage(`Signed in as ${userLabel}. Open the admin page and press "Make this account the administrator" once.`, "ok");
+          return { label: "Open admin page", url: nextUrl };
+        }
         setMessage(response.status === 403
           ? `Signed in as ${userLabel}, but the server did not grant this account admin permission.`
-          : "Signed in, but the admin API could not verify permission. Live admin actions remain disabled.", "error");
+          : adminSetupProblem(response.status, body), "error");
         return null;
       }
       setMessage(`Server verified administrator access for ${userLabel}.`, "ok");

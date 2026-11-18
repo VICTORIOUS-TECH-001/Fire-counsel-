@@ -14,7 +14,7 @@ import { createWebsiteHandler } from "./website.js";
 import { createAiRouter } from "./routes/ai.js";
 import { createAdminAiRouter } from "./routes/adminAi.js";
 import { createPresenceRouter } from "./routes/presence.js";
-import { getFirebaseAuth } from "./config/firebaseAdmin.js";
+import { firebaseAdminStatus, getFirebaseAuth } from "./config/firebaseAdmin.js";
 
 // Emails allowed to give themselves the admin claim once (set ADMIN_EMAILS in
 // Render). The account must have a verified email. Nobody else can.
@@ -108,16 +108,20 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
     }
 
     const healthy = database === "connected";
+    const firebaseAdmin = firebaseAdminStatus(env);
+    const firebaseKeyPasted = Boolean(String(env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim());
     return res.status(healthy ? 200 : 503).json({
       service: "FIRE COUNSEL API",
       status: healthy ? "ok" : "degraded",
       database,
       ...(databaseError ? { database_error: databaseError } : {}),
+      // Secret-free reason the Firebase Admin key cannot be used (sign-in checks fail).
+      ...(firebaseKeyPasted && !firebaseAdmin.ok ? { firebase_admin_error: firebaseAdmin.code } : {}),
       // Setup checklist (yes/no only, never values) so the dashboard
       // settings can be checked from a phone browser.
       setup: {
         website: serveWebsite,
-        firebase_admin_key: Boolean(String(env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim()),
+        firebase_admin_key: firebaseAdmin.ok,
         gemini_key: Boolean(String(env.GEMINI_API_KEY || "").trim()),
         openrouter_key: Boolean(String(env.OPENROUTER_API_KEY || "").trim()),
         admin_emails: Boolean(String(env.ADMIN_EMAILS || "").trim())
