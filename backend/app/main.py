@@ -1,4 +1,3 @@
-import json
 import logging
 from typing import Any
 
@@ -18,7 +17,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("fire-counsel")
 settings = get_settings()
 
-app = FastAPI(title=settings.app_name, version="0.1.0")
+app = FastAPI(title=settings.app_name, version="0.1.1")
 if settings.allowed_origins:
     app.add_middleware(
         CORSMiddleware,
@@ -36,8 +35,9 @@ class AskRequest(BaseModel):
     topic: str | None = Field(default=None, max_length=200)
 
 
-def _retrieve_context(question: str, jurisdiction: str) -> dict[str, list[dict[str, Any]]]:
-    """Full-text retrieval. Empty lists are valid when Neon is not configured."""
+def _retrieve_context(question: str, jurisdiction: str,
+                     course: str | None = None) -> dict[str, list[dict[str, Any]]]:
+    """Retrieve legal evidence and course context from Neon full-text indexes."""
     empty = {"materials": [], "authorities": [], "statutes": [], "past_questions": []}
     if not settings.database_url:
         return empty
@@ -84,6 +84,7 @@ def _retrieve_context(question: str, jurisdiction: str) -> dict[str, list[dict[s
             rows = conn.execute(
                 query, (question, jurisdiction, jurisdiction, jurisdiction)
             ).fetchall()
+            course_pattern = f"%{course}%" if course else f"%{question[:80]}%"
             past_rows = conn.execute(
                 """
                 SELECT pq.question_text, pq.exam_year, pq.section_label, c.name
@@ -94,7 +95,7 @@ def _retrieve_context(question: str, jurisdiction: str) -> dict[str, list[dict[s
                 ORDER BY pq.exam_year DESC NULLS LAST
                 LIMIT 12
                 """,
-                (f"%{question[:80]}%", f"%{question[:100]}%", jurisdiction),
+                (course_pattern, f"%{question[:100]}%", jurisdiction),
             ).fetchall()
     except Exception:
         logger.exception("Knowledge-library retrieval failed")
@@ -126,6 +127,20 @@ def _retrieve_context(question: str, jurisdiction: str) -> dict[str, list[dict[s
     return result
 
 
+def _needs_online_research(question: str, evidence: dict) -> bool:
+    """Search automatically when the internal authority base is weak or freshness matters."""
+    verified = sum(
+        item.get("verification_status") == "verified"
+        for item in evidence.get("authorities", []) + evidence.get("statutes", [])
+    )
+    freshness_terms = (
+        "latest", "current law", "recent decision", "recent case",
+        "amendment", "as at", "2025", "2026", "overruled", "good law"
+    )
+    asks_for_research = any(term in question.lower() for term in freshness_terms)
+    return verified < 2 or asks_for_research
+
+
 def _grounded_sources(response: Any) -> list[dict[str, str]]:
     found: dict[str, dict[str, str]] = {}
     try:
@@ -142,6 +157,28 @@ def _grounded_sources(response: Any) -> list[dict[str, str]]:
     return list(found.values())
 
 
+def _run_online_research(client: Any, question: str, jurisdiction: str) -> tuple[str, list[dict[str, str]]]:
+    """Run Google Search grounding separately from JSON formatting for API compatibility."""
+    research_prompt = (
+        f"Research this legal question in {jurisdiction}: {question}\n\n"
+        "Find relevant primary legal authorities first: judgments, legislation and official "
+        "court or government sources. Verify case names, citations, courts, dates and the "
+        "specific propositions supported. Distinguish binding from persuasive decisions. "
+        "Do not invent citations or treat snippets as judgments. Summarise the findings and "
+        "state when a source or proposition cannot be verified. Return source titles and URLs."
+    )
+    response = client.models.generate_content(
+        model=settings.gemini_model,
+        contents=research_prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_INSTRUCTIONS,
+            tools=[types.Tool(google_search=types.GoogleSearch())],
+            temperature=0.1,
+        ),
+    )
+    return response.text or "", _grounded_sources(response)
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "fire-counsel-api", "prompt_version": PROMPT_VERSION}
@@ -151,12 +188,26 @@ def health():
 def ask(payload: AskRequest, user: dict = Depends(require_user)):
     if not settings.gemini_api_key:
         raise HTTPException(status_code=503, detail="Gemini API is not configured on the server.")
-    evidence = _retrieve_context(payload.question, payload.jurisdiction)
-    prompt = build_user_prompt(
-        payload.question, payload.jurisdiction, payload.course, payload.topic, evidence
-    )
+    evidence = _retrieve_context(payload.question, payload.jurisdiction, payload.course)
     try:
         client = genai.Client(api_key=settings.gemini_api_key)
+        research_text = ""
+        sources: list[dict[str, str]] = []
+        research_error = False
+
+        if _needs_online_research(payload.question, evidence):
+            try:
+                research_text, sources = _run_online_research(
+                    client, payload.question, payload.jurisdiction
+                )
+            except Exception:
+                research_error = True
+                logger.exception("Automatic legal web research failed")
+
+        prompt = build_user_prompt(
+            payload.question, payload.jurisdiction, payload.course, payload.topic,
+            evidence, research_text=research_text, research_sources=sources
+        )
         response = client.models.generate_content(
             model=settings.gemini_model,
             contents=prompt,
@@ -164,7 +215,6 @@ def ask(payload: AskRequest, user: dict = Depends(require_user)):
                 system_instruction=SYSTEM_INSTRUCTIONS,
                 response_mime_type="application/json",
                 response_schema=LegalAnswer,
-                tools=[types.Tool(google_search=types.GoogleSearch())],
                 temperature=0.2,
             ),
         )
@@ -177,15 +227,20 @@ def ask(payload: AskRequest, user: dict = Depends(require_user)):
             answer = LegalAnswer.model_validate_json(response.text)
         else:
             raise ValueError("Gemini returned no structured answer.")
-        # Keep grounding links returned by Google Search. Never fabricate URLs.
+
         existing = {str(source.url) for source in answer.research_sources}
-        for source in _grounded_sources(response):
+        for source in sources:
             if source["url"] not in existing:
                 answer.research_sources.append(source)
+        if research_error:
+            answer.limitations.append(
+                "Automatic online research could not be completed for this request; "
+                "verify current law against primary sources before relying on it."
+            )
         return answer
     except Exception as exc:
         logger.exception("Legal answer generation failed for uid=%s", user.get("uid"))
         raise HTTPException(
             status_code=502,
-            detail="FIRE COUNSEL could not complete the research response. Please try again."
+            detail="FIRE COUNSEL could not complete the response. Please try again."
         ) from exc
