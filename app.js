@@ -185,7 +185,7 @@
   }
 
   function renderLegalAnswer(answer) {
-    const text = value => escapeHTML(value ?? "").replace(/\\n/g, "<br>");
+    const text = value => escapeHTML(value ?? "").replace(/\n/g, "<br>");
     const sectionHtml = (answer.sections || []).map(section =>
       `<section class="answer-section"><h3>${text(section.heading)}</h3><p>${text(section.content)}</p></section>`
     ).join("");
@@ -253,7 +253,7 @@
 
   async function handleAIQuestion(event) {
     event.preventDefault();
-    const apiBase = String(window.FIRE_COUNSEL_CONFIG?.apiBaseUrl || "").trim().replace(/\\/+$/, "");
+    const apiBase = String(window.FIRE_COUNSEL_CONFIG?.apiBaseUrl || "").trim().replace(/\/+$/, "");
     if (!apiBase) {
       $("#ai-api-notice").hidden = false;
       return toast("The AI backend URL has not been configured yet.");
