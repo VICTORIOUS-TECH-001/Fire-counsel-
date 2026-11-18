@@ -1,3 +1,4 @@
+# Pytest uses the backend directory as the import root.
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
