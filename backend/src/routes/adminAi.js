@@ -55,17 +55,17 @@ export function createAdminAiRouter({
   // Tests every model one by one so the admin can see exactly which one works.
   router.post("/test", async (req, res) => {
     try {
-      if (!aiConfig(env).configured) throw new AiError(503, "No AI key is set in Render. Add GEMINI_API_KEY (and optionally OPENROUTER_API_KEY), then redeploy.", "AI_NOT_CONFIGURED");
+      if (!aiConfig(env).configured) throw new AiError(503, "No AI key is set in Render. Add GEMINI_API_KEY (and optionally GROQ_API_KEY, OPENROUTER_API_KEY), then redeploy.", "AI_NOT_CONFIGURED");
       const models = await testModels({ env, fetchImpl, search: req.body?.search === true });
-      const first = models.find((item) => item.ok && item.role !== "web search");
-      const searchResult = models.find((item) => item.role === "web search");
+      const first = models.find((item) => item.ok && !/search/.test(item.role));
+      const searchResult = models.find((item) => item.role === "web search" && item.ok) || models.find((item) => item.role === "backup web search" && item.ok) || models.find((item) => /search/.test(item.role));
       res.json({ data: {
         ok: Boolean(first),
         provider: first?.provider || null,
         model: first?.model || null,
         reply: first?.reply || "",
-        fallback: first?.provider === "openrouter",
-        search: searchResult ? (searchResult.ok ? { ok: true, model: searchResult.model, sources: searchResult.sources } : { ok: false, error: searchResult.error }) : null,
+        fallback: Boolean(first) && first.provider !== "gemini",
+        search: searchResult ? (searchResult.ok ? { ok: true, provider: searchResult.provider, model: searchResult.model, sources: searchResult.sources } : { ok: false, provider: searchResult.provider, error: searchResult.error }) : null,
         models
       } });
     } catch (error) { publicAiError(res, error); }

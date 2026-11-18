@@ -165,12 +165,12 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
   const cacheMs = clampInt(env.AI_RESEARCH_CACHE_MINUTES, 0, 24 * 60, 360) * 60_000;
   const researchParallel = clampInt(env.AI_RESEARCH_PARALLEL, 1, 6, 3);
 
-  async function research(query, attachments = [], { timeoutMs } = {}) {
+  async function research(query, attachments = [], { timeoutMs, searchQuery } = {}) {
     const key = researchCache && cacheMs && !attachments.length ? String(query).toLowerCase().replace(/\s+/g, " ").trim() : null;
     const hit = key ? RESEARCH_CACHE.get(key) : null;
     if (hit && hit.until > Date.now()) return { ...hit.value, cached: true };
     try {
-      const result = await gen({ search: true, system: RESEARCHER, messages: [{ role: "user", text: query, attachments }], maxTokens: 6000, temperature: 0.2, timeoutMs });
+      const result = await gen({ search: true, searchQuery, system: RESEARCHER, messages: [{ role: "user", text: query, attachments }], maxTokens: 6000, temperature: 0.2, timeoutMs });
       const value = { ok: true, notes: result.text, sources: result.sources, queries: result.searchQueries, model: result.model };
       if (key && value.sources.length) {
         if (RESEARCH_CACHE.size >= 300) RESEARCH_CACHE.delete(RESEARCH_CACHE.keys().next().value);
@@ -384,7 +384,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     onProgress(options.webSearch !== false ? "searching" : "library");
     const [library, webResult] = await Promise.all([
       libraryExcerpts(text || attachments.map((a) => a.name).join(" "), { courseId: options.courseId || null }),
-      options.webSearch !== false ? research(`Student question${task ? ` (${task.label})` : ""}: ${text}`, attachments, { timeoutMs: CHAT_RESEARCH_MS }) : null
+      options.webSearch !== false ? research(`Student question${task ? ` (${task.label})` : ""}: ${text}`, attachments, { timeoutMs: CHAT_RESEARCH_MS, searchQuery: `${truncate(text || attachments.map((a) => a.name).join(" "), 300)} Nigeria law` }) : null
     ]);
     if (webResult) {
       researchResult = webResult;
@@ -433,7 +433,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     const perCase = await mapLimit(selected, researchParallel, async (item) => {
       const [found, r, passages] = await Promise.all([
         findCases(item.name),
-        research(`Research this case/authority for a Nigerian law student${subject ? ` (subject: ${subject})` : ""}: ${item.name}${item.citation ? ` — citation as printed: ${item.citation}` : ""}${item.proposition ? `. The textbook cites it for: ${item.proposition}` : ""}.`),
+        research(`Research this case/authority for a Nigerian law student${subject ? ` (subject: ${subject})` : ""}: ${item.name}${item.citation ? ` — citation as printed: ${item.citation}` : ""}${item.proposition ? `. The textbook cites it for: ${item.proposition}` : ""}.`, [], { searchQuery: `${item.name}${item.citation ? ` ${item.citation}` : ""} case judgment ratio` }),
         libraryExcerpts(item.name, { limit: 3, maxChars: 6_000 })
       ]);
       finished += 1;
@@ -493,7 +493,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     if (options.allowResearch) {
       onProgress("searching");
       [researchResult, library] = await Promise.all([
-        research(`Find authoritative sources for these study notes${options.topic ? ` on ${options.topic}` : ""}: ${truncate(text, 3000)}`, attachments),
+        research(`Find authoritative sources for these study notes${options.topic ? ` on ${options.topic}` : ""}: ${truncate(text, 3000)}`, attachments, { searchQuery: `${options.topic || truncate(text, 200)} Nigerian law` }),
         libraryExcerpts(options.topic || text, { courseId: course?.id || null, limit: 6, maxChars: 12_000 })
       ]);
       if (researchResult.ok) checked = await verify(researchResult.sources, { terms, limit: 15 });

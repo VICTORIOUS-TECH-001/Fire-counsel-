@@ -104,3 +104,16 @@ body[data-theme="dark"] .ai-sources{background:#262034;border-color:#3e3351}
 .ai-studio{grid-template-columns:minmax(0,1fr)}
 .ai-studio>*,.ai-workspace *{min-width:0}
 .ai-workspace select,.ai-workspace input[type=text]{max-width:100%}
+
+/* Admin: per-service AI health table */
+.fc-health-wrap{overflow-x:auto;max-width:100%}
+.fc-health{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+.fc-health th,.fc-health td{padding:6px 8px;border-bottom:1px solid rgba(127,127,127,.25);text-align:left;vertical-align:top}
+.fc-health td code{word-break:break-all}
+.fc-health tr[data-ok="false"] td small{display:block;margin-top:2px;opacity:.85}
+.fc-warn{color:#e0a100}
+.fc-health td{word-break:normal;overflow-wrap:anywhere}
+.fc-health td:first-child{width:45%}
+.fc-health td small,.fc-health td code{display:block;margin-top:3px;font-size:12px}
+.fc-health-job{opacity:.7}
+.fc-health .fc-state{white-space:nowrap}

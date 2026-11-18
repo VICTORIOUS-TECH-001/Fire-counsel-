@@ -41,6 +41,14 @@ services:
       # only when Gemini is busy or out of free quota).
       - key: OPENROUTER_API_KEY
         sync: false
+      # Groq key: https://console.groq.com/keys (starts with gsk_). Fast free
+      # backup writer, tried after Gemini and before OpenRouter.
+      - key: GROQ_API_KEY
+        sync: false
+      # Tavily key: https://app.tavily.com (starts with tvly-). Backup web
+      # search (1,000 free searches a month) when Gemini search is unavailable.
+      - key: TAVILY_API_KEY
+        sync: false
       # Comma-separated emails that may press "Make me admin" once in the
       # Admin Studio (the email must be verified). Example: you@gmail.com
       - key: ADMIN_EMAILS

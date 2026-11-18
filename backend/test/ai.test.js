@@ -754,3 +754,138 @@ test("while the AI is writing, the partial answer is saved so the page can show 
   assert.equal(last.status, "done");
   assert.match(last.content, /Done\.$/);
 });
+
+// ---------------- Groq (fast backup writer) and Tavily (backup web search) ----------------
+
+test("Groq answers when Gemini is busy, with the answer length fitted to the free token budget", async () => {
+  const { resetProviderHealth } = await import("../src/services/ai/providers.js");
+  resetProviderHealth();
+  const groqCalls = [];
+  const fetchImpl = async (url, init) => {
+    if (url.includes("generativelanguage")) return jsonResponse(429, { error: { message: "quota" } });
+    assert.match(url, /^https:\/\/api\.groq\.com\/openai\/v1\/chat\/completions$/);
+    groqCalls.push({ headers: init.headers, body: JSON.parse(init.body) });
+    return jsonResponse(200, { model: "openai/gpt-oss-120b", choices: [{ message: { content: "<think>hidden</think>Estoppel answer" }, finish_reason: "stop" }] });
+  };
+  const result = await generate({ system: "S", messages: [{ role: "user", text: "Explain estoppel" }], maxTokens: 32768 },
+    { env: { GEMINI_API_KEY: "g", GEMINI_MODELS: "m1", GROQ_API_KEY: "gsk_test", OPENROUTER_API_KEY: "o" }, fetchImpl });
+  assert.equal(result.provider, "groq");
+  assert.equal(result.fallback, true);
+  assert.equal(result.text, "Estoppel answer");
+  assert.equal(groqCalls[0].headers.Authorization, "Bearer gsk_test");
+  assert.equal(groqCalls[0].body.model, "openai/gpt-oss-120b");
+  assert.ok(groqCalls[0].body.max_tokens < 8000 && groqCalls[0].body.max_tokens > 7000, `fitted max_tokens: ${groqCalls[0].body.max_tokens}`);
+  assert.deepEqual(groqCalls[0].body.messages[0], { role: "system", content: "S" });
+  resetProviderHealth();
+});
+
+test("requests Groq cannot take (too long, or with photos/PDFs) go straight to OpenRouter", async () => {
+  const { resetProviderHealth, providerHealth } = await import("../src/services/ai/providers.js");
+  resetProviderHealth();
+  const seen = [];
+  const fetchImpl = async (url) => {
+    seen.push(new URL(url).host);
+    return jsonResponse(200, { model: "free", choices: [{ message: { content: "OpenRouter answer" }, finish_reason: "stop" }] });
+  };
+  const env = { GROQ_API_KEY: "gsk_x", OPENROUTER_API_KEY: "o" };
+  const long = await generate({ messages: [{ role: "user", text: "x".repeat(40_000) }] }, { env, fetchImpl });
+  const photo = await generate({ messages: [{ role: "user", text: "Read this", attachments: [{ name: "a.png", mimeType: "image/png", data: "AA==" }] }] }, { env, fetchImpl });
+  assert.equal(long.provider, "openrouter");
+  assert.equal(photo.provider, "openrouter");
+  assert.deepEqual(seen, ["openrouter.ai", "openrouter.ai"], "Groq was not called at all");
+  assert.equal(providerHealth().length, 0, "Groq is not marked unhealthy for these");
+});
+
+test("Tavily is the backup web search: real links, notes written by the next free model", async () => {
+  const { resetProviderHealth, providerHealth } = await import("../src/services/ai/providers.js");
+  resetProviderHealth();
+  const calls = [];
+  let tavilyStatus = 200;
+  const fetchImpl = async (url, init) => {
+    const body = JSON.parse(init.body);
+    calls.push({ host: new URL(url).host, body, auth: init.headers.Authorization });
+    if (url.includes("generativelanguage")) return jsonResponse(429, { error: { message: "search quota" } });
+    if (url.includes("tavily")) {
+      if (tavilyStatus !== 200) return jsonResponse(tavilyStatus, { detail: { error: "This request exceeds your plan's set usage limit." } });
+      return jsonResponse(200, { results: [
+        { title: "Carlill v Carbolic Smoke Ball Co", url: "https://en.wikipedia.org/wiki/Carlill_v_Carbolic_Smoke_Ball_Co", content: "An advertisement can be a unilateral offer.", score: 0.9 },
+        { title: "bad", url: "javascript:alert(1)", content: "x" }] });
+    }
+    assert.match(body.messages.at(-1).content, /WEB SEARCH RESULTS \(Tavily/);
+    assert.match(body.messages.at(-1).content, /unilateral offer/);
+    return jsonResponse(200, { model: "openai/gpt-oss-120b", choices: [{ message: { content: "Research notes on Carlill" }, finish_reason: "stop" }] });
+  };
+  const env = { GEMINI_API_KEY: "g", GEMINI_SEARCH_MODELS: "s1", GEMINI_MODELS: "w1", GROQ_API_KEY: "gsk_x", TRIVILY_API_KEY: "tvly-abc" };
+  // Gemini writers are busy too (429), so Groq writes the notes.
+  const result = await generate({ search: true, searchQuery: "Carlill v Carbolic case", system: "R", messages: [{ role: "user", text: "Research this case: Carlill v Carbolic" }] }, { env, fetchImpl });
+  assert.equal(result.provider, "groq+tavily");
+  assert.equal(result.text, "Research notes on Carlill");
+  assert.deepEqual(result.sources, [{ url: "https://en.wikipedia.org/wiki/Carlill_v_Carbolic_Smoke_Ball_Co", title: "Carlill v Carbolic Smoke Ball Co", origin: "tavily" }]);
+  const tavily = calls.find((c) => c.host === "api.tavily.com");
+  assert.equal(tavily.auth, "Bearer tvly-abc");
+  assert.equal(tavily.body.query, "Carlill v Carbolic case");
+  assert.equal(tavily.body.search_depth, "basic");
+  // Monthly free credits used up: Tavily is paused for hours, not retried on every request.
+  resetProviderHealth();
+  tavilyStatus = 432;
+  await assert.rejects(generate({ search: true, messages: [{ role: "user", text: "Research: Donoghue v Stevenson" }] }, { env, fetchImpl }), /Tavily free searches for this month are used up/);
+  assert.ok(providerHealth().some((item) => item.model === "tavily" && item.code === "PROVIDER_MONTHLY_QUOTA" && item.retry_in_seconds > 3600));
+  const before = calls.filter((c) => c.host === "api.tavily.com").length;
+  await assert.rejects(generate({ search: true, messages: [{ role: "user", text: "Research: Hyde v Wrench" }] }, { env, fetchImpl }));
+  assert.equal(calls.filter((c) => c.host === "api.tavily.com").length, before);
+  resetProviderHealth();
+});
+
+test("web search still works with Groq + Tavily even when the Gemini key is wrong", async () => {
+  const { resetProviderHealth } = await import("../src/services/ai/providers.js");
+  resetProviderHealth();
+  const fetchImpl = async (url) => {
+    if (url.includes("generativelanguage")) return jsonResponse(400, { error: { message: "API key not valid" } });
+    if (url.includes("tavily")) return jsonResponse(200, { results: [{ title: "NigeriaLII", url: "https://nigerialii.org/", content: "Judgments" }] });
+    return jsonResponse(200, { choices: [{ message: { content: "notes" } }] });
+  };
+  const result = await generate({ search: true, messages: [{ role: "user", text: "Q" }] }, { env: { GEMINI_API_KEY: "bad", GEMINI_MODELS: "w1", GEMINI_SEARCH_MODELS: "s1", GROQ_API_KEY: "gsk_x", TAVILY_API_KEY: "tvly-x" }, fetchImpl });
+  assert.equal(result.sources[0].url, "https://nigerialii.org/");
+  resetProviderHealth();
+});
+
+test("key names are forgiving, wrong keys are explained, and no key is ever shown", () => {
+  const xai = describeProviders({ GROK_API_KEY: "xai-secret", TAVILY_KEY: "secret-no-prefix", GEMINI_API_KEY: "g" });
+  assert.equal(xai.groq.configured, false);
+  assert.match(xai.groq.warning, /xAI Grok key/);
+  assert.equal(xai.tavily.configured, true);
+  assert.equal(xai.tavily.key_name, "TAVILY_KEY");
+  assert.match(xai.tavily.warning, /tvly-/);
+  assert.equal(JSON.stringify(xai).includes("secret"), false);
+  const good = describeProviders({ GROQ_API_KEY: "gsk_abc", TAVILY_API_KEY: "tvly-abc" });
+  assert.equal(good.configured, true, "Groq alone can run the AI");
+  assert.deepEqual([good.groq.configured, good.groq.warning, good.tavily.warning], [true, null, null]);
+  assert.deepEqual(good.groq.models, ["openai/gpt-oss-120b", "openai/gpt-oss-20b"]);
+});
+
+test("admin AI test checks the health of Gemini, Groq, OpenRouter and Tavily one by one", async t => {
+  const { resetProviderHealth } = await import("../src/services/ai/providers.js");
+  resetProviderHealth();
+  const fetchImpl = async (url, init) => {
+    if (url.includes("tavily")) return jsonResponse(200, { results: [{ title: "Supreme Court of Nigeria", url: "https://supremecourt.gov.ng/", content: "Official site" }] });
+    if (url.includes("groq")) {
+      const model = JSON.parse(init.body).model;
+      if (model === "openai/gpt-oss-20b") return jsonResponse(401, { error: { message: "Invalid API Key" } });
+      return jsonResponse(200, { model, choices: [{ message: { content: "FIRE COUNSEL AI is connected." } }] });
+    }
+    if (url.includes("openrouter")) return jsonResponse(200, { model: "free-model", choices: [{ message: { content: "FIRE COUNSEL AI is connected." } }] });
+    return jsonResponse(429, { error: { message: "quota" } });
+  };
+  const env = { GEMINI_API_KEY: "g", GEMINI_MODELS: "w1", GROQ_API_KEY: "gsk_x", OPENROUTER_API_KEY: "o", TAVILY_API_KEY: "tvly-x" };
+  const request = await serve(t, app => app.use("/api/v1/admin/ai", createAdminAiRouter({ poolProvider: () => pool, verifyToken: stubVerify, env, fetchImpl, configured: () => true })));
+  const status = await (await request("/api/v1/admin/ai/status", { token: "admin" })).json();
+  assert.deepEqual([status.data.providers.groq.configured, status.data.providers.tavily.configured], [true, true]);
+  const body = await (await request("/api/v1/admin/ai/test", { token: "admin", method: "POST", body: {} })).json();
+  assert.deepEqual(body.data.models.map((m) => [m.provider, m.model, m.ok]), [
+    ["gemini", "w1", false], ["groq", "openai/gpt-oss-120b", true], ["groq", "openai/gpt-oss-20b", false], ["openrouter", "free-model", true], ["tavily", "tavily", true]]);
+  assert.match(body.data.models[2].error, /Groq rejected the API key/);
+  assert.equal(body.data.provider, "groq", "the first healthy writer, not Tavily");
+  assert.equal(body.data.fallback, true);
+  assert.deepEqual(body.data.search, { ok: true, provider: "tavily", model: "tavily", sources: 1 });
+  resetProviderHealth();
+});

@@ -122,14 +122,15 @@
       </section>
 
       <section class="admin-panel" id="panel-ai" aria-labelledby="ai-title" hidden>
-        <div class="admin-heading"><div><span class="eyebrow">GEMINI FIRST · OPENROUTER BACKUP · PRIVATE PROMPTS</span><h1 id="ai-title">AI studio settings.</h1><p>See which AI keys the server has, test the connection, and upload your private prompts. Keys are never typed here: they live in Render&rsquo;s Environment settings.</p></div><span class="panel-status" id="ai-panel-status">SIGN IN AS ADMIN</span></div>
+        <div class="admin-heading"><div><span class="eyebrow">GEMINI FIRST · GROQ &amp; OPENROUTER BACKUP · TAVILY SEARCH</span><h1 id="ai-title">AI studio settings.</h1><p>See which AI keys the server has, test the connection, and upload your private prompts. Keys are never typed here: they live in Render&rsquo;s Environment settings.</p></div><span class="panel-status" id="ai-panel-status">SIGN IN AS ADMIN</span></div>
         <div class="fc-admin-grid">
           <section class="fc-admin-card" aria-labelledby="ai-providers-title">
             <span class="eyebrow">AI PROVIDERS</span><h2 id="ai-providers-title">Connection status</h2>
             <div id="ai-provider-status"><p>Sign in as an administrator to load the status.</p></div>
             <div class="fc-row"><button class="button button-primary" id="ai-test-button" type="button" disabled>Test AI connection</button><label><input id="ai-test-search" type="checkbox"> also test web search</label></div>
             <p class="fc-status" id="ai-test-result" role="status" aria-live="polite"></p>
-            <p><strong>To add or change a key:</strong> open <a href="https://dashboard.render.com" target="_blank" rel="noopener">dashboard.render.com</a> → your <b>fire-counsel</b> service → <b>Environment</b> → add <code>GEMINI_API_KEY</code> (from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>) and <code>OPENROUTER_API_KEY</code> (from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>) → <b>Save</b>. Render restarts the site automatically.</p>
+            <div id="ai-test-models" class="fc-health-wrap"></div>
+            <p><strong>To add or change a key:</strong> open <a href="https://dashboard.render.com" target="_blank" rel="noopener">dashboard.render.com</a> → your <b>fire-counsel</b> service → <b>Environment</b> → add <code>GEMINI_API_KEY</code> (from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>), <code>GROQ_API_KEY</code> (from <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>, starts with <code>gsk_</code>), <code>OPENROUTER_API_KEY</code> (from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>) and <code>TAVILY_API_KEY</code> (from <a href="https://app.tavily.com" target="_blank" rel="noopener">app.tavily.com</a>, starts with <code>tvly-</code>) → <b>Save</b>. Render restarts the site automatically.</p>
           </section>
           <section class="fc-admin-card" aria-labelledby="ai-today-title">
             <span class="eyebrow">TODAY</span><h2 id="ai-today-title">AI use across all students</h2>

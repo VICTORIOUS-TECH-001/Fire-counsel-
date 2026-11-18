@@ -439,6 +439,54 @@ test("admin sections navigate correctly and a student cannot unlock database con
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
+test("admin AI panel shows Groq and Tavily keys and a health row for every model", async ({ page }) => {
+  await stubAuth(page, { user: admin });
+  const providers = {
+    configured: true,
+    gemini: { configured: true, models: ["gemini-3.8-flash"], search_models: ["gemini-2.5-flash-lite"] },
+    groq: { configured: true, key_name: "GROQ_API_KEY", warning: null, models: ["openai/gpt-oss-120b", "openai/gpt-oss-20b"] },
+    openrouter: { configured: true, models: ["openrouter/free"] },
+    tavily: { configured: true, key_name: "TRIVILY_API_KEY", warning: "Tavily keys normally start with tvly-. Check that the whole key was pasted.", depth: "basic" }
+  };
+  const models = [
+    { provider: "gemini", model: "gemini-3.8-flash", role: "writer", ok: false, ms: 900, code: "PROVIDER_QUOTA", error: "Gemini rate limit or free quota reached." },
+    { provider: "groq", model: "openai/gpt-oss-120b", role: "fast backup", ok: true, ms: 420, reply: "FIRE COUNSEL AI is connected.", sources: 0 },
+    { provider: "openrouter", model: "free-model", role: "backup", ok: true, ms: 2100, reply: "FIRE COUNSEL AI is connected.", sources: 0 },
+    { provider: "tavily", model: "tavily", role: "backup web search", ok: true, ms: 800, reply: "3 pages", sources: 3 }
+  ];
+  await page.route("**/api/**", route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/health") return json(route, { database: "connected" });
+    if (path === "/api/v1/admin/me") return json(route, { user: { ...admin, role: "admin" } });
+    if (path.endsWith("/catalog")) return json(route, { data: catalog });
+    if (path === "/api/v1/presence") return route.fulfill({ status: 204 });
+    if (path === "/api/v1/admin/ai/status") return json(route, { data: { providers, skipped_models: [], database: "configured", schema_ready: true, prompts: [], limits: null, today: {}, timezone: "Africa/Lagos" } });
+    if (path === "/api/v1/admin/ai/test") return json(route, { data: { ok: true, provider: "groq", model: "openai/gpt-oss-120b", reply: "FIRE COUNSEL AI is connected.", fallback: true, search: { ok: true, provider: "tavily", model: "tavily", sources: 3 }, models } });
+    return json(route, { data: [] });
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/admin.html");
+  await expect(page.locator("#admin-auth-status")).toHaveAttribute("data-state", "verified");
+  await page.locator("[data-panel=ai]").click();
+  const status = page.locator("#ai-provider-status");
+  await expect(status).toContainText("Groq (fast backup)");
+  await expect(status).toContainText("Tavily (backup web search)");
+  await expect(status).toContainText("TRIVILY_API_KEY");
+  await expect(status.locator(".fc-warn")).toContainText("tvly-");
+  await page.locator("#ai-test-button").click();
+  await expect(page.locator("#ai-test-result")).toContainText("Working: Groq (openai/gpt-oss-120b)");
+  await expect(page.locator("#ai-test-result")).toContainText("Web search works via Tavily (3 sources)");
+  const rows = page.locator("#ai-test-models tbody tr");
+  await expect(rows).toHaveCount(4);
+  await expect(rows.nth(0)).toContainText("QUOTA");
+  await expect(rows.nth(0)).toContainText("free quota reached");
+  await expect(rows.nth(1)).toContainText("HEALTHY");
+  await expect(rows.nth(3)).toContainText("Tavily");
+  await expect(rows.nth(3)).toContainText("3 sources");
+  if (process.env.SHOT_DIR) await page.locator("#panel-ai").screenshot({ path: `${process.env.SHOT_DIR}/admin-health.png` });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test("verified administrator still cannot edit when Neon is unconfigured", async ({ page }) => {
   await stubAuth(page, { user: admin });
   await page.route("**/api/**", route => {
