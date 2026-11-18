@@ -1,4 +1,4 @@
-import { test, expect, expectNoHorizontalOverflow, stubAuth, student, json, rowId } from "./fixtures.mjs";
+import { test, expect, expectNoHorizontalOverflow, debugOverflow, stubAuth, student, json, rowId } from "./fixtures.mjs";
 
 const installationKey = "fire-counsel-installation-v1";
 const baseProfile = {
@@ -246,6 +246,7 @@ test("profile loading, creation, security and signed-out views fit small screens
   const checkWidths = async () => {
     for (const width of [320, 390, 768, 1024]) {
       await page.setViewportSize({ width, height: 844 });
+      await debugOverflow(page);
       await expectNoHorizontalOverflow(page);
     }
   };
