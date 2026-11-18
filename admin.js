@@ -9,6 +9,7 @@
   const setSlideStatus = (message, kind = "") => { const node = $("#slide-status"); if (node) { node.textContent = message; node.className = `slide-status ${kind}`; } };
   const setText = (selector, message) => { const node = $(selector); if (node) node.textContent = message; };
   const escapeHTML = value => String(value ?? "").replace(/[&<>\"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'\"':"&quot;","'":"&#39;"}[ch]));
+  let defaultContent = null;
   let temporarySlides = [];
   let currentObjectUrls = new Set();
 
