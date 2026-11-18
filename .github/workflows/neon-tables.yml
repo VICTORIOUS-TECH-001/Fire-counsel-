@@ -9,6 +9,7 @@ on:
   push:
     paths:
       - backend/scripts/list-tables.js
+      - backend/scripts/check-admin-schema.js
       - .github/workflows/neon-tables.yml
 
 permissions:
@@ -30,3 +31,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npm --prefix backend run db:tables
+      - name: Check the admin panel against the Neon schema (read-only)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node backend/scripts/check-admin-schema.js
