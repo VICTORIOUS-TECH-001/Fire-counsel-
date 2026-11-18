@@ -2,20 +2,197 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() {
-      return request.auth != null;
+      // Check this session, not linked identities; legacy password/custom
+      // sessions cannot write or read private data, even with an admin claim.
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider == 'google.com';
     }
 
     function isAdmin() {
-      return signedIn() && request.auth.token.admin == true;
+      return signedIn() && request.auth.token.get('admin', false) == true;
     }
 
-    // Public homepage content only. Secrets and private account data never belong here.
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // ------------------------------------------------------------------
+    // Shared field checks. firebase/content-schema.mjs mirrors these exact
+    // limits in JavaScript for pre-write validation; keep them in sync.
+    // Rules cannot iterate lists, so list entries are checked per index up
+    // to the same maximum the client validator enforces.
+
+    function isBoundedText(value, max) {
+      return value is string && value.size() <= max;
+    }
+
+    // Links the homepage/student pages may point at: site-relative paths,
+    // in-page anchors, or https URLs. Never javascript: or data:.
+    function isSafeLink(value) {
+      return value is string
+        && value.size() <= 300
+        && value.matches('^(\\./|/|#)[^\\s"<>]*$|^https://[^\\s"<>]+$');
+    }
+
+    // Images the homepage may draw: bundled assets, Neon /media uploads, or
+    // the reviewed site/slides folder of the fire-counsel Storage bucket
+    // (object names are URL-encoded: site/slides/x.jpg -> site%2Fslides%2Fx.jpg).
+    function isSafeImage(value) {
+      return value is string
+        && value.size() <= 2048
+        && (value.matches('(?i)^(\\.?/)?assets/[A-Za-z0-9_./-]+\\.(png|jpe?g|webp)$')
+          || value.matches('(?i)^/media/[0-9a-f-]{36}\\.(png|jpg|webp)$')
+          || value.matches('(?i)^https://firebasestorage\\.googleapis\\.com/v0/b/fire-counsel\\.firebasestorage\\.app/o/site%2Fslides%2F[A-Za-z0-9_.%-]+\\.(png|jpe?g|webp)(\\?alt=media(&token=[A-Za-z0-9_-]+)?)?$'));
+    }
+
+    function validNavItem(item) {
+      return item is map
+        && item.keys().hasOnly(["label", "href"])
+        && item.keys().hasAll(["label", "href"])
+        && item.label is string && item.label.size() >= 1 && item.label.size() <= 60
+        && isSafeLink(item.href);
+    }
+
+    function validSlide(slide) {
+      return slide is map
+        && slide.keys().hasOnly(["eyebrow", "title", "accent", "body", "image", "imageAlt", "imageCredit", "primaryLabel", "primaryHref", "secondaryLabel", "secondaryHref"])
+        && slide.keys().hasAll(["eyebrow", "title", "accent", "body", "image", "imageAlt", "imageCredit", "primaryLabel", "primaryHref", "secondaryLabel", "secondaryHref"])
+        && isBoundedText(slide.eyebrow, 120)
+        && slide.title is string && slide.title.size() >= 1 && slide.title.size() <= 120
+        && isBoundedText(slide.accent, 120)
+        && isBoundedText(slide.body, 600)
+        && isSafeImage(slide.image)
+        && isBoundedText(slide.imageAlt, 200)
+        && isBoundedText(slide.imageCredit, 200)
+        && isBoundedText(slide.primaryLabel, 60)
+        && isSafeLink(slide.primaryHref)
+        && isBoundedText(slide.secondaryLabel, 60)
+        && isSafeLink(slide.secondaryHref);
+    }
+
+    // 1..12 slides, every one validated (no list iteration in rules).
+    function validSlides(slides) {
+      return slides is list
+        && slides.size() >= 1 && slides.size() <= 12
+        && validSlide(slides[0])
+        && (slides.size() < 2 || validSlide(slides[1]))
+        && (slides.size() < 3 || validSlide(slides[2]))
+        && (slides.size() < 4 || validSlide(slides[3]))
+        && (slides.size() < 5 || validSlide(slides[4]))
+        && (slides.size() < 6 || validSlide(slides[5]))
+        && (slides.size() < 7 || validSlide(slides[6]))
+        && (slides.size() < 8 || validSlide(slides[7]))
+        && (slides.size() < 9 || validSlide(slides[8]))
+        && (slides.size() < 10 || validSlide(slides[9]))
+        && (slides.size() < 11 || validSlide(slides[10]))
+        && (slides.size() < 12 || validSlide(slides[11]));
+    }
+
+    // The whole homepage document. The write must carry server-owned metadata
+    // (updatedAt is the server timestamp sentinel, updatedBy the caller's uid)
+    // so the public page can trust who published and when.
+    function validSiteContent() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(["brand", "navigation", "hero", "quickFacts", "learning", "caseNotes", "articles", "resources", "footer", "updatedAt", "updatedBy"])
+        && data.keys().hasAll(["brand", "navigation", "hero", "quickFacts", "learning", "caseNotes", "articles", "resources", "footer", "updatedAt", "updatedBy"])
+        && data.updatedAt == request.time
+        && data.updatedBy is string && data.updatedBy == request.auth.uid
+        && data.brand is map
+        && data.brand.keys().hasOnly(["name", "tagline", "markImage", "markAlt"])
+        && data.brand.keys().hasAll(["name", "tagline", "markImage", "markAlt"])
+        && data.brand.name is string && data.brand.name.size() >= 1 && data.brand.name.size() <= 80
+        && isBoundedText(data.brand.tagline, 200)
+        && isSafeImage(data.brand.markImage)
+        && isBoundedText(data.brand.markAlt, 200)
+        && data.navigation is list && data.navigation.size() >= 1 && data.navigation.size() <= 8
+        && validNavItem(data.navigation[0])
+        && (data.navigation.size() < 2 || validNavItem(data.navigation[1]))
+        && (data.navigation.size() < 3 || validNavItem(data.navigation[2]))
+        && (data.navigation.size() < 4 || validNavItem(data.navigation[3]))
+        && (data.navigation.size() < 5 || validNavItem(data.navigation[4]))
+        && (data.navigation.size() < 6 || validNavItem(data.navigation[5]))
+        && (data.navigation.size() < 7 || validNavItem(data.navigation[6]))
+        && (data.navigation.size() < 8 || validNavItem(data.navigation[7]))
+        && data.hero is map
+        && data.hero.keys().hasOnly(["autoplayMs", "slides"])
+        && data.hero.keys().hasAll(["slides"])
+        && (!data.hero.keys().hasAny(["autoplayMs"]) || (data.hero.autoplayMs is number && data.hero.autoplayMs >= 4000 && data.hero.autoplayMs <= 15000))
+        && validSlides(data.hero.slides)
+        && data.quickFacts is list && data.quickFacts.size() <= 40
+        && data.learning is map
+        && data.caseNotes is map
+        && data.articles is map
+        && data.resources is map
+        && data.footer is map;
+    }
+
+    // Public homepage content, including the hero slides. Visitors read it
+    // live; only a server-issued admin: true claim may publish from the
+    // browser (validated above). Secrets and private account data never
+    // belong here. Deletion stays server-only so the homepage cannot be
+    // removed by a client.
     match /siteContent/{documentId} {
       allow read: if true;
-      // Publish through a server that validates an admin claim and the JSON schema.
-      allow create, update, delete: if false;
+      allow create, update: if isAdmin() && validSiteContent();
+      allow delete: if false;
     }
 
+    // ------------------------------------------------------------------
+    // Student public pages. A signed-in student owns studentPages/{their uid}
+    // and edits it directly from the study page; visitors can fetch a page
+    // only when the owner published it. Listing the collection is admin-only
+    // so the pages cannot be scraped en masse. The private account profile
+    // stays in Neon behind the API; nothing here replaces it.
+
+    function validPageLink(value) {
+      return value is string
+        && value.size() >= 1 && value.size() <= 300
+        && value.matches('^https://[^\\s"<>]+$');
+    }
+
+    function validFocusArea(value) {
+      return value is string && value.size() >= 1 && value.size() <= 40;
+    }
+
+    function validStudentPage() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(["displayName", "headline", "bio", "links", "focusAreas", "published", "createdAt", "updatedAt"])
+        && data.keys().hasAll(["displayName", "headline", "bio", "links", "focusAreas", "published", "createdAt", "updatedAt"])
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+        && isBoundedText(data.headline, 160)
+        && isBoundedText(data.bio, 2000)
+        && data.published is bool
+        && data.links is list && data.links.size() <= 5
+        && (data.links.size() < 1 || validPageLink(data.links[0]))
+        && (data.links.size() < 2 || validPageLink(data.links[1]))
+        && (data.links.size() < 3 || validPageLink(data.links[2]))
+        && (data.links.size() < 4 || validPageLink(data.links[3]))
+        && (data.links.size() < 5 || validPageLink(data.links[4]))
+        && data.focusAreas is list && data.focusAreas.size() <= 8
+        && (data.focusAreas.size() < 1 || validFocusArea(data.focusAreas[0]))
+        && (data.focusAreas.size() < 2 || validFocusArea(data.focusAreas[1]))
+        && (data.focusAreas.size() < 3 || validFocusArea(data.focusAreas[2]))
+        && (data.focusAreas.size() < 4 || validFocusArea(data.focusAreas[3]))
+        && (data.focusAreas.size() < 5 || validFocusArea(data.focusAreas[4]))
+        && (data.focusAreas.size() < 6 || validFocusArea(data.focusAreas[5]))
+        && (data.focusAreas.size() < 7 || validFocusArea(data.focusAreas[6]))
+        && (data.focusAreas.size() < 8 || validFocusArea(data.focusAreas[7]))
+        && data.updatedAt == request.time
+        && (request.method == "create"
+          ? data.createdAt == request.time
+          : data.createdAt == resource.data.createdAt);
+    }
+
+    match /studentPages/{uid} {
+      allow get: if isAdmin()
+        || isOwner(uid)
+        || resource.data.published == true;
+      allow list: if isAdmin();
+      allow create, update: if (isAdmin() || isOwner(uid)) && validStudentPage();
+      allow delete: if isAdmin() || isOwner(uid);
+    }
+
+    // ------------------------------------------------------------------
     // Account, quota, entitlement and usage changes are server-only.
     // The backend must return each student only their own safe account summary.
     match /accounts/{uid} {

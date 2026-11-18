@@ -41,8 +41,9 @@ body[data-theme="dark"] .student-signin-link{color:#e7d8ff}
 #student-profile-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* The study shell does not load the public site's stylesheet. */
 .app~.site-footer{margin-left:var(--sidebar,252px);padding:28px 34px 22px;border-top:1px solid var(--line);color:var(--muted);font-size:11px;line-height:1.7}
-.app~.site-footer .footer-main{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:24px}
-.app~.site-footer .site-brand{display:flex;align-items:center;gap:10px;color:var(--ink)}
+.app~.site-footer .footer-main{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:24px}
+.app~.site-footer .footer-main>*{min-width:0}
+.app~.site-footer .site-brand{display:flex;align-items:center;flex-wrap:wrap;gap:10px;min-width:0;max-width:100%;color:var(--ink)}
 .app~.site-footer .brand-image-wrap{display:block;flex:none;width:40px;height:40px;overflow:hidden;border-radius:12px}
 .app~.site-footer .brand-image-wrap img{width:100%;height:100%;object-fit:cover}
 .app~.site-footer .footer-brand p{max-width:270px;font-size:11px}
@@ -51,7 +52,7 @@ body[data-theme="dark"] .student-signin-link{color:#e7d8ff}
 .app~.site-footer a:hover{text-decoration:underline}
 .app~.site-footer .footer-disclaimer{margin-top:24px;padding-top:17px;border-top:1px solid var(--line);font-size:10px}
 .app~.site-footer .footer-bottom{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-top:14px;font-size:10px}
-@media(max-width:1100px){.app~.site-footer .footer-main{grid-template-columns:1fr 1fr}.app~.site-footer .footer-brand{grid-column:1/-1}}
+@media(max-width:1100px){.app~.site-footer .footer-main{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.app~.site-footer .footer-brand{grid-column:1/-1}}
 @media(max-width:900px){.app~.site-footer{margin-left:0;padding:24px 22px}}
 @media(max-width:480px){.app~.site-footer .footer-main{gap:18px}.app~.site-footer .footer-bottom{align-items:flex-start;flex-direction:column}}
 .server-material-list,.research-search-results{display:grid;gap:12px}
@@ -120,3 +121,22 @@ body[data-theme="dark"] .student-profile-grid .integration-status[data-kind="ok"
 .fc-version-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
 .fc-version-list li{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid #eceef3;border-radius:10px}
 .fc-version-list small{display:block;color:#6b7080;font-size:12px;overflow-wrap:anywhere}
+
+/* App sign-in gate (auth-gate.mjs). Locked pages (study workspace, AI studio)
+   hide everything behind this screen until Firebase Auth confirms a student. */
+body[data-auth-gate="pending"]>*:not(.fc-preloader):not(.auth-gate),body[data-auth-gate="locked"]>*:not(.fc-preloader):not(.auth-gate){display:none}
+.auth-gate{display:none}
+body[data-auth-gate="pending"] .auth-gate,body[data-auth-gate="locked"] .auth-gate{display:grid;place-items:center;position:fixed;inset:0;z-index:90;padding:22px;background:radial-gradient(circle at 50% 18%,rgba(37,99,235,.22),transparent 30rem),#040b1f}
+.auth-gate-card{display:grid;justify-items:center;gap:13px;width:min(100%,420px);padding:36px 30px 28px;border:1px solid rgba(77,144,255,.36);border-radius:22px;background:linear-gradient(160deg,rgba(25,62,145,.55) 0%,rgba(10,30,76,.78) 55%,rgba(7,20,52,.92) 100%);box-shadow:0 10px 28px rgba(1,8,30,.55);text-align:center}
+.auth-gate-brand{width:56px;height:56px;object-fit:cover;border-radius:15px;border:1px solid rgba(77,144,255,.36)}
+.auth-gate-lock{display:grid;place-items:center;width:44px;height:44px;border-radius:13px;background:rgba(59,130,246,.16);border:1px solid rgba(77,144,255,.36);color:#93c5fd}
+.auth-gate-lock svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.auth-gate-card h1{margin:0;font-size:23px;letter-spacing:-.03em;color:#eaf2ff}
+.auth-gate-card p{margin:0;color:#a9bfe3;font-size:12px;line-height:1.7}
+.auth-gate-signin{display:inline-flex;align-items:center;justify-content:center;margin-top:6px;padding:11px 18px;border-radius:10px;background:#3b82f6;color:#fff;font-size:12px;font-weight:800;text-decoration:none}
+.auth-gate-signin:hover{background:#2563eb}
+.auth-gate-home{color:#93c5fd;font-size:11px;font-weight:700;text-decoration:none}
+.auth-gate-home:hover{text-decoration:underline}
+.auth-gate-status{margin-top:2px;font-size:10px;color:#a9bfe3}
+.auth-gate-status:empty{display:none}
+body[data-auth-gate="pending"] .auth-gate-lock,body[data-auth-gate="pending"] .auth-gate-card h1,body[data-auth-gate="pending"] #auth-gate-message,body[data-auth-gate="pending"] .auth-gate-signin,body[data-auth-gate="pending"] .auth-gate-home{display:none}

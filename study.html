@@ -13,7 +13,7 @@
 <link href="./integrations.css" rel="stylesheet"/>
 <link href="./workspace.css" rel="stylesheet"/>
 </head>
-<body class="ws" data-theme="dark">
+<body class="ws" data-theme="dark" data-auth-gate="pending">
 <div class="fc-preloader" id="fc-preloader" role="status" aria-label="FIRE COUNSEL is loading">
 <div class="fc-pre-core" aria-hidden="true"><div class="fc-pre-ring"></div><div class="fc-pre-hex"><div class="fc-pre-fire"><i class="fl fl1"></i><i class="fl fl2"></i><i class="fl fl3"></i><i class="fl fl4"></i><i class="em em1"></i><i class="em em2"></i><i class="em em3"></i><i class="em em4"></i><i class="em em5"></i></div></div></div>
 <div class="fc-pre-name">FIRE <span>COUNSEL</span></div>
@@ -22,6 +22,18 @@
 <div class="fc-pre-status">Loading your workspace…</div>
 </div>
 <script src="./preloader.js"></script>
+<script type="module" src="./auth-gate.mjs"></script>
+<div class="auth-gate" id="auth-gate" role="dialog" aria-modal="true" aria-labelledby="auth-gate-title">
+  <div class="auth-gate-card">
+    <img class="auth-gate-brand" src="./assets/images/fire-counsel-brand.jpg" alt="" width="56" height="56">
+    <span class="auth-gate-lock" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+    <h1 id="auth-gate-title">Workspace locked</h1>
+    <p id="auth-gate-message">Your study workspace is private. Sign in to open it.</p>
+    <a class="button primary auth-gate-signin" id="auth-gate-signin" href="./auth.html?next=study.html">Sign in with Google</a>
+    <a class="auth-gate-home" href="./index.html">&larr; Back to the homepage</a>
+    <p class="auth-gate-status" id="auth-gate-status" role="status" aria-live="polite">Checking your sign-in&hellip;</p>
+  </div>
+</div>
 <div class="app">
 <aside aria-label="Main navigation" class="sidebar ws-sidebar" id="sidebar">
 <a aria-label="FIRE COUNSEL home" class="brand ws-brand" href="./index.html">
@@ -172,6 +184,21 @@
   <dl class="profile-device-details" id="profile-device-details" hidden><dt>Registered</dt><dd id="profile-bound-at">—</dd><dt>Last profile sync</dt><dd id="profile-last-seen">—</dd><dt>Last observed connection IP</dt><dd id="profile-observed-ip">Unavailable</dd><dt>Address source</dt><dd id="profile-ip-source">Unavailable</dd></dl>
   <p>IP addresses change on mobile data, Wi-Fi and VPNs, and several people may share one. An IP change does not create another account. An unconfigured or intermediary proxy may hide your public IP; FIRE COUNSEL does not guess it or ask an external IP service.</p>
 </section>
+<section class="integration-card student-page-card" aria-labelledby="student-page-title">
+  <div class="eyebrow">FIRESTORE · YOUR PUBLIC PAGE</div><h2 id="student-page-title">My public student page</h2>
+  <p>A small page you own in Firebase Firestore, separate from the private profile above. Nothing is visible to visitors until you tick <strong>Publish my page</strong>. Your study files are never part of it.</p>
+  <p class="integration-status" id="student-page-status" role="status" aria-live="polite">Checking Firebase sign-in…</p>
+  <form id="student-page-form" class="student-profile-form" hidden>
+    <label class="database-field">Display name<input id="student-page-name" type="text" autocomplete="name" required maxlength="120" placeholder="Name shown on your public page"></label>
+    <label class="database-field">Headline<input id="student-page-headline" type="text" maxlength="160" placeholder="e.g. 300-level law student"></label>
+    <label class="database-field">About you<textarea id="student-page-bio" rows="4" maxlength="2000" placeholder="A short introduction visitors will read"></textarea></label>
+    <label class="database-field">Links<textarea id="student-page-links" rows="3" placeholder="One https:// link per line (at most 5)"></textarea><small>https:// links only — for example a portfolio or society page.</small></label>
+    <label class="database-field">Focus areas<input id="student-page-focus" type="text" maxlength="360" placeholder="Comma-separated, e.g. Tort, Contract, Constitutional law"></label>
+    <label class="profile-policy"><input id="student-page-published" type="checkbox"><span><strong>Publish my page.</strong> Anyone with the link can read it while this is on. Untick it to make the page private again.</span></label>
+    <button class="button primary" id="student-page-save" type="submit">Save my public page</button>
+  </form>
+  <div class="integration-actions" id="student-page-actions" hidden><a class="mini-link" id="student-page-view-link" href="./student.html" target="_blank" rel="noopener noreferrer">View my public page ↗</a><small id="student-page-updated"></small></div>
+</section>
 <section class="integration-card student-security-card" id="profile-security" aria-labelledby="profile-security-title" hidden>
   <div class="eyebrow">FIREBASE ACCOUNT SECURITY</div><h2 id="profile-security-title">Email &amp; password</h2><p>Credentials are handled directly by Firebase, never stored in Neon or returned with your profile. Sensitive changes require you to confirm your current Firebase password or Google account.</p>
   <p class="integration-status" id="profile-security-status" role="status" aria-live="polite"></p>
@@ -207,6 +234,7 @@
 <script type="module" src="./study-materials.mjs"></script>
 <script type="module" src="./research-search.mjs"></script>
 <script type="module" src="./student-profile.mjs"></script>
+<script type="module" src="./student-page.mjs"></script>
 <script type="module" src="./presence.mjs"></script>
 
 </body>

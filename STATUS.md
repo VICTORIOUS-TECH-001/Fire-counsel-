@@ -1,5 +1,22 @@
 # FIRE COUNSEL — status and verification report
 
+**Latest update:** 18 November 2026 (UTC), branch `arena/d4df7fc6-fire-counsel`
+
+**Access and paywall changes this round:**
+- Sign-in is **Google-only** (`auth.html` has no email/password form or unsigned-continue link) and the button carries the official four-colour Google logo (inline SVG, offline-safe).
+- Locked pages (`study.html` workspace **and** `ai.html` AI studio) no longer render for signed-out visitors: a shared lock screen (`auth-gate.mjs`) hides the page until Firebase Auth confirms an account, and sign-out locks again instantly. A browser that has signed in before keeps its local study tools offline; a fresh browser must sign in online once. Server data was never exposed either way — every API route requires a verified Firebase token. The public homepage, the auth page and published student pages stay public; the admin page keeps its own server-verified admin gate.
+- AI features are now a premium plan, enforced server-side: `ai_user_limits.premium` (migration `005_premium.sql`, admin-granted in Admin → Users & AI limits) is checked inside `reserveUsage`, so free accounts get `403 PREMIUM_REQUIRED` before any AI spend and cannot enable it from a browser. `/api/v1/ai/me` exposes the flag; the AI studio shows a free-plan notice and locks its composer.
+- Google-only is enforced beyond the UI: verified API tokens and proposed Firestore/Storage rules require `firebase.sign_in_provider == "google.com"`, including for admins. Password/custom/anonymous sessions cannot use protected APIs or writes even when the account has a linked Google identity.
+- Admin → **Users & AI limits** lists Firebase accounts (including zero-use students), Active/Offline status and today's per-feature usage. API tests now verify day/failed-request filtering; a browser test covers the list, search, effective limits, and clearing it on sign-out while ignoring a delayed refresh.
+- **Owner guide:** [DEPLOYMENT.md](DEPLOYMENT.md) has the exact `NEON_API_KEY` secret / `NEON_PROJECT_ID` variable / `DATABASE_URL` secret and migration-workflow steps. The Neon management API 401 is still an owner credential/configuration issue; this session cannot inspect repository secret settings.
+- **Deploy step required:** run the Neon migration workflow (Actions → "Neon database migration") so the `premium` column exists before using the admin premium toggle; without it, reads simply report every account as free.
+
+**Latest verification (18 November):** `npm test` passed — frontend **63/63**, backend **144/144**, proxy **14/14**, Firebase local **10/10**; syntax **102** modules. Chromium browser suite **41/41** passed locally with external services blocked and whole-test retries disabled. The extra layout regression deliberately creates overflow, requires the real width check to fail, then requires it to pass when the box fits; no clipping CSS, relaxed width threshold or assertion timeout increase. Layout checks observe render frames on the foreground page, and the preserved-data test uses the actual mobile menu rather than a native fragment navigation during resize. The Java-enabled Firestore/Storage gate passed on `5f38a00`, including **8 security-rule scenarios** and the local suites it reruns. These are synthetic/emulator checks, not live project verification. The updated rules still require owner review and deployment.
+
+## Historical baseline (15 November 2026)
+
+The sections below record the earlier review. The latest access/Google-only/admin-usage changes above supersede its older email-registration, unsigned-local-access and disabled-AI descriptions.
+
 **Checked:** 15 November 2026 (UTC)
 
 **Branch:** `arena/15cb68b6-fire-counsel`
@@ -53,6 +70,15 @@ Browser tests use isolated disposable profiles, synthetic users and stubbed auth
 
 See [backend/STUDENT_PROFILES.md](backend/STUDENT_PROFILES.md) for the exact flow, API contract, proxy/IP limitations, migration review and remaining staging checks. Local tests use a synthetic identity model and in-memory PostgreSQL; they do not establish compatibility with the actual Neon schema or real Google/Firebase behavior.
 
+## Firestore direct-write content and student pages (18 November 2026 update)
+
+- `firebase/firestore.rules` now covers two browser-written collections in addition to the server-only ones. `siteContent/public` accepts writes only from the server-issued `admin: true` claim, with the full homepage shape validated in-rule: exact top-level sections, 1–12 fully-checked slides, bounded text fields, safe link patterns (site-relative/anchor/https only) and images confined to bundled assets, Neon `/media/` uploads or this bucket's `site/slides/` folder. `updatedAt` must be the server timestamp and `updatedBy` the caller's UID. Delete stays server-only.
+- `studentPages/{uid}` is a new owner-written public page: exact key set (`displayName`, `headline`, `bio`, `links`, `focusAreas`, `published`, `createdAt`, `updatedAt`), bounded fields, https-only links, `createdAt` immutable after creation. Public `get` succeeds only for `published: true`; `list` is admin-only. The private Neon profile and its `/api/v1/profile` contract are unchanged.
+- `firebase/content-schema.mjs` mirrors the rule limits in JavaScript for pre-write validation and read-side checks; `firebase/firestore-client.mjs` (Firestore Lite) implements public content load, admin publish, and student page load/save. The homepage reads Firestore first with a 2.5 s cap and falls back to the bundled JSON; the admin publish writes Firestore first and still archives each version in Neon, with a partial-failure message if only the history save fails.
+- New `student.html` + `student-page-view.mjs` render a published page unauthenticated, escaping all text and re-validating link protocols; the editor card lives in `study.html` (`student-page.mjs`). Both files were added to the restricted static allowlists in `tools/dev_server.py` and `backend/src/website.js`.
+- Auth review: the error mapping moved into `firebase/auth-errors.mjs` and now also covers `auth/user-disabled`, `auth/invalid-email`/`auth/missing-email` and `auth/requires-recent-login`; `auth-client.mjs` exposes `hasAdminClaim()` for UI gating (rules remain the enforcement).
+- Local gates rerun: frontend/wiring/auth suites **35/35**, Firebase local suite (compat + content-schema) **10/10**, Python proxy suite **14/14**, syntax check 99 modules. The rules suite was extended to 8 scenarios (validated admin publish, forged metadata, unsafe slide image/link, student-page ownership/publish/immutability and list-denial) — it still needs the Java-enabled GitHub Actions emulator job; Java is absent from this sandbox. **The new rules are not deployed**, so live publishes/saves fail closed with permission errors until the owner deploys them after review.
+
 ## Current integration status
 
 | Area | Status / remaining work |
@@ -68,7 +94,7 @@ See [backend/STUDENT_PROFILES.md](backend/STUDENT_PROFILES.md) for the exact flo
 | Neon connection/schema | `DATABASE_URL` is absent. No live Neon reads/writes, schema compatibility, memberships, CRUD or full-text search have been verified. Profile SQL/migration tests use in-memory PGlite with known identity columns; other SQL/UI tests use injected providers/stubs. |
 | Academic content | Allowlisted content CRUD and pasted-text versions/chunks are implemented. Academic-material **file uploads are not implemented**. |
 | Student materials/search | Verified email + active bound profile now precede existing approved/published/institution/enrollment checks. Disabled/unreviewed profile setup blocks these APIs instead of bypassing the device restriction. All live access/retrieval still needs disposable staging testing. No AI/external search runs. |
-| Firestore/Storage rules | Six security-rule scenarios passed in Java 21 GitHub Actions demo-project emulators. Java remains absent locally. The live settings/current rules have not been reviewed and nothing was deployed. |
+| Firestore/Storage rules | Six security-rule scenarios passed in Java 21 GitHub Actions demo-project emulators; the suite now adds validated admin `siteContent` publishing and owner-gated `studentPages` scenarios for the next run. Java remains absent locally. The live settings/current rules have not been reviewed and nothing was deployed. |
 | AI/Gemini, OCR and quotas | Provider key entry and operations remain disabled. No provider calls or quota enforcement. |
 | Slideshow uploads/deletes | Browser-local temporary photo previews only; no cloud upload/delete. |
 | Accounts/payments/publishing | Account adjustments are synthetic local drafts only. No account listing, administrator-set passwords, payment/activation or global publishing endpoint. Students' own Firebase security/profile flows are implemented separately; administrator account adjustment remains disabled. |

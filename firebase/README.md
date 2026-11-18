@@ -8,15 +8,17 @@ Commit that public key with the site. It identifies the app; it is not an admin
 credential and it does not replace Security Rules or the Admin SDK.
 
 `client.mjs` initializes the Firebase Web SDK only after that key is present.
-`auth-client.mjs` implements email/password registration/sign-in, Google popup
-sign-in (redirect when the popup is blocked or the page is inside a frame),
+`auth-client.mjs` implements Google-only popup sign-in (redirect when the popup is blocked or the page is inside a frame),
 sign-out, a Google Authenticator (TOTP) second step when Firebase asks for one,
-verification/reset emails, reauthenticated password changes and verified email
-changes. It supplies Firebase ID-token headers and a persisted installation
+verification emails, reauthenticated security changes for existing linked accounts and verified email
+changes. Email registration/sign-in/reset helpers and the corresponding auth UI are removed. It supplies Firebase ID-token headers and a persisted installation
 marker for protected student same-origin `/api/...` calls. `auth.html` is
 the shared sign-in page; the admin page requests `/api/v1/admin/me` and treats
 the backend response—not a browser claim—as authoritative. It does not grant
-admin claims or enable live edits.
+admin claims. Publishing homepage content (incl. slides) and student-page
+editing write directly to Firestore; the deployed security rules re-verify the
+Google session and admin claim or document ownership on every request, so a manipulated UI
+cannot widen access.
 
 The provided config confirms the project ID, Auth domain, Storage bucket, app
 ID and measurement ID. It does **not** verify the live project's Firestore
@@ -103,16 +105,25 @@ A trusted project owner must separately grant an administrator claim to the
 reviewed Firebase UID. The API verifies Firebase tokens and the claim; a browser
 role or email address is never sufficient.
 
-### Email/password registration and secure changes
+### Google-only enforcement and existing accounts
 
-To use email registration, review **Authentication → Sign-in method →
-Email/Password** in the existing project, enable that provider if approved and
-review its password policy. No provider setting is changed by this repository.
-The Auth page has a **New here? Create a student account** form asking for name,
-email and password/confirmation only. Account creation and initial displayName
-are Firebase SDK operations; the Neon profile is created later after consent.
-A placeholder Web API key produces a setup notice on the sign-in page while local study
-continues to work.
+Both app pages require a Google session. The API and proposed Firestore/Storage
+rules require the token's `firebase.sign_in_provider` to equal `google.com`;
+linking Google to an account does not authorize a session signed in with a
+password or custom token. A rejected API request returns
+`403 GOOGLE_SIGN_IN_REQUIRED`, including for administrators.
+
+In Firebase **Authentication → Sign-in method**, enable Google and disable
+Email/Password and other unused providers. Before rollout, verify that the
+administrator's Google sign-in preserves the intended Firebase UID/admin claim.
+Recover/link a password-only account through a trusted owner-controlled process;
+never delete/recreate an account or grant admin merely because emails match.
+No automatic linking or legacy password sign-in form is provided here.
+
+A browser with a previous Google sign-in may use local study tools offline when
+Firebase is unavailable. Explicit sign-out clears that convenience marker and
+locks the page, without clearing the separate installation marker or study data.
+Protected API access still requires online token verification.
 
 After creating a profile, students can explicitly request email verification.
 An unverified account can edit its basic profile but not access protected student
@@ -123,8 +134,8 @@ complete the verification link and select **Refresh account** to force a fresh
 token and sync the current Firebase Admin email into Neon. A linked Google
 account's own email/password is not changed by those Firebase contact-email
 operations. Google-only accounts have no Firebase password to display or edit.
-Forgot-password reset requests use generic responses and are sent by Firebase,
-not the API. Passwords never enter Neon or profile JSON.
+There is no app password-reset screen; Google-only users manage their password
+with Google. Passwords never enter Neon or profile JSON.
 
 Firebase Web configuration is enough to attempt these client Auth actions; a
 Neon connection and Firebase Admin private key are not required for that SDK
@@ -145,15 +156,20 @@ file.
 ## Local tests and deployment gate
 
 Use Node.js 22.17+ for the complete repository toolchain. From this directory, `npm run test:local` checks that the legacy IndexedDB name,
-version, stores and session counter remain unchanged and that service-worker
-cleanup does not clear browser study data. `npm run test:rules` runs the Firestore
+version, stores and session counter remain unchanged, that service-worker
+cleanup does not clear browser study data, and that the shared Firestore
+content validators (`content-schema.mjs`) accept the bundled homepage content
+while rejecting malformed slides, links, images and student pages. `npm run test:rules` runs the Firestore
 and Storage suite against local emulators using a `demo-` project ID; it covers
-anonymous/student/admin reads and writes, slide upload type/size, public reads,
-and admin-only deletion. It never targets the live Firebase project.
+anonymous/student/admin reads and writes, the validated admin `siteContent`
+publish path (including forged metadata and unsafe slide images/links),
+`studentPages` owner-write/publish-gating/immutable-createdAt rules, slide
+upload type/size, public reads, and admin-only deletion. It never targets the
+live Firebase project.
 
 The root `npm test` and `npm run test:browser` additionally cover page wiring,
 service-worker behavior, preserved legacy study records, API proxy restrictions,
-and simulated registration, Google-prefilled profile creation/editing, browser
+and simulated Google-only access, rejection of saved password sessions, Google-prefilled profile creation/editing, browser
 installation denial, Firebase security, material/search/admin and stale-session
 flows. Browser stubs do not test live Firebase sign-in, real provider linking or
 verification/reset/change-email delivery. The profile SQL tests use in-memory

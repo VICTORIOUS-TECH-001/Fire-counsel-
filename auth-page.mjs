@@ -1,21 +1,19 @@
 import { createRequestScope } from "./request-scope.mjs";
+import { authErrorText } from "./firebase/auth-errors.mjs";
 
+// Google is the only sign-in option. The session's token provider is checked
+// as well, so a saved legacy password session cannot enable continuation.
+// TOTP still appears when Firebase requires an enrolled second factor.
 const $ = selector => document.querySelector(selector);
 const message = $("#auth-message");
-const emailForm = $("#email-signin-form");
 const googleButton = $("#google-signin-button");
 const mfaForm = $("#mfa-form");
-const divider = $("#auth-divider");
 const signedInPanel = $("#signed-in-panel");
 const continueButton = $("#continue-button");
 const signOutButton = $("#sign-out-button");
-const emailButton = $("#email-signin-button");
-const forgotPasswordButton = $("#forgot-password-button");
-const modeToggle = $("#auth-mode-toggle");
 const requestedNext = new URLSearchParams(location.search).get("next") || "study.html#dashboard";
 const allowedNextFiles = new Set(["study.html", "admin.html", "index.html", "ai.html"]);
 let authClient;
-let creatingAccount = false;
 const sessionScope = createRequestScope();
 
 function safeNextUrl(value) {
@@ -30,39 +28,19 @@ function safeNextUrl(value) {
 const nextUrl = safeNextUrl(requestedNext);
 const wantsAdmin = nextUrl.pathname.endsWith("/admin.html");
 let continueUrl = nextUrl;
-modeToggle.hidden = wantsAdmin;
 $("#manage-profile-link").hidden = wantsAdmin;
-if (wantsAdmin) $("#auth-intro").textContent = "Sign in to an existing administrator account. The server must verify the Firebase admin claim; registration, Google sign-in and profile creation never grant administrator permission.";
+if (wantsAdmin) $("#auth-intro").textContent = "Sign in to an existing administrator account with Google. The server must verify the Firebase admin claim; Google sign-in and profile creation never grant administrator permission.";
 
 function setMessage(text, kind = "") {
   message.textContent = text;
   message.dataset.kind = kind;
 }
 
-function authErrorText(error) {
-  if (error?.code === "auth/operation-not-allowed") return "That sign-in provider is not enabled in Firebase Authentication yet. For Google, turn it on under Authentication → Sign-in method and choose a support email.";
-  if (error?.code === "auth/unauthorized-domain") return "Add this website's exact hostname (no https://, port, or path) under Firebase Authentication → Settings → Authorized domains.";
-  if (error?.code === "auth/app-not-authorized" || /referer.*not.*allow/i.test(error?.message || "")) return "This site is blocked by the Firebase Web API key restrictions. In Google Cloud → APIs & Services → Credentials, allow this URL on the browser key and allow the Identity Toolkit API.";
-  if (error?.code === "auth/invalid-api-key" || /api-key-not-valid/i.test(`${error?.code || ""} ${error?.message || ""}`)) return "Firebase rejected the Web API key. Paste the apiKey from Project settings → Your apps → Config into firebase/firebase-config.mjs.";
-  if (error?.code === "auth/account-exists-with-different-credential") return "That email already has a FIRE COUNSEL account with a different sign-in method. Sign in the original way, or use the same Google account that created it. Automatic linking is not enabled.";
-  if (error?.code === "auth/multi-factor-auth-required") return "This account needs the 6-digit code from Google Authenticator.";
-  if (["auth/invalid-verification-code", "auth/code-expired"].includes(error?.code)) return "That authenticator code was not accepted. Wait for the next code and try again.";
-  if (["auth/popup-blocked", "auth/operation-not-supported-in-this-environment"].includes(error?.code)) return "The sign-in popup was blocked. Allow popups for this site, or retry. A framed preview uses Google redirect instead.";
-  if (["auth/popup-closed-by-user", "auth/cancelled-popup-request"].includes(error?.code)) return "Google sign-in was closed before it finished. If Google said the app is in testing, add this Google account as a test user on the OAuth consent screen.";
-  if (["auth/invalid-credential", "auth/wrong-password", "auth/user-not-found"].includes(error?.code)) return "Email or password was not accepted.";
-  if (error?.code === "auth/email-already-in-use") return "An account could not be created with those details. Try signing in or requesting a password reset instead.";
-  if (error?.code === "auth/weak-password" || error?.code === "auth/password-does-not-meet-requirements") return "Choose a stronger password that meets this Firebase project's password policy.";
-  if (error?.code === "auth/too-many-requests") return "Too many attempts. Wait a little before trying again.";
-  if (error?.code === "auth/network-request-failed") return "Firebase could not be reached. Check the connection and try again.";
-  return error?.message || "Sign-in could not be completed. Try again.";
-}
-
 function showMfa(info) {
-  emailForm.hidden = true;
-  divider.hidden = true;
   googleButton.hidden = true;
   signedInPanel.hidden = true;
   mfaForm.hidden = false;
+  $("#mfa-submit").disabled = false;
   $("#mfa-hint").textContent = `Enter the current 6-digit code from ${info.displayName}. Firebase Authentication with Identity Platform must have TOTP enabled, this email must be verified, and the account must already be enrolled. Codes change about every 30 seconds.`;
   setMessage(`Google accepted the first step. Finish with ${info.displayName}.`, "");
   $("#mfa-code").focus();
@@ -138,7 +116,7 @@ async function verifyServerAccess(user) {
       return { label: "Set up my student profile", url: new URL("./study.html#profile", location.href) };
     }
     if (response.status === 401 || response.status === 403) {
-      setMessage(body.error || "The server could not authorize this account on this browser installation. Local study is still available separately.", "error");
+      setMessage(body.error || "The server could not authorize this account on this browser installation.", "error");
       return null;
     }
     setMessage(`Firebase sign-in succeeded for ${userLabel}; student profiles are not ready on this server. Your local study space is still available.`);
@@ -151,8 +129,6 @@ async function verifyServerAccess(user) {
 
 function showSignedIn(user) {
   const isCurrent = sessionScope.capture();
-  emailForm.hidden = true;
-  divider.hidden = true;
   googleButton.hidden = true;
   hideMfa();
   signedInPanel.hidden = false;
@@ -168,26 +144,9 @@ function showSignedIn(user) {
   }).catch(() => {});
 }
 
-function setAccountMode(create) {
-  creatingAccount = create && !wantsAdmin;
-  for (const id of ["signup-name-row", "signup-confirm-row", "signup-hint"]) $(`#${id}`).hidden = !creatingAccount;
-  $("#auth-name").disabled = !creatingAccount;
-  $("#auth-password-confirm").disabled = !creatingAccount;
-  $("#auth-password").value = "";
-  $("#auth-password-confirm").value = "";
-  $("#auth-password").autocomplete = creatingAccount ? "new-password" : "current-password";
-  $("#auth-password").minLength = creatingAccount ? 8 : 6;
-  $("#auth-title").textContent = creatingAccount ? "Your account starts here." : "Welcome back.";
-  emailButton.textContent = creatingAccount ? "Create my Firebase account" : "Sign in with email";
-  modeToggle.textContent = creatingAccount ? "Already have an account? Sign in" : "New here? Create a student account";
-  forgotPasswordButton.hidden = creatingAccount;
-}
-
 try {
   authClient = await import("./firebase/auth-client.mjs");
 } catch (error) {
-  emailForm.hidden = true;
-  divider.hidden = true;
   googleButton.hidden = true;
   mfaForm.hidden = true;
   setMessage(error?.message || "Firebase client configuration could not load. Put the Web API key in firebase/firebase-config.mjs, then reload.", "error");
@@ -199,73 +158,47 @@ if (authClient) {
   } catch (error) {
     handleAuthError(error);
   }
-  authClient.onAuthStateChanged(authClient.firebaseAuth, user => {
+  authClient.onIdTokenChanged(authClient.firebaseAuth, async user => {
     sessionScope.invalidate();
-    googleButton.disabled = false;
+    const isCurrent = sessionScope.capture();
     continueButton.hidden = true;
     continueButton.disabled = true;
-    $("#auth-password").value = "";
-    $("#auth-password-confirm").value = "";
-    if (user) showSignedIn(user);
-    else if (mfaForm.hidden) {
-      emailForm.hidden = false;
-      divider.hidden = false;
-      googleButton.hidden = false;
-      signedInPanel.hidden = true;
-      $("#signed-in-email").textContent = "";
-      $("#auth-name").value = "";
-      setMessage("Sign in with Google or email, or create a student account.");
+    signedInPanel.hidden = true;
+    $("#signed-in-email").textContent = "";
+    if (!user) {
+      googleButton.disabled = false;
+      if (mfaForm.hidden) {
+        googleButton.hidden = false;
+        setMessage("Sign in with your Google account to open FIRE COUNSEL.");
+      }
+      return;
     }
-  }, error => handleAuthError(error));
+    googleButton.hidden = true;
+    setMessage("Checking your Google sign-in…");
+    try {
+      const googleSession = await authClient.hasGoogleSession(user);
+      if (!isCurrent()) return;
+      if (googleSession) showSignedIn(user);
+      else {
+        hideMfa();
+        googleButton.hidden = false;
+        setMessage("This saved session did not sign in with Google. Continue with Google to open FIRE COUNSEL.", "error");
+      }
+    } catch (error) {
+      if (!isCurrent()) return;
+      googleButton.hidden = false;
+      handleAuthError(error);
+    } finally {
+      if (isCurrent()) googleButton.disabled = false;
+    }
+  }, error => {
+    sessionScope.invalidate();
+    signedInPanel.hidden = true;
+    continueButton.hidden = true;
+    continueButton.disabled = true;
+    handleAuthError(error);
+  });
 }
-
-modeToggle.addEventListener("click", () => setAccountMode(!creatingAccount));
-emailForm.addEventListener("submit", async event => {
-  event.preventDefault();
-  if (!authClient || emailButton.disabled) return;
-  const email = $("#auth-email").value;
-  const password = $("#auth-password").value;
-  if (creatingAccount && password !== $("#auth-password-confirm").value) {
-    setMessage("Your passwords do not match.", "error");
-    return;
-  }
-  emailButton.disabled = true;
-  modeToggle.disabled = true;
-  googleButton.disabled = true;
-  setMessage(creatingAccount ? "Creating your account securely with Firebase…" : "Signing in…");
-  try {
-    if (creatingAccount) await authClient.registerWithEmail(email, password, $("#auth-name").value);
-    else await authClient.signInWithEmail(email, password);
-  } catch (error) { handleAuthError(error); }
-  finally {
-    $("#auth-password").value = "";
-    $("#auth-password-confirm").value = "";
-    emailButton.disabled = false;
-    modeToggle.disabled = false;
-    googleButton.disabled = false;
-  }
-});
-
-forgotPasswordButton.addEventListener("click", async () => {
-  if (!authClient) return;
-  const email = $("#auth-email").value.trim();
-  if (!email) {
-    setMessage("Enter your email address first, then request a reset link.", "error");
-    $("#auth-email").focus();
-    return;
-  }
-  const isCurrent = sessionScope.capture();
-  forgotPasswordButton.disabled = true;
-  setMessage("Requesting a password reset email…");
-  try {
-    await authClient.requestPasswordReset(email);
-    if (isCurrent()) setMessage("If a Firebase account exists for that email, Firebase will send a password-reset link.", "ok");
-  } catch (error) {
-    if (!isCurrent()) return;
-    if (error?.code === "auth/user-not-found") setMessage("If a Firebase account exists for that email, Firebase will send a password-reset link.", "ok");
-    else setMessage("The password-reset request could not be completed. Check Firebase Auth setup and try again.", "error");
-  } finally { forgotPasswordButton.disabled = false; }
-});
 
 googleButton.addEventListener("click", async () => {
   if (!authClient || googleButton.disabled) return;

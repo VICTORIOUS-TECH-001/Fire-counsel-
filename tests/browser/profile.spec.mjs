@@ -44,29 +44,6 @@ async function finish(page, response) {
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
-test("email registration needs no course/payment fields and sends the password only to the Firebase stub", async ({ page }) => {
-  await stubAuth(page);
-  const api = await profileApi(page, { initial: null });
-  await page.goto("/auth.html");
-  await page.locator("#auth-mode-toggle").click();
-  await expect(page.locator("#signup-name-row")).toBeVisible();
-  await page.locator("#auth-name").fill("Registered Student");
-  await page.locator("#auth-email").fill("registered@example.invalid");
-  await page.locator("#auth-password").fill("synthetic-new-password");
-  await page.locator("#auth-password-confirm").fill("synthetic-wrong-confirmation");
-  await page.locator("#email-signin-button").click();
-  await expect(page.locator("#auth-message")).toContainText("do not match");
-  expect(await page.evaluate(() => window.__auth.registrations)).toEqual([]);
-  await page.locator("#auth-password-confirm").fill("synthetic-new-password");
-  await page.locator("#email-signin-button").click();
-  await expect(page.locator("#continue-button")).toHaveText("Set up my student profile");
-  expect(await page.evaluate(() => window.__auth.registrations)).toEqual([{ email: "registered@example.invalid", name: "Registered Student" }]);
-  await expect(page.locator("#auth-password")).toHaveValue("");
-  await expect(page.locator("#auth-password-confirm")).toHaveValue("");
-  expect(api.requests.every(request => request.method === "GET")).toBe(true);
-  expect(api.saved).toBeNull();
-});
-
 test("Google details prefill a new profile and creation requires explicit installation acceptance", async ({ page }) => {
   await stubAuth(page, { user: google });
   const api = await profileApi(page, { initial: null, identity: google });
@@ -179,7 +156,7 @@ test("a binding denial on the auth screen cannot unlock student continuation", a
   await page.goto("/auth.html");
   await expect(page.locator("#auth-message")).toContainText("another browser installation");
   await expect(page.locator("#continue-button")).toBeHidden();
-  await expect(page.locator(".local-link")).toBeVisible();
+  await expect(page.locator("#google-signin-button")).toBeHidden();
 });
 
 test("a delayed profile load cannot restore a signed-out user's details", async ({ page }) => {
@@ -192,7 +169,7 @@ test("a delayed profile load cannot restore a signed-out user's details", async 
   await page.goto("/study.html#profile");
   await requestStarted;
   await page.locator("#profile-signout").click();
-  await expect(page.locator("#profile-signin")).toBeVisible();
+  await expect(page.locator("#auth-gate-signin")).toBeVisible();
   const returned = page.waitForResponse("**/api/v1/profile");
   release(); await finish(page, await returned);
   await expect(page.locator("#student-profile-form")).toBeHidden();
@@ -216,7 +193,7 @@ test("a delayed profile save cannot replace the next account's profile", async (
   await page.locator("#profile-save").click();
   await requestStarted;
   switched = true;
-  await page.evaluate(() => window.__auth.setUser({ uid: "next-user", email: "next@example.invalid", displayName: "Next Student", providerData: [{ providerId: "password" }] }));
+  await page.evaluate(() => window.__auth.setUser({ uid: "next-user", email: "next@example.invalid", displayName: "Next Student", providerData: [{ providerId: "google.com" }], signInProvider: "google.com" }));
   await expect(page.locator("#student-profile-name")).toHaveText("Next Student");
   const returned = page.waitForResponse(response => response.url().endsWith("/api/v1/profile") && response.request().method() === "PATCH");
   release(); await finish(page, await returned);
@@ -256,7 +233,7 @@ test("profile loading, creation, security and signed-out views fit small screens
   await expect(page.locator("#student-profile-title")).toHaveText(identity.displayName);
   await checkWidths();
   await page.locator("#profile-signout").click();
-  await expect(page.locator("#profile-signin")).toBeVisible();
+  await expect(page.locator("#auth-gate-signin")).toBeVisible();
   await checkWidths();
 });
 
@@ -275,14 +252,53 @@ test("profile editing and sign-out preserve local recall records, session count 
   await page.locator("#profile-save").click();
   await expect(page.locator("#student-profile-status")).toContainText("has been saved");
   await page.locator("#profile-signout").click();
-  await expect(page.locator("#profile-signin")).toBeVisible();
+  await expect(page.locator("#auth-gate-signin")).toBeVisible();
   await page.reload();
+  // The stubbed session is restored on reload (like Firebase persistence), so
+  // the gate unlocks — and the local study data must have survived.
+  await expect(page.locator("#auth-gate")).toBeHidden();
   await page.locator("#student-nav [data-page=memory]").click();
   await expect(page.locator("#recall-area")).toContainText("Preserved local question");
   await expect(page.locator("#stat-sessions")).toHaveText("7");
   expect(await page.evaluate(key => localStorage.getItem(key), installationKey)).toBe(id);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/study.html#profile");
+  // Use the mobile navigation, not a second native fragment navigation while
+  // Chromium is resizing/restoring the preceding page's scroll position.
+  await page.locator("#menu-toggle").click();
+  await page.locator("#student-nav [data-page=profile]").click();
+  await expect(page.locator("#sidebar")).not.toHaveClass(/\bopen\b/);
   await expect(page.locator("#profile-page")).toBeVisible();
   await expectNoHorizontalOverflow(page);
+});
+
+test("workspace stays locked for a signed-out visitor and unlocks on sign-in", async ({ page }) => {
+  await stubAuth(page);
+  await page.goto("/study.html#dashboard");
+  // No preview: the shell is hidden behind the lock screen.
+  await expect(page.locator("#auth-gate")).toBeVisible();
+  await expect(page.locator("#auth-gate-signin")).toHaveAttribute("href", "./auth.html?next=study.html");
+  await expect(page.locator("#main-content")).toBeHidden();
+  await expect(page.locator("#sidebar")).toBeHidden();
+  // A late sign-in (e.g. redirect back from the auth page) unlocks it live.
+  await page.evaluate(u => window.__auth.setUser(u), student);
+  await expect(page.locator("#auth-gate")).toBeHidden();
+  await expect(page.locator("#main-content")).toBeVisible();
+  // Signing out locks it again and clears the offline-return marker.
+  await page.evaluate(() => window.__auth.setUser(null));
+  await expect(page.locator("#auth-gate")).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem("fire-counsel-auth-gate-v2"))).toBe(null);
+});
+
+test("workspace opens offline only for a browser that signed in before", async ({ page }) => {
+  // Firebase cannot load (offline/blocked): a fresh browser stays locked.
+  await page.route("**/firebase/auth-client.mjs", route => route.abort());
+  await page.goto("/study.html#dashboard");
+  await expect(page.locator("#auth-gate")).toBeVisible();
+  await expect(page.locator("#main-content")).toBeHidden();
+  // Mark a previous sign-in (what the gate stores after a real sign-in)…
+  await page.evaluate(() => localStorage.setItem("fire-counsel-auth-gate-v2", "synthetic-student"));
+  await page.reload();
+  // …and the local study tools open without a network.
+  await expect(page.locator("#auth-gate")).toBeHidden();
+  await expect(page.locator("#main-content")).toBeVisible();
 });

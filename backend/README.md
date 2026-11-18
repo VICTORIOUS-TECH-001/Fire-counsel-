@@ -44,7 +44,7 @@ Student and administrator sign-in are Firebase Auth client operations. The API v
 ## Security and staging boundaries
 
 - Firebase Admin credentials must match `FIREBASE_PROJECT_ID`; the server fails closed when either is missing or mismatched.
-- Every protected request checks token revocation. Every admin route must use `verifyFirebaseToken` followed by `requireAdmin`.
+- Every protected request checks token revocation and requires the verified session provider `firebase.sign_in_provider == "google.com"`; other providers receive `403 GOOGLE_SIGN_IN_REQUIRED`, even for linked Google identities and administrators. Every admin route must use `verifyFirebaseToken` followed by `requireAdmin`.
 - Firebase Admin SDK calls bypass Firestore and Storage Security Rules, so server authorization is mandatory on every server write route.
 - CORS allows only exact configured origins and the installation header. Do not use `*` for authenticated routes.
 - The installation lock is enforced by profile, material and research routes; it is not physical-device identification, an IP lock, or a restriction on Firebase authentication itself. A changed IP is allowed; a different/lost marker is denied without automatic re-binding. No self-service transfer/recovery exists.

@@ -8,17 +8,19 @@ export const DEFAULT_WEBSITE_ROOT = path.resolve(path.dirname(fileURLToPath(impo
 // Same explicit allowlist as tools/dev_server.py. Backend code, .env files, Git
 // metadata, package files, tests and rules are never served.
 export const PUBLIC_FILES = new Set([
-  "index.html", "study.html", "admin.html", "auth.html", "ai.html",
+  "index.html", "study.html", "admin.html", "auth.html", "ai.html", "student.html",
   "site.css", "styles.css", "admin.css", "auth.css", "integrations.css",
   "site.js", "app.js", "admin.js", "sw.js", "manifest.webmanifest",
   "auth-page.mjs", "admin-auth.mjs", "admin-database.mjs",
   "study-materials.mjs", "research-search.mjs", "request-scope.mjs",
-  "student-profile.mjs", "installation.mjs",
+  "student-profile.mjs", "student-page.mjs", "student-page-view.mjs", "installation.mjs",
+  "auth-gate.mjs",
   "ai-studio.css", "ai-page.css", "ai-studio.mjs", "ai-markdown.mjs", "admin-ai.mjs", "admin-courses.mjs", "presence.mjs",
   "admin-site.mjs", "admin-uploads.mjs", "pdf-reader.mjs",
   "preloader.css", "preloader.js", "workspace.css", "workspace.mjs", "workspace-config.mjs", "admin-workspace.mjs",
   "data/site-content.json",
-  "firebase/client.mjs", "firebase/auth-client.mjs",
+  "firebase/client.mjs", "firebase/auth-client.mjs", "firebase/auth-errors.mjs",
+  "firebase/firestore-client.mjs", "firebase/content-schema.mjs",
   "firebase/firebase-config.mjs", "firebase/firebase-config.example.mjs"
 ]);
 // Friendly sign-in addresses (mirrors the Netlify _redirects file).

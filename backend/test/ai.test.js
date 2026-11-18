@@ -16,6 +16,7 @@ import { createPresenceRouter } from "../src/routes/presence.js";
 import { buildDocx, buildPdf, prepareMarkdown, documentFileName } from "../src/services/ai/documents.js";
 
 const MIGRATION = readFileSync(new URL("../migrations/002_ai_studio.sql", import.meta.url), "utf8");
+const MIGRATION_PREMIUM = readFileSync(new URL("../migrations/005_premium.sql", import.meta.url), "utf8");
 const COURSE_A = "11111111-1111-4111-8111-111111111111";
 const COURSE_B = "22222222-2222-4222-8222-222222222222";
 let db;
@@ -37,6 +38,8 @@ before(async () => {
   `);
   await db.exec(MIGRATION);
   await db.exec(MIGRATION); // idempotent re-run
+  await db.exec(MIGRATION_PREMIUM);
+  await db.exec(MIGRATION_PREMIUM); // idempotent re-run
   let tail = Promise.resolve();
   async function acquire() {
     let release;
@@ -202,6 +205,7 @@ test("uploads accept photos, PDFs and text only, with size limits", () => {
 });
 
 test("daily allowance: 20 chats and 3 case analyses by default, failures not counted, admin overrides and pause", async () => {
+  await pool.query("INSERT INTO ai_user_limits (firebase_uid, premium) VALUES ('user-a', true)");
   for (let i = 0; i < 3; i += 1) await finishUsage(pool, await reserveUsage(pool, "user-a", "case"), "completed");
   await assert.rejects(reserveUsage(pool, "user-a", "case"), { code: "LIMIT_REACHED", status: 429 });
   const failed = await reserveUsage(pool, "user-a", "chat");
@@ -210,7 +214,7 @@ test("daily allowance: 20 chats and 3 case analyses by default, failures not cou
   assert.equal(allowance.features.case.remaining, 0);
   assert.equal(allowance.features.chat.limit, 20);
   assert.equal(allowance.features.chat.used, 0);
-  await pool.query("INSERT INTO ai_user_limits (firebase_uid, case_daily) VALUES ('user-a', 5)");
+  await pool.query("UPDATE ai_user_limits SET case_daily = 5 WHERE firebase_uid = 'user-a'");
   await reserveUsage(pool, "user-a", "case");
   allowance = await getAllowance(pool, "user-a");
   assert.equal(allowance.features.case.limit, 5);
@@ -220,8 +224,28 @@ test("daily allowance: 20 chats and 3 case analyses by default, failures not cou
   assert.ok(await reserveUsage(pool, "admin", "case", { isAdmin: true }));
 });
 
+test("paywall: AI features need an admin-granted premium plan", async () => {
+  // Free plan (no row, or premium = false): every feature is refused.
+  await assert.rejects(reserveUsage(pool, "user-a", "chat"), { code: "PREMIUM_REQUIRED", status: 403 });
+  assert.equal((await getAllowance(pool, "user-a")).premium, false);
+  await pool.query("INSERT INTO ai_user_limits (firebase_uid, premium) VALUES ('user-a', false)");
+  await assert.rejects(reserveUsage(pool, "user-a", "case"), { code: "PREMIUM_REQUIRED" });
+  // The usage table stays clean: a refused request is never counted.
+  assert.equal((await pool.query("SELECT count(*)::int AS n FROM ai_usage WHERE firebase_uid = 'user-a'")).rows[0].n, 0);
+  // Granting premium opens the normal daily allowance; revoking re-locks.
+  await pool.query("UPDATE ai_user_limits SET premium = true WHERE firebase_uid = 'user-a'");
+  assert.ok(await reserveUsage(pool, "user-a", "chat"));
+  assert.equal((await getAllowance(pool, "user-a")).premium, true);
+  await pool.query("UPDATE ai_user_limits SET premium = false WHERE firebase_uid = 'user-a'");
+  await assert.rejects(reserveUsage(pool, "user-a", "chat"), { code: "PREMIUM_REQUIRED" });
+  // Admins are never paywalled.
+  assert.ok(await reserveUsage(pool, "admin", "chat", { isAdmin: true }));
+  assert.equal((await getAllowance(pool, "admin", { isAdmin: true })).premium, true);
+});
+
 test("parallel requests cannot go over the limit", async () => {
   await pool.query("INSERT INTO ai_settings (key, value) VALUES ('default_limits', '{\"chat\":2,\"case\":3,\"notes\":3,\"questions\":5}')");
+  await pool.query("INSERT INTO ai_user_limits (firebase_uid, premium) VALUES ('user-b', true)");
   const results = await Promise.allSettled(Array.from({ length: 6 }, () => reserveUsage(pool, "user-b", "chat")));
   assert.equal(results.filter(r => r.status === "fulfilled").length, 2);
   assert.ok(results.filter(r => r.status === "rejected").every(r => r.reason.code === "LIMIT_REACHED"));
@@ -330,6 +354,7 @@ async function waitForMessage(request, conversationId) {
 
 test("students send AI messages as background jobs, see results, and cannot read others' conversations", async t => {
   const runs = [];
+  await pool.query("INSERT INTO ai_user_limits (firebase_uid, premium) VALUES ('user-a', true), ('user-b', true)");
   const studioFactory = () => ({ run: async (mode, input) => { runs.push({ mode, input }); return { content: `Answer to ${input.text}`, sources: [{ url: "https://a.example", status: "verified" }], provider: "gemini", model: "m", meta: {} }; }, listCourses: async () => [] });
   const request = await serve(t, app => app.use("/api/v1/ai", createAiRouter({ poolProvider: () => pool, verifyToken: stubVerify, env: { GEMINI_API_KEY: "k" }, studioFactory, configured: () => true })));
 
@@ -370,6 +395,7 @@ test("students send AI messages as background jobs, see results, and cannot read
 
 test("AI routes enforce verified email, limits, and do not count failed jobs", async t => {
   let fail = true;
+  await pool.query("INSERT INTO ai_user_limits (firebase_uid, premium) VALUES ('user-a', true)");
   const studioFactory = () => ({ run: async () => { if (fail) throw new Error("boom"); return { content: "ok", sources: [], provider: "gemini", model: "m", meta: {} }; } });
   const request = await serve(t, app => app.use("/api/v1/ai", createAiRouter({ poolProvider: () => pool, verifyToken: stubVerify, env: { GEMINI_API_KEY: "k" }, studioFactory, configured: () => true })));
   assert.equal((await request("/api/v1/ai/messages", { token: "unverified", method: "POST", body: { mode: "chat", text: "hi" } })).status, 403);
@@ -391,6 +417,7 @@ test("AI routes enforce verified email, limits, and do not count failed jobs", a
 });
 
 test("AI routes explain when the server has no AI key", async t => {
+  await pool.query("INSERT INTO ai_user_limits (firebase_uid, premium) VALUES ('user-a', true)");
   const request = await serve(t, app => app.use("/api/v1/ai", createAiRouter({ poolProvider: () => pool, verifyToken: stubVerify, env: {}, configured: () => true })));
   const response = await request("/api/v1/ai/messages", { method: "POST", body: { mode: "chat", text: "hi" } });
   assert.equal(response.status, 503);
@@ -429,20 +456,57 @@ test("admin AI studio: admin only, private prompts, default limits, per-user lim
   assert.deepEqual((await limits.json()).data, { chat: 30, case: 4, notes: 3, questions: 5 });
   assert.equal((await request("/api/v1/admin/ai/limits", { token: "admin", method: "PUT", body: { chat: -1 } })).status, 400);
 
-  assert.equal((await request("/api/v1/admin/ai/users/user-b/limits", { token: "admin", method: "PUT", body: { case: 10, paused: false, note: "Exam week" } })).status, 200);
+  assert.equal((await request("/api/v1/admin/ai/users/user-b/limits", { token: "admin", method: "PUT", body: { case: 10, paused: false, premium: true, note: "Exam week" } })).status, 200);
   assert.equal((await request("/api/v1/admin/ai/users/nobody/limits", { token: "admin", method: "PUT", body: { case: 1 } })).status, 404);
   assert.equal((await getAllowance(pool, "user-b")).features.case.limit, 10);
+  assert.equal((await getAllowance(pool, "user-b")).premium, true);
   assert.equal((await getAllowance(pool, "user-a")).features.chat.limit, 30);
+  assert.equal((await getAllowance(pool, "user-a")).premium, false);
 
   assert.equal((await request("/api/v1/presence", { method: "POST", body: { page: "study" } })).status, 204);
+  await pool.query(`INSERT INTO ai_usage (firebase_uid, feature, status, created_at) VALUES
+    ('user-a', 'chat', 'completed', NOW()), ('user-a', 'chat', 'completed', NOW()),
+    ('user-a', 'case', 'started', NOW()), ('user-a', 'notes', 'failed', NOW()),
+    ('user-a', 'questions', 'completed', NOW() - INTERVAL '2 days'),
+    ('user-b', 'notes', 'completed', NOW())`);
+  assert.equal((await request("/api/v1/admin/ai/users")).status, 403);
   const users = (await (await request("/api/v1/admin/ai/users", { token: "admin" })).json()).data;
   assert.equal(users.total, 2);
   assert.equal(users.online, 1);
   assert.deepEqual(users.users.map(u => [u.uid, u.online]), [["user-a", true], ["user-b", false]]);
   assert.equal(users.users[1].limits.case, 10);
   assert.equal(users.users[1].note, "Exam week");
+  assert.equal(users.users[1].premium, true);
+  assert.equal(users.users[0].premium, false);
+  assert.deepEqual(users.users[0].usage_today, { chat: 2, case: 1 });
+  assert.deepEqual(users.users[1].usage_today, { notes: 1 });
+  assert.deepEqual(users.users[0].providers, ["google.com"]);
   const search = (await (await request("/api/v1/admin/ai/users?q=student%20a", { token: "admin" })).json()).data;
   assert.deepEqual(search.users.map(u => u.uid), ["user-a"]);
+});
+
+test("AI routes refuse free-plan accounts with PREMIUM_REQUIRED until an admin grants premium", async t => {
+  const studioFactory = () => ({ run: async () => ({ content: "ok", sources: [], provider: "gemini", model: "m", meta: {} }) });
+  const authProvider = () => ({
+    getUser: async (uid) => { if (uid !== "user-a") { const e = new Error("missing"); e.code = "auth/user-not-found"; throw e; } return { uid }; },
+    listUsers: async () => ({ users: [] })
+  });
+  const request = await serve(t, app => {
+    app.use("/api/v1/ai", createAiRouter({ poolProvider: () => pool, verifyToken: stubVerify, env: { GEMINI_API_KEY: "k" }, studioFactory, configured: () => true }));
+    app.use("/api/v1/admin/ai", createAdminAiRouter({ poolProvider: () => pool, verifyToken: stubVerify, authProvider, env: { GEMINI_API_KEY: "k" }, configured: () => true }));
+  });
+  // Free plan: the paywall refuses before any AI spend, and /me says why.
+  const me = await (await request("/api/v1/ai/me")).json();
+  assert.equal(me.data.allowance.premium, false);
+  const refused = await request("/api/v1/ai/messages", { method: "POST", body: { mode: "chat", text: "hi" } });
+  assert.equal(refused.status, 403);
+  assert.equal((await refused.json()).code, "PREMIUM_REQUIRED");
+  // Only an admin can grant premium; the same request then passes the paywall.
+  assert.equal((await request("/api/v1/admin/ai/users/user-a/limits", { method: "PUT", body: { premium: true } })).status, 403);
+  assert.equal((await request("/api/v1/admin/ai/users/user-a/limits", { token: "admin", method: "PUT", body: { premium: true } })).status, 200);
+  assert.equal((await (await request("/api/v1/ai/me")).json()).data.allowance.premium, true);
+  const accepted = await request("/api/v1/ai/messages", { method: "POST", body: { mode: "chat", text: "hi" } });
+  assert.equal(accepted.status, 202);
 });
 
 // ---------------- documents ----------------
@@ -521,6 +585,7 @@ test("chat tasks shape the answer, and the studio reports progress stages", asyn
 
 test("AI jobs show live progress, stop at the deadline without counting, and ignore late answers", async t => {
   let release;
+  await pool.query("INSERT INTO ai_user_limits (firebase_uid, premium) VALUES ('user-a', true)");
   const gate = new Promise((resolve) => { release = resolve; });
   const seenOptions = [];
   const studioFactory = () => ({ run: async (mode, input) => {
@@ -726,6 +791,7 @@ test("link checks keep their order, run a few at a time and share recent results
 
 test("while the AI is writing, the partial answer is saved so the page can show it", async t => {
   let release;
+  await pool.query("INSERT INTO ai_user_limits (firebase_uid, premium) VALUES ('user-a', true)");
   const gate = new Promise((resolve) => { release = resolve; });
   const studioFactory = () => ({ run: async (mode, input) => {
     input.onPartial("The rule in Carlill");

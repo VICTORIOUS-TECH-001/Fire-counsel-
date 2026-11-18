@@ -1,8 +1,10 @@
 # FIRE COUNSEL — legal learning PWA
 
-“Ignite your legal intelligence.” A local-first law-study workspace with a public homepage, student tools, Firebase registration/sign-in, editable student profiles, and a server-authorized Neon content editor.
+“Ignite your legal intelligence.” A local-first law-study workspace with a public homepage, student tools, Google-only Firebase sign-in, editable student profiles, and a server-authorized Neon content editor.
 
 **Local tests are not live-project approval.** Firebase and Neon are not configured in this checkout. Read [STATUS.md](STATUS.md) for the latest test results, integration limits, and remaining release gates. Render Free remains **disposable staging only**, never a place for real student data, prompts or payments.
+
+**Owner setup:** [Google-only access, admin usage and the exact Neon secret/migration steps](DEPLOYMENT.md).
 
 ## Run the app safely
 
@@ -31,8 +33,9 @@ The website listens on `0.0.0.0:8080`; the API listens on `0.0.0.0:4000`. On you
 | Page | Path | Purpose |
 | --- | --- | --- |
 | Public homepage | `/` | JSON-driven content, slideshow, articles, legal-links directory |
-| Student workspace | `/study.html` | Personal local files, flashcards, subjects and focus timer |
-| Account access | `/auth.html` | Firebase email/password registration, Google sign-in and reset emails |
+| Student workspace | `/study.html` | Google sign-in required; personal local files, flashcards, subjects and focus timer |
+| AI studio | `/ai.html` | Google sign-in required; AI use additionally requires admin-granted Premium (admins bypass the paywall) |
+| Account access | `/auth.html` | Google-only sign-in; no email/password form or unsigned continuation |
 | My profile | `/study.html#profile` | Self-service name edits, Firebase email/password security and installation status; no courses/payments required |
 | Admin studio | `/admin.html` | Website draft → preview → publish, document uploads (PDF/Word/photos), Database data, AI settings — all server-protected |
 | Database readiness | `/api/health` | `503 / not_configured` is expected without Neon |
@@ -71,10 +74,10 @@ The Firebase development toolchain still has known moderate advisories and inher
 ## What is implemented
 
 - `index.html`, `site.js`, `site.css`, `data/site-content.json`: responsive public site, locally stored photographs, accessible slideshow controls, articles and approved-link placeholders.
-- `study.html`, `app.js`: IndexedDB-backed personal documents, recall cards, subject choices and a localStorage focus-session counter. These work without signing in.
-- `auth.html`, `firebase/auth-client.mjs`: Firebase email/password registration, Google sign-in, sign-out, verification/reset emails and reauthenticated email/password changes. Google supplies available name/email/photo, **not its password**. No account listing, administrator-set-password or admin-claim-grant endpoint exists.
+- `study.html`, `app.js`: IndexedDB-backed personal documents, recall cards, subject choices and a localStorage focus-session counter. The page requires Google sign-in. Returning browsers retain local tools offline; fresh browsers must sign in online once.
+- `auth.html`, `auth-gate.mjs`, `firebase/auth-client.mjs`: Google-only sign-in and sign-out, with a shared lock screen on the workspace and AI studio. The browser, API and proposed Firebase rules check the session token provider, not merely a linked Google identity. Google supplies available name/email/photo, **not its password**. Firebase account-security helpers remain for existing linked accounts; email registration/sign-in/reset helpers have been removed.
 - `student-profile.mjs`, `/api/v1/profile`: students can create and edit their own Neon profile independently of courses, membership, plans, payments or admin approval. First creation requires explicit browser-installation policy acceptance and a recent Firebase sign-in. UID/email/status/IP/roles cannot be supplied or changed through profile JSON. Live enablement is gated off until private schema review and staging migration. See [the profile setup/policy guide](backend/STUDENT_PROFILES.md).
-- `admin.html`, `admin-auth.mjs`, `admin-database.mjs`: server-verified administrator status and allowlisted Neon academic/legal content forms. The HTML itself is not an authorization boundary; every protected API route independently verifies the token and `admin: true` claim.
+- `admin.html`, `admin-auth.mjs`, `admin-database.mjs`, `admin-ai.mjs`: server-verified administrator status, allowlisted Neon content forms, and a Firebase account list with per-student AI usage, presence, Premium grants and limits. The HTML itself is not an authorization boundary; every protected API route independently verifies the token and `admin: true` claim.
 - `study-materials.mjs`, `research-search.mjs`: authenticated approved/published material text and verified-source retrieval. Verified email, an active profile, its registered browser installation, institution/private/platform scopes and course eligibility are enforced by the backend. Profile creation grants no content entitlement. This is **database search, not Gemini, an AI answer or external web search**.
 - Text material versions and searchable plain-text chunks are stored transactionally by the API. **Academic-material file uploads are not implemented.** Student-selected personal files are saved locally, not uploaded.
 - `sw.js`: versioned, explicit public/study app-shell caching; network-first page/content refresh and offline study reloads. API replies, Authorization requests, admin pages, runtime Firebase config and arbitrary responses are not cached.
@@ -82,27 +85,27 @@ The Firebase development toolchain still has known moderate advisories and inher
 
 ## Private setup and release boundaries
 
-No live credentials are needed for local study or tests. Before any live integration, review the existing Firebase project and Neon schema; use disposable staging fixtures, never real student work.
+No live credentials are needed for automated tests; first-time app access requires configured Google sign-in. Before any live integration, review the existing Firebase project and Neon schema; use disposable staging fixtures, never real student work.
 
 1. Copy `backend/.env.example` to the ignored `backend/.env`. Supply `DATABASE_URL`, `FIREBASE_PROJECT_ID`, and matching `FIREBASE_SERVICE_ACCOUNT_JSON` privately. Do not paste values in chat or commit them. Database connections enforce TLS certificate/hostname validation.
 2. Put the Firebase **Web** `apiKey` in `firebase/firebase-config.mjs` (Project settings → Your apps → Config). That file is what the sign-in page loads, including on the published site. The other `fire-counsel` fields are already filled in. A Web API key is public app identification, not an admin credential. Never put a service-account key, OAuth client secret, or Gemini key there. Google sign-in is already implemented on `/auth.html`; it stays hidden until this key is real. Add the site hostname under Authentication → Settings → Authorized domains, keep the Google provider enabled with a support email, and if the Google Cloud OAuth consent screen is in Testing, add the Google account as a test user.
-3. Verify Auth providers, authorized domains, App Check, deployed rules and the intended administrator UID/claim in the actual Firebase project. A Google account, an email address or a browser-supplied role does not grant administrator permission.
+3. Enable Google and disable other sign-in providers after checking existing administrator account linking/UID continuity. Verify authorized domains, App Check, deployed rules and the intended administrator UID/claim in the actual Firebase project. A Google account, an email address or a browser-supplied role does not grant administrator permission.
 4. Pass local Firestore/Storage emulator tests and review existing deployed rules before considering any deployment. Proposed rules are not deployed by this repository's tests.
 5. Review `backend/migrations/001_student_profiles.sql` against the actual Neon schema and manually apply it only to disposable staging. Keep `STUDENT_PROFILES_ENABLED=false` until ready, then enable and test profile/installation authorization. No migration runs at startup. Optional trusted proxy IPs/CIDRs require a separate ingress/header review; the default ignores forwarded IPs.
-6. Test real staging registration/Google, verification/reset/change-email delivery, password changes, second-installation denial, admin authorization, Neon CRUD, access scopes and retrieval end to end. Mocks and PGlite do not verify these live services. Review the lockout/recovery policy before real-user rollout.
+6. Test real staging Google sign-in (including legacy password-session denial), account-security changes, second-installation denial, admin authorization, Neon CRUD, access scopes and retrieval end to end. Mocks and PGlite do not verify these live services. Review the lockout/recovery policy before real-user rollout.
 
 Backend endpoint/security details are in [backend/README.md](backend/README.md); the reviewed schema reference is [backend/DATABASE_SCHEMA.md](backend/DATABASE_SCHEMA.md). Firebase setup and proposed rules are documented in [firebase/README.md](firebase/README.md).
 
 ## Existing study data and preview settings
 
-The student database deliberately retains **`lexmaster-ai-stage1`**, version **1**, stores **`documents`, `cards`, `settings`**, and counter **`lexmaster-sessions`**. No study-store migration, deletion or localStorage clearing is performed. The independent `fire-counsel-installation-v1` marker persists across sign-out; clearing it can lock the student profile to a lost installation. Automated browser tests seed and verify disposable legacy records; they do not inspect anyone's real browser profile. Local study data is shared by accounts using that browser, not encrypted or separated by Firebase UID; sign-out does not hide/delete it. Clearing browser site data can delete local work and the account installation marker, so keep independent backups.
+The student database deliberately retains **`lexmaster-ai-stage1`**, version **1**, stores **`documents`, `cards`, `settings`**, and counter **`lexmaster-sessions`**. No study-store migration, deletion or localStorage clearing is performed. The independent `fire-counsel-installation-v1` marker persists across sign-out; clearing it can lock the student profile to a lost installation. Automated browser tests seed and verify disposable legacy records; they do not inspect anyone's real browser profile. Local study data is shared by accounts using that browser, not encrypted or separated by Firebase UID; sign-out locks the page without deleting or encrypting it; the same browser vault becomes visible after another account signs in. Clearing browser site data can delete local work and the account installation marker, so keep independent backups.
 
 ## Website publishing, uploads and the PDF reader
 
 - **Website edits** (admin → Pages & JSON): *Save draft* stores the draft in Neon (`site_content`), *Preview* opens `index.html?preview=1`, which receives the unsaved draft from the admin tab (same origin only, never stored), and *Publish* makes it live. The public `/data/site-content.json` is then served from Neon, with the bundled file as the fallback. Every publish is kept in `site_content_versions` and can be restored. Slide photos are stored in `site_images` and served at `/media/<id>.<ext>`. No Firebase Storage (Blaze plan) is needed.
 - **Document uploads** (admin → Upload documents): PDFs, Word files, photos and text are sent raw to `/api/v1/admin/documents` and read in the background. Digital PDFs are read with pdf.js (free, no AI). Scanned pages are read by Gemini (with the existing key) in page batches, with OCR.space as an optional fallback if `OCR_SPACE_API_KEY` is set. The text goes into the Neon library (materials + page-numbered chunks, case records or past questions), and the AI studio quotes it as `[Library: title, p. N]`. Optional limits: `FILE_STORAGE_LIMIT_MB` (default 350), `DOCUMENT_MAX_FILE_MB` (25), `DOCUMENT_OCR_MAX_PAGES`, `DOCUMENT_OCR_BATCH_PAGES`.
 - **Student reader** (`pdf-reader.mjs`): personal library files and published materials' original PDFs open in an in-page reader (pdf.js served from `backend/node_modules/pdfjs-dist` at `/vendor/pdfjs/`, allowlisted). Static copies of the site without the backend fall back to the phone's PDF viewer.
-- Run the **Neon database migration** workflow once after deploying (migration `003_site_and_documents.sql`).
+- Run **Neon database migration (AI, website, uploads)** after merge, before using the new schema-dependent controls (migrations `002`–`005`). See [the step-by-step owner guide](DEPLOYMENT.md#3-run-the-database-migration-after-merge).
 
 Never paste provider keys into a static page, localStorage, site JSON, Firestore documents or chat.
 
@@ -110,7 +113,7 @@ Never paste provider keys into a static page, localStorage, site JSON, Firestore
 
 - Adults-only (18+) audience and Gemini were selected, but age verification and provider/privacy approval are not active. Do not use Gemini Free for student work.
 - Firebase is used for sign-in only. Since February 2026, Cloud Storage for Firebase needs the Blaze plan, so website photos and uploaded documents are stored in Neon instead. The proposed Storage rules remain in the repository but are unused.
-- Administrator-chosen Free/paid per-feature counts, reset periods and individual adjustments are previews only. No preset live quotas are imposed.
+- AI access is admin-granted Premium, with server-enforced per-feature daily quotas and per-account overrides. There is no payment checkout or automatic paid-plan activation.
 - Archived questions must be exact verified questions, not generated variants. New practice scenarios must be separately labelled and grounded in approved material.
 - Nigeria was selected, but additional jurisdictions and school-approved source domains remain to be specified. External legal-web fallback stays off. During testing it stays off even if a domain is named later: the owner supplies the materials, and a missing source is reported as not found. See [Testing materials](#testing-materials--owner-supplied-only).
 - Paystack and the supplied ₦2,000 price remain future choices; paid-plan duration and activation are unresolved and disabled.

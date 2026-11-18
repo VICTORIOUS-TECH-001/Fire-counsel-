@@ -7,29 +7,25 @@ import { INSTALLATION_HEADER, needsStudentInstallation } from "../../installatio
 const source = readFileSync(new URL("../../firebase/auth-client.mjs", import.meta.url), "utf8");
 // Evaluate the actual helper code with an in-memory Firebase SDK, not the CDN.
 // No provider, credentials, email service, browser server or network is used.
-function client({ provider = "password" } = {}) {
+function client({ provider = "password", signInProvider = "google.com" } = {}) {
   const calls = [];
   const requests = [];
   const user = {
     uid: "synthetic-uid", email: "student@example.invalid", providerData: [{ providerId: provider }],
     async getIdToken(refresh) { calls.push(["token", refresh]); return "synthetic-id-token"; },
-    async getIdTokenResult() { return { claims: { admin: false } }; }
+    async getIdTokenResult() { return { claims: { admin: false, firebase: { sign_in_provider: signInProvider } } }; }
   };
   const auth = { currentUser: user };
   const sdk = {
     firebaseApp: {}, getAuth: () => auth,
     GoogleAuthProvider: class { setCustomParameters(parameters) { calls.push(["google-parameters", parameters.prompt]); } },
     EmailAuthProvider: { credential(email, password) { return { email, password }; } },
-    async createUserWithEmailAndPassword(_auth, email, password) { calls.push(["register", email, password]); user.email = email; auth.currentUser = user; return { user }; },
-    async updateProfile(account, values) { calls.push(["name", account.uid, values.displayName]); },
     async reauthenticateWithCredential(account, credential) { calls.push(["reauth-password", account.uid, credential.email, credential.password]); },
     async reauthenticateWithPopup(account) { calls.push(["reauth-google", account.uid]); },
     async verifyBeforeUpdateEmail(account, email) { calls.push(["verify-new-email", account.uid, email]); },
     async updatePassword(account, password) { calls.push(["update-password", account.uid, password]); },
     async sendEmailVerification(account) { calls.push(["verify-email", account.uid]); },
     async reload(account) { calls.push(["reload", account.uid]); },
-    async signInWithEmailAndPassword(_auth, email, password) { calls.push(["signin", email, password]); },
-    async sendPasswordResetEmail(_auth, email) { calls.push(["reset", email]); },
     async signInWithPopup() { calls.push(["google-popup"]); },
     async signInWithRedirect() { calls.push(["google-redirect"]); },
     TotpMultiFactorGenerator: {
@@ -43,7 +39,7 @@ function client({ provider = "password" } = {}) {
       };
     },
     async signOut() { auth.currentUser = null; },
-    getRedirectResult() {}, onAuthStateChanged() {}
+    getRedirectResult() {}, onAuthStateChanged() {}, onIdTokenChanged() {}
   };
   const context = {
     ...Object.fromEntries(Object.keys(sdk).map(key => [key, (...args) => sdk[key](...args)])),
@@ -60,25 +56,26 @@ function client({ provider = "password" } = {}) {
     .replace(/import\s*\{[\s\S]*?\}\s*from\s*"[^"]+";\s*/g, "")
     .replace(/export\s*\{[^}]*\};/g, "")
     .replace(/\bexport /g, "");
-  const exports = ["registerWithEmail", "signInWithEmail", "signInWithGoogle", "beginMfaChallenge", "completeMfaChallenge", "hasPasswordProvider", "requestAccountEmailChange", "changeAccountPassword", "requestAccountVerification", "requestPasswordReset", "refreshAccount", "getApiAuthorizationHeader", "apiRequest"];
+  const exports = ["hasGoogleSession", "signInWithGoogle", "beginMfaChallenge", "completeMfaChallenge", "hasPasswordProvider", "requestAccountEmailChange", "changeAccountPassword", "requestAccountVerification", "refreshAccount", "getApiAuthorizationHeader", "apiRequest", "hasAdminClaim"];
   vm.runInNewContext(`${executable}\nglobalThis.exports = { ${exports.join(",")} };`, context);
   return { ...context.exports, auth, user, sdk, context, calls, requests };
 }
 
-test("email registration sends credentials only to Firebase and uses the name as displayName", async () => {
-  const api = client();
-  await api.registerWithEmail(" student@example.invalid ", "synthetic-new-password", " Student Name ");
-  assert.deepEqual(api.calls, [["register", "student@example.invalid", "synthetic-new-password"], ["name", "synthetic-uid", "Student Name"]]);
-  assert.equal(api.requests.length, 0);
+test("Google-only auth removes email registration, password sign-in and reset helpers", () => {
+  assert.doesNotMatch(source, /createUserWithEmailAndPassword|signInWithEmailAndPassword|sendPasswordResetEmail|registerWithEmail/);
 });
 
-test("registration validates names before creating an identity and explains a partial name-update failure", async () => {
-  const api = client();
-  await assert.rejects(api.registerWithEmail("x@example.invalid", "synthetic", " "), /Enter a name/);
-  assert.equal(api.calls.length, 0);
-  api.sdk.updateProfile = async () => { throw new Error("synthetic name failure"); };
-  await assert.rejects(api.registerWithEmail("x@example.invalid", "synthetic", "Student"), /Firebase created your account.*do not register again/);
-  assert.equal(api.auth.currentUser, api.user);
+test("Google sessions are checked from the token provider, never a linked providerData entry", async () => {
+  const google = client({ provider: "google.com" });
+  assert.equal(await google.hasGoogleSession(), true);
+  google.auth.currentUser = null;
+  assert.equal(await google.hasGoogleSession(), false);
+  for (const signInProvider of ["password", "anonymous", "custom", ""]) {
+    const legacy = client({ provider: "google.com", signInProvider });
+    assert.equal(await legacy.hasGoogleSession(), false);
+    await assert.rejects(legacy.apiRequest("/api/v1/profile"), /Sign in with Google/);
+    assert.equal(legacy.requests.length, 0);
+  }
 });
 
 test("password changes reauthenticate the current Firebase user and never call a profile/API route", async () => {
@@ -116,11 +113,10 @@ test("failed reauthentication or an account switch cannot apply a sensitive chan
   assert.ok(!api.calls.some(call => call[0] === "verify-new-email"));
 });
 
-test("verification and password-reset emails are explicit Firebase actions, not Neon writes", async () => {
+test("verification emails are explicit Firebase actions, not Neon writes", async () => {
   const api = client();
   await api.requestAccountVerification();
-  await api.requestPasswordReset(" student@example.invalid ");
-  assert.deepEqual(api.calls, [["verify-email", "synthetic-uid"], ["reset", "student@example.invalid"]]);
+  assert.deepEqual(api.calls, [["verify-email", "synthetic-uid"]]);
   assert.equal(api.requests.length, 0);
 });
 
@@ -189,4 +185,14 @@ test("Google Authenticator completes only a pending TOTP challenge", async () =>
     ["resolve-mfa", "123456"]
   ]);
   await assert.rejects(api.completeMfaChallenge("123456"), /Start sign-in again/);
+});
+
+test("hasAdminClaim reads the token claim and never trusts a signed-out session", async () => {
+  const api = client();
+  assert.equal(await api.hasAdminClaim(), false);
+  api.user.getIdTokenResult = async () => ({ claims: { admin: true } });
+  assert.equal(await api.hasAdminClaim(), true);
+  api.auth.currentUser = null;
+  assert.equal(await api.hasAdminClaim(null), false);
+  assert.equal(await api.hasAdminClaim(), false);
 });

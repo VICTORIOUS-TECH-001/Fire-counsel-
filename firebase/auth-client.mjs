@@ -3,23 +3,20 @@
 import {
   EmailAuthProvider,
   GoogleAuthProvider,
-  createUserWithEmailAndPassword,
   getAuth,
   getRedirectResult,
   onAuthStateChanged,
+  onIdTokenChanged,
   reauthenticateWithCredential,
   reauthenticateWithPopup,
   reload,
   sendEmailVerification,
-  signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
   signOut,
-  sendPasswordResetEmail,
   TotpMultiFactorGenerator,
   getMultiFactorResolver,
   updatePassword,
-  updateProfile,
   verifyBeforeUpdateEmail
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { firebaseApp, firebaseSetupError } from "./client.mjs";
@@ -30,7 +27,7 @@ if (!firebaseApp) {
 }
 
 export const firebaseAuth = getAuth(firebaseApp);
-export { getRedirectResult, onAuthStateChanged, signOut };
+export { getRedirectResult, onAuthStateChanged, onIdTokenChanged, signOut };
 
 let pendingMfaResolver = null;
 
@@ -66,27 +63,14 @@ export function hasPasswordProvider(user = firebaseAuth.currentUser) {
   return Boolean(user?.providerData?.some(provider => provider.providerId === "password"));
 }
 
-export function requestPasswordReset(email) {
-  return sendPasswordResetEmail(firebaseAuth, email.trim());
-}
-
-export function signInWithEmail(email, password) {
-  return signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
-}
-
-export async function registerWithEmail(email, password, name) {
-  const fullName = name.trim();
-  if (!fullName || fullName.length > 120 || /[\u0000-\u001f\u007f]/.test(fullName)) throw new Error("Enter a name from 1 to 120 characters, without control characters.");
-  const result = await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password);
-  assertSameAccount(result.user);
-  try {
-    await updateProfile(result.user, { displayName: fullName });
-  } catch {
-    // Firebase account creation cannot be rolled back by a failed name update.
-    // Never delete an account or encourage a duplicate registration here.
-    throw new Error("Firebase created your account, but could not save its initial name. Open your student profile to set your name; do not register again.");
-  }
-  return result;
+// UI check only; the API and Firebase rules independently require the verified
+// token's provider. providerData is insufficient for accounts linked to both
+// Google and a legacy password: it does not say how THIS session signed in.
+export async function hasGoogleSession(user = firebaseAuth.currentUser) {
+  if (!user) return false;
+  const token = await user.getIdTokenResult();
+  assertSameAccount(user);
+  return token.claims.firebase?.sign_in_provider === "google.com";
 }
 
 export async function signInWithGoogle() {
@@ -151,6 +135,9 @@ export async function refreshAccount() {
 
 export async function getApiAuthorizationHeader(forceRefresh = false) {
   const user = currentAccount();
+  if (!(await hasGoogleSession(user))) {
+    throw Object.assign(new Error("Sign in with Google to use FIRE COUNSEL."), { code: "auth/google-sign-in-required" });
+  }
   const token = await user.getIdToken(forceRefresh);
   assertSameAccount(user);
   return { Authorization: `Bearer ${token}` };
@@ -163,6 +150,17 @@ export async function getDisplayRole() {
   const token = await user.getIdTokenResult();
   assertSameAccount(user);
   return token.claims.admin === true ? "admin" : "student";
+}
+
+// True when the current token carries the server-issued admin: true claim.
+// Firestore/Storage rules re-check this claim on every direct client write;
+// this helper only decides what the UI offers. A freshly granted claim needs
+// getIdToken(true) first — the admin page does that after /api/v1/admin/claim.
+export async function hasAdminClaim(user = firebaseAuth.currentUser) {
+  if (!user) return false;
+  const token = await user.getIdTokenResult();
+  assertSameAccount(user);
+  return token.claims.admin === true;
 }
 
 // Same-origin only: deployment must proxy/serve /api on this origin. Neither

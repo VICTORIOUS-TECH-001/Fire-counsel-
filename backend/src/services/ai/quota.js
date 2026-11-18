@@ -41,7 +41,7 @@ export async function getAllowance(db, uid, { env = process.env, isAdmin = false
     const count = used[key] || 0;
     features[key] = { label: feature.label, limit, used: count, remaining: limit == null ? null : Math.max(limit - count, 0), custom: Number.isInteger(custom) };
   }
-  return { paused: !isAdmin && override.paused === true, unlimited: isAdmin, timezone: timezone(env), features };
+  return { paused: !isAdmin && override.paused === true, premium: isAdmin || override.premium === true, unlimited: isAdmin, timezone: timezone(env), features };
 }
 
 /** Atomically checks the allowance and records a started request. */
@@ -55,6 +55,9 @@ export async function reserveUsage(pool, uid, feature, { env = process.env, isAd
     await client.query("UPDATE ai_usage SET status = 'failed', finished_at = NOW() WHERE firebase_uid = $1 AND status = 'started' AND created_at < NOW() - interval '20 minutes'", [uid]);
     if (!isAdmin && feature !== "extract") {
       const allowance = await getAllowance(client, uid, { env });
+      // The paywall: AI features need an admin-granted premium plan. The flag
+      // lives server-side in Neon, so a student cannot enable it from a browser.
+      if (!allowance.premium) throw new AiError(403, "Fire Counsel AI is a premium feature. Ask the FIRE COUNSEL administrator to enable premium on this account.", "PREMIUM_REQUIRED");
       if (allowance.paused) throw new AiError(403, "AI access is paused for this account. Contact the FIRE COUNSEL administrator.", "AI_PAUSED");
       const state = allowance.features[feature];
       if (state.limit != null && state.used >= state.limit) {

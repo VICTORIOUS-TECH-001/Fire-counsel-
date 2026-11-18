@@ -247,6 +247,7 @@ export function createAdminAiRouter({
           usage_today: usageMap.get(user.uid) || {},
           limits: Object.fromEntries(Object.entries(LIMIT_COLUMNS).map(([key, column]) => [key, Number.isInteger(override[column]) ? override[column] : null])),
           paused: override.paused === true,
+          premium: override.premium === true,
           note: override.note || null
         };
       }).filter((user) => !query || [user.email, user.name, user.uid].some((value) => value && value.toLowerCase().includes(query)))
@@ -265,14 +266,15 @@ export function createAdminAiRouter({
       const values = {};
       for (const [key, feature] of Object.entries(FEATURES)) values[feature.column] = validateLimit(req.body?.[key], feature.label);
       const paused = req.body?.paused === true;
+      const premium = req.body?.premium === true;
       const note = typeof req.body?.note === "string" && req.body.note.trim() ? req.body.note.trim().slice(0, 280) : null;
       await poolProvider().query(
-        `INSERT INTO ai_user_limits (firebase_uid, chat_daily, case_daily, notes_daily, questions_daily, paused, note, updated_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO ai_user_limits (firebase_uid, chat_daily, case_daily, notes_daily, questions_daily, paused, premium, note, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          ON CONFLICT (firebase_uid) DO UPDATE SET chat_daily = EXCLUDED.chat_daily, case_daily = EXCLUDED.case_daily, notes_daily = EXCLUDED.notes_daily,
-           questions_daily = EXCLUDED.questions_daily, paused = EXCLUDED.paused, note = EXCLUDED.note, updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
-        [req.params.uid, values.chat_daily, values.case_daily, values.notes_daily, values.questions_daily, paused, note, req.user.email || req.user.uid]);
-      res.json({ data: { uid: req.params.uid, limits: { chat: values.chat_daily, case: values.case_daily, notes: values.notes_daily, questions: values.questions_daily }, paused, note } });
+           questions_daily = EXCLUDED.questions_daily, paused = EXCLUDED.paused, premium = EXCLUDED.premium, note = EXCLUDED.note, updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
+        [req.params.uid, values.chat_daily, values.case_daily, values.notes_daily, values.questions_daily, paused, premium, note, req.user.email || req.user.uid]);
+      res.json({ data: { uid: req.params.uid, limits: { chat: values.chat_daily, case: values.case_daily, notes: values.notes_daily, questions: values.questions_daily }, paused, premium, note } });
     } catch (error) { publicAiError(res, error); }
   });
 
