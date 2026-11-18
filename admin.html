@@ -5,12 +5,21 @@
   <meta name="theme-color" content="#10121b"><meta name="robots" content="noindex,nofollow">
   <meta name="description" content="FIRE COUNSEL admin studio: website publishing, document uploads, Neon content and AI settings with server-verified administrator access.">
   <title>FIRE COUNSEL · Admin Studio</title>
+  <link rel="stylesheet" href="./preloader.css">
   <link rel="icon" href="./assets/fire-counsel-192.png" type="image/png">
   <link rel="stylesheet" href="./admin.css">
   <link rel="stylesheet" href="./integrations.css">
   <link rel="stylesheet" href="./ai-studio.css">
 </head>
 <body>
+<div class="fc-preloader" id="fc-preloader" role="status" aria-label="FIRE COUNSEL is loading">
+<div class="fc-pre-core" aria-hidden="true"><div class="fc-pre-ring"></div><div class="fc-pre-hex"><div class="fc-pre-fire"><i class="fl fl1"></i><i class="fl fl2"></i><i class="fl fl3"></i><i class="fl fl4"></i><i class="em em1"></i><i class="em em2"></i><i class="em em3"></i><i class="em em4"></i><i class="em em5"></i></div></div></div>
+<div class="fc-pre-name">FIRE <span>COUNSEL</span></div>
+<div class="fc-pre-tag">Ignite your legal intelligence</div>
+<div class="fc-pre-bar" aria-hidden="true"><i></i></div>
+<div class="fc-pre-status">Loading the admin studio…</div>
+</div>
+<script src="./preloader.js"></script>
   <header class="admin-topbar">
     <a class="admin-brand" href="./index.html"><img src="./assets/images/fire-counsel-brand.jpg" alt="" width="46" height="46"><span><strong>FIRE COUNSEL</strong><small>ADMIN STUDIO</small></span></a>
     <div class="admin-top-actions"><span class="preview-chip"><i></i> ADMIN STUDIO</span><a class="preview-site" id="preview-site-top" href="./index.html?preview=1" target="fire-counsel-preview">Preview website changes ↗</a></div>
@@ -21,6 +30,7 @@
       <button class="admin-tab is-active" type="button" data-panel="overview"><span>⌂</span>Overview</button>
       <button class="admin-tab" type="button" data-panel="database"><span>▦</span>Database data</button>
       <button class="admin-tab" type="button" data-panel="courses"><span>§</span>Courses</button>
+      <button class="admin-tab" type="button" data-panel="workspace"><span>▣</span>Student workspace</button>
       <button class="admin-tab" type="button" data-panel="uploads"><span>⇪</span>Upload documents</button>
       <button class="admin-tab" type="button" data-panel="content"><span>▤</span>Pages & JSON</button>
       <button class="admin-tab" type="button" data-panel="media"><span>▧</span>Slides & images</button>
@@ -89,6 +99,15 @@
           <div class="fc-row"><button class="button button-primary" id="course-save" type="submit" disabled>Save course</button><button class="button button-light" id="course-cancel" type="button">Close</button><span class="fc-status" id="course-form-status" role="status" aria-live="polite"></span></div>
           <p><small>To remove a course from students, untick <b>Show to all students</b> and save. Its materials and past questions stay in the database.</small></p>
         </form>
+      </section>
+
+      <section class="admin-panel" id="panel-workspace" aria-labelledby="workspace-title" hidden>
+        <div class="admin-heading"><div><span class="eyebrow">STUDENT DASHBOARD · SHOWN TO EVERY STUDENT</span><h1 id="workspace-title">Student workspace.</h1><p>Edit everything on the students&rsquo; dashboard: the welcome banner, the menu, the tool tiles, the AI box, the quote card, progress goals, class deadlines and notices. Press <b>Preview</b> to see your changes, then <b>Publish to all students</b>.</p></div><span class="panel-status" id="ws-admin-state">SIGN IN AS ADMIN</span></div>
+        <p class="fc-status" id="ws-admin-status" role="status" aria-live="polite">Sign in as the administrator to edit the student workspace.</p>
+        <div class="fc-ws-actions"><button class="button button-light" id="ws-admin-preview" type="button" disabled>Preview</button><button class="button button-light" id="ws-admin-reset" type="button" disabled>Start again from the original design</button><button class="button button-primary" id="ws-admin-publish" type="button" disabled>Publish to all students</button></div>
+        <div class="fc-ws-editor" id="ws-admin-editor"></div>
+        <datalist id="ws-destinations"></datalist>
+        <div class="fc-ws-actions fc-ws-actions-bottom"><button class="button button-light" id="ws-admin-preview-2" type="button" disabled>Preview</button><button class="button button-primary" id="ws-admin-publish-2" type="button" disabled>Publish to all students</button></div>
       </section>
 
       <section class="admin-panel" id="panel-uploads" aria-labelledby="uploads-title" hidden>
@@ -236,6 +255,7 @@
   <script type="module" src="./admin-database.mjs"></script>
   <script type="module" src="./admin-ai.mjs"></script>
   <script type="module" src="./admin-courses.mjs"></script>
+  <script type="module" src="./admin-workspace.mjs"></script>
   <script type="module" src="./admin-site.mjs"></script>
   <script type="module" src="./admin-uploads.mjs"></script>
   <script type="module" src="./presence.mjs"></script>

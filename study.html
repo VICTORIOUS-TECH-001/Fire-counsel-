@@ -1,82 +1,115 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport"/>
-<meta content="#111322" name="theme-color"/>
-<meta content="FIRE COUNSEL &mdash; private, local-first study tools for law students." name="description"/>
+<meta content="#061331" name="theme-color"/>
+<meta content="FIRE COUNSEL &mdash; your complete law student workspace." name="description"/>
 <title>FIRE COUNSEL &mdash; Student Study Space</title>
+<link href="./preloader.css" rel="stylesheet"/>
 <link href="./manifest.webmanifest" rel="manifest"/>
 <link href="./assets/fire-counsel-192.png" rel="icon" type="image/png"/>
 <link href="./styles.css" rel="stylesheet"/>
 <link href="./integrations.css" rel="stylesheet"/>
+<link href="./workspace.css" rel="stylesheet"/>
 </head>
-<body data-theme="light">
+<body class="ws" data-theme="dark">
+<div class="fc-preloader" id="fc-preloader" role="status" aria-label="FIRE COUNSEL is loading">
+<div class="fc-pre-core" aria-hidden="true"><div class="fc-pre-ring"></div><div class="fc-pre-hex"><div class="fc-pre-fire"><i class="fl fl1"></i><i class="fl fl2"></i><i class="fl fl3"></i><i class="fl fl4"></i><i class="em em1"></i><i class="em em2"></i><i class="em em3"></i><i class="em em4"></i><i class="em em5"></i></div></div></div>
+<div class="fc-pre-name">FIRE <span>COUNSEL</span></div>
+<div class="fc-pre-tag">Ignite your legal intelligence</div>
+<div class="fc-pre-bar" aria-hidden="true"><i></i></div>
+<div class="fc-pre-status">Loading your workspace…</div>
+</div>
+<script src="./preloader.js"></script>
 <div class="app">
-<aside aria-label="Main navigation" class="sidebar" id="sidebar">
-<a aria-label="FIRE COUNSEL home" class="brand" href="./index.html">
-<span class="brand-mark"><img alt="" decoding="async" height="44" src="./assets/images/fire-counsel-brand.jpg" width="44"/></span>
-<span class="brand-copy"><strong>FIRE COUNSEL</strong><small>AI &middot; LEGAL STUDY</small></span>
+<aside aria-label="Main navigation" class="sidebar ws-sidebar" id="sidebar">
+<a aria-label="FIRE COUNSEL home" class="brand ws-brand" href="./index.html">
+<span class="brand-mark ws-logo"><img alt="" decoding="async" height="48" id="ws-logo" src="./assets/images/fire-counsel-brand.jpg" width="48"/></span>
+<span class="brand-copy"><strong id="ws-brand-name">FIRE COUNSEL</strong><small id="ws-brand-tagline">Study &bull; Research &bull; Excel</small></span>
 </a>
-<div class="workspace-chip"><span class="status-dot"></span><span id="workspace-label">Student workspace</span></div>
-<nav aria-label="Student navigation" class="nav-list" id="student-nav">
-<div class="nav-label">Study</div>
-<a class="nav-link active" data-page="dashboard" href="#dashboard"><span class="nav-icon"><svg viewbox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg></span>Overview</a>
-<a class="nav-link" data-page="subjects" href="#subjects"><span class="nav-icon"><svg viewbox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21zM4 5.5v13A2.5 2.5 0 0 1 6.5 16H20M8 7h8M8 10h7"></path></svg></span>My courses<span class="nav-count" id="course-nav-count">6</span></a>
-<a class="nav-link" href="./ai.html"><span class="nav-icon"><svg viewbox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 0 1 8.7 4a8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"></path><path d="M8 12h8M12 8v8"></path></svg></span>Fire Counsel AI<span class="ai-nav-tag">AI</span></a>
-<a class="nav-link" data-page="ai-chat" href="#ai-chat"><span class="nav-icon"><svg viewbox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg></span>Trusted sources</a>
-<a class="nav-link" data-page="library" href="#library"><span class="nav-icon"><svg viewbox="0 0 24 24"><path d="M5 3h10l4 4v14H5zM14 3v5h5M8 12h8M8 16h8"></path></svg></span>My study library</a>
-<a class="nav-link" data-page="memory" href="#memory"><span class="nav-icon"><svg viewbox="0 0 24 24"><rect height="15" rx="2" width="13" x="4" y="5"></rect><path d="M8 3h11a2 2 0 0 1 2 2v12M7 10h7M7 14h5"></path></svg></span>Case flashcards</a>
-<a class="nav-link" data-page="exams" href="#exams"><span class="nav-icon"><svg viewbox="0 0 24 24"><path d="M5 3h14a2 2 0 0 1 2 2v14l-4-2-5 3-5-3-4 2V5a2 2 0 0 1 2-2Z"></path><path d="M8 8h8M8 12h6"></path></svg></span>Past questions</a>
-<div class="nav-label">Account</div>
-<a class="nav-link" href="./auth.html?next=study.html"><span class="nav-icon"><svg viewbox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><path d="M10 17l5-5-5-5M15 12H3"></path></svg></span>Sign in</a>
-<a class="nav-link" data-page="profile" href="#profile"><span class="nav-icon"><svg viewbox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21v-2a8 8 0 0 1 16 0v2"></path></svg></span>My profile</a>
-</nav>
-<div class="sidebar-spacer"></div>
-<a class="student-signin-link" href="./auth.html?next=study.html">Sign in / create account ↗</a>
-<div class="local-card"><div class="local-card-top"><span class="local-icon">⌂</span><span>Local study vault</span></div><p>Personal files, flashcards and practice stay on this device.</p></div>
-<div class="offline-card"><span class="status-dot" id="connection-dot"></span><div><strong id="connection-label">Ready to study</strong><small id="connection-detail">Checking connection&hellip;</small></div></div>
-<div class="profile"><span class="avatar" id="student-profile-avatar">FC</span><span class="profile-info"><strong id="student-profile-name">Student workspace</strong><small id="profile-role">Local-first workspace</small></span><a aria-label="Open my profile" class="icon-button profile-more" data-page="profile" href="#profile">&middot;&middot;&middot;</a></div>
+<nav aria-label="Student navigation" class="nav-list ws-nav" id="student-nav"><a class="nav-link" data-page="dashboard" href="#dashboard"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></span><span class="nav-text">Dashboard</span></a><a class="nav-link" data-page="subjects" href="#subjects"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="M12 6.5C10 5 7 4.5 3 5v13c4-.5 7 0 9 1.5 2-1.5 5-2 9-1.5V5c-4-.5-7 0-9 1.5Z"/><path d="M12 6.5v13"/></svg></span><span class="nav-text">My Courses</span><span class="nav-count" id="course-nav-count">6</span></a><a class="nav-link" data-page="library" href="#library"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><rect x="9" y="3" width="12" height="9" rx="1"/><path d="m12 9 3-3 2 2 2-2"/><circle cx="5" cy="7" r="2"/><path d="M2 21v-5a3 3 0 0 1 3-3h1l4 2M7 21v-6"/></svg></span><span class="nav-text">Lecture Room</span></a><a class="nav-link" data-go="library" href="#library"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/><path d="M8.5 17v-4h1.3a1.2 1.2 0 0 1 0 2.4H8.5M13 13v4h1a2 2 0 0 0 0-4zM18 13h-2v4M16 15h1.5"/></svg></span><span class="nav-text">PDF Reader</span></a><a class="nav-link" href="./ai.html?mode=case"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="M12 3v18M7 21h10M5 7h14M12 4.5 5 7M12 4.5 19 7"/><path d="m5 7-3 6a3 3 0 0 0 6 0zM19 7l-3 6a3 3 0 0 0 6 0z"/></svg></span><span class="nav-text">Case Briefing</span></a><a class="nav-link" href="./ai.html?task=statute"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="M3 10h18L12 4zM5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 21h18M4 18h16"/></svg></span><span class="nav-text">Statute Explorer</span></a><a class="nav-link" href="./ai.html?q=Define%20this%20legal%20term%20and%20give%20an%20example%3A%20"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H20v15H5.5A1.5 1.5 0 0 0 4 19.5z"/><path d="M4 19.5A1.5 1.5 0 0 0 5.5 21H20v-3"/><path d="m9 13 2.5-6L14 13M10 11h3"/></svg></span><span class="nav-text">Legal Dictionary</span></a><a class="nav-link" data-page="ai-chat" href="#ai-chat"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></span><span class="nav-text">Research Desk</span></a><a class="nav-link" data-page="exams" href="#exams"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M8.5 12.5l2 2 4-4.5"/></svg></span><span class="nav-text">Examination Centre</span></a><a class="nav-link" data-page="memory" href="#memory"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><rect x="3" y="7" width="13" height="14" rx="2" transform="rotate(-8 9.5 14)"/><path d="M10 4.2 18.8 3a2 2 0 0 1 2.2 1.7l1.5 10.9a2 2 0 0 1-1.7 2.3L19 18"/></svg></span><span class="nav-text">Flashcards</span></a><a class="nav-link" data-page="planner" href="#planner"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M7.5 14h2M11 14h2M14.5 14h2M7.5 17.5h2M11 17.5h2"/></svg></span><span class="nav-text">Study Planner</span></a><a class="nav-link" href="./ai.html"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="M12 3c.5 3.8 2.2 5.5 6 6-3.8.5-5.5 2.2-6 6-.5-3.8-2.2-5.5-6-6 3.8-.5 5.5-2.2 6-6Z"/><path d="M19 15c.2 1.6.9 2.3 2.5 2.5-1.6.2-2.3.9-2.5 2.5-.2-1.6-.9-2.3-2.5-2.5 1.6-.2 2.3-.9 2.5-2.5ZM5 15.5c.2 1.2.7 1.7 1.8 1.8-1.1.2-1.6.7-1.8 1.9-.2-1.2-.7-1.7-1.8-1.9 1.1-.1 1.6-.6 1.8-1.8Z"/></svg></span><span class="nav-text">AI Tutor</span></a><a class="nav-link" data-go="planner" href="#planner"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg></span><span class="nav-text">My Progress</span></a><a class="nav-link" data-page="profile" href="#profile"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></span><span class="nav-text">Settings</span></a></nav>
+<a class="ws-help" href="./ai.html" id="ws-help"><span class="ws-help-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="2.5" y="14" width="4" height="6" rx="1.5"/><rect x="17.5" y="14" width="4" height="6" rx="1.5"/><path d="M19.5 20c0 1-1.5 2-4.5 2h-2"/></svg></span><span><strong id="ws-help-title">Need Help?</strong><small id="ws-help-subtitle">Chat with FIRE COUNSEL</small></span></a>
+<div class="ws-connection"><span class="status-dot" id="connection-dot"></span><span><strong id="connection-label">Ready to study</strong><small id="connection-detail">Checking connection&hellip;</small></span></div>
+<span hidden id="workspace-label">Student workspace</span>
 </aside>
 <div class="scrim" id="scrim"></div>
-<main class="main" id="main-content">
-<header class="topbar">
-<div class="top-left">
-<button aria-label="Open navigation" class="icon-button mobile-menu" id="menu-toggle" type="button"><svg viewbox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"></path></svg></button>
-<div class="breadcrumb"><span id="breadcrumb-workspace">Student</span><b>/</b><strong id="page-breadcrumb">Overview</strong></div>
-<label class="top-search"><svg viewbox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg><input aria-label="Search" id="global-search" placeholder="Search your study space&hellip;" type="search"/></label>
-</div>
-<div class="top-right">
-<span class="demo-pill"><i></i><span id="mode-label">LOCAL STUDY</span></span>
-<button aria-label="Toggle light and dark theme" class="icon-button theme-button" id="theme-toggle" title="Toggle theme" type="button"><svg viewbox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"></path></svg></button>
-<button aria-label="Install app" class="icon-button install-button" hidden="" id="install-button" title="Install FIRE COUNSEL" type="button">&darr;</button>
-<a class="help-button" href="./auth.html?next=study.html">Sign in</a><button class="help-button" id="help-button" type="button">Help &amp; privacy <span>&nearrow;</span></button>
+<main class="main ws-main" id="main-content">
+<header class="topbar ws-topbar">
+<button aria-label="Open navigation" class="icon-button mobile-menu ws-menu" id="menu-toggle" type="button"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"></path></svg></button>
+<label class="top-search ws-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg><input aria-label="Search cases, statutes and notes" id="global-search" placeholder="Search cases, statutes, notes&hellip;" type="search"/></label>
+<div class="ws-top-right">
+<div class="ws-crumbs" hidden><span id="breadcrumb-workspace">Student</span><strong id="page-breadcrumb">Overview</strong><span id="mode-label">LOCAL STUDY</span><button aria-label="Toggle theme" id="theme-toggle" type="button">Theme</button></div>
+<button aria-label="Install app" class="ws-icon-button" hidden id="install-button" title="Install FIRE COUNSEL" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg></button>
+<button aria-label="Help and privacy" class="ws-icon-button" id="help-button" title="Help &amp; privacy" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.5h.01"/></svg></button>
+<div class="ws-bell-wrap"><button aria-controls="ws-bell-panel" aria-expanded="false" aria-label="Notifications" class="ws-icon-button ws-bell" id="ws-bell" type="button"><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10.3 20a1.9 1.9 0 0 0 3.4 0"/></svg><span class="ws-bell-count" hidden id="ws-bell-count">0</span></button><div class="ws-bell-panel" hidden id="ws-bell-panel" role="region" aria-label="Notifications"></div></div>
+<a class="ws-signin" href="./auth.html?next=study.html" id="ws-signin">Sign in</a>
+<a class="profile ws-user" data-go="profile" href="#profile"><span class="avatar" id="student-profile-avatar">FC</span><span class="profile-info"><strong id="student-profile-name">Student workspace</strong><small id="profile-role">Local-first workspace</small></span><svg class="ws-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a>
 </div>
 </header>
 <div class="views">
-<section aria-label="Student home" class="page active-page" id="dashboard-page">
-<div class="page-heading" id="student-home"><div><div class="eyebrow">YOUR LEGAL STUDY SPACE &middot; <span id="today-label">Today</span></div><h1>Build clarity, case by case.</h1><p>A calmer study plan, stronger recall, and course materials you can trust.</p></div><div class="heading-actions"><a class="button primary" href="./ai.html">Ask Fire Counsel AI <span class="arrow">&nearrow;</span></a></div></div>
-<div aria-label="FIRE COUNSEL study highlights" aria-roledescription="carousel" class="hero">
-<div class="hero-track">
-<article class="hero-slide active" data-slide="0"><div class="hero-copy"><div class="hero-tag"><span>✦</span> YOUR LEGAL STUDY COMPANION</div><h2>Understand the law.<br/><em>Remember the details.</em></h2><p>Study with active recall, deliberate practice and answers grounded in trusted course materials.</p><div class="hero-buttons"><button class="button white" data-go="subjects">Explore your courses <span class="arrow">&rarr;</span></button><button class="button ghost-white" data-go="exams">Start a focus session</button></div></div><div class="hero-art"><img alt="A judge in robes writing in a law library" decoding="async" height="340" loading="lazy" src="./assets/images/pexels-law-judge.jpg" width="520"/></div></article>
-<article class="hero-slide" data-slide="1"><div class="hero-copy"><div class="hero-tag"><span>✦</span> A LIBRARY THAT LEARNS WITH YOU</div><h2>Good notes make<br/><em>great arguments.</em></h2><p>Choose a course, keep your own cases close, and practise one useful question at a time.</p><div class="hero-buttons"><button class="button white" data-go="memory">Create a case card <span class="arrow">&rarr;</span></button><button class="button ghost-white" data-go="library">Open my library</button></div></div><div class="hero-art"><img alt="A student studying with books and a laptop in a library" decoding="async" height="340" loading="lazy" src="./assets/images/pexels-law-student.jpg" width="520"/></div></article>
-<article class="hero-slide" data-slide="2"><div class="hero-copy"><div class="hero-tag"><span>✦</span> PRACTISE WITH PURPOSE</div><h2>From past questions<br/><em>to confident answers.</em></h2><p>Work through exam questions, save your own revision notes locally, and build a steady routine.</p><div class="hero-buttons"><button class="button white" data-go="exams">Explore exam practice <span class="arrow">&rarr;</span></button><button class="button ghost-white" data-go="subjects">Choose a course</button></div></div><div class="hero-art"><img alt="FIRE COUNSEL gavel and flame brand artwork" decoding="async" height="340" loading="lazy" src="./assets/images/fire-counsel-brand.jpg" width="520"/></div></article>
+<section aria-label="Student home" class="page active-page ws-dashboard" id="dashboard-page">
+<div class="ws-grid">
+<div class="ws-center">
+<section class="ws-hero" id="student-home">
+<img alt="" class="ws-hero-img" decoding="async" height="594" id="ws-hero-img" src="./assets/images/workspace-hero.jpg" width="1400"/>
+<div class="ws-hero-copy">
+<span class="ws-date"><span id="today-label">Today</span></span>
+<h1><span id="ws-welcome-title">Welcome to FIRE COUNSEL,</span> <em id="ws-welcome-accent">Your Complete Law Student Workspace</em></h1>
+<p id="ws-welcome-tagline">Study smarter. Research deeper. Achieve greater.</p>
+<a class="ws-cta" data-go="subjects" href="#subjects" id="ws-welcome-button"><span id="ws-welcome-label">Explore Your Workspace</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
 </div>
-<div class="carousel-footer"><button aria-label="Previous slide" class="carousel-arrow" id="prev-slide" type="button">&lsaquo;</button><div class="carousel-dots"><button aria-label="Slide 1" class="carousel-dot active" type="button"></button><button aria-label="Slide 2" class="carousel-dot" type="button"></button><button aria-label="Slide 3" class="carousel-dot" type="button"></button></div><button aria-label="Next slide" class="carousel-arrow" id="next-slide" type="button">&rsaquo;</button></div>
+</section>
+<section aria-label="Study tools" class="ws-tiles" id="ws-tiles"><a class="ws-tile" data-go="subjects" href="#subjects"><span class="ws-tile-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="M12 6.5C10 5 7 4.5 3 5v13c4-.5 7 0 9 1.5 2-1.5 5-2 9-1.5V5c-4-.5-7 0-9 1.5Z"/><path d="M12 6.5v13"/></svg></span><span class="ws-tile-text"><strong>My Courses</strong><small>Manage your courses</small></span><span class="ws-tile-go"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a><a class="ws-tile" data-go="library" href="#library"><span class="ws-tile-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><rect x="9" y="3" width="12" height="9" rx="1"/><path d="m12 9 3-3 2 2 2-2"/><circle cx="5" cy="7" r="2"/><path d="M2 21v-5a3 3 0 0 1 3-3h1l4 2M7 21v-6"/></svg></span><span class="ws-tile-text"><strong>Lecture Room</strong><small>Access lecture materials</small></span><span class="ws-tile-go"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a><a class="ws-tile" data-go="library" href="#library"><span class="ws-tile-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/><path d="M8.5 17v-4h1.3a1.2 1.2 0 0 1 0 2.4H8.5M13 13v4h1a2 2 0 0 0 0-4zM18 13h-2v4M16 15h1.5"/></svg></span><span class="ws-tile-text"><strong>PDF Reader</strong><small>Read your saved PDFs</small></span><span class="ws-tile-go"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a><a class="ws-tile" href="./ai.html?mode=case"><span class="ws-tile-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="M12 3v18M7 21h10M5 7h14M12 4.5 5 7M12 4.5 19 7"/><path d="m5 7-3 6a3 3 0 0 0 6 0zM19 7l-3 6a3 3 0 0 0 6 0z"/></svg></span><span class="ws-tile-text"><strong>Case Briefing</strong><small>Analyse landmark cases</small></span><span class="ws-tile-go"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a><a class="ws-tile" href="./ai.html?task=statute"><span class="ws-tile-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="M3 10h18L12 4zM5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 21h18M4 18h16"/></svg></span><span class="ws-tile-text"><strong>Statute Explorer</strong><small>Nigerian &amp; international laws</small></span><span class="ws-tile-go"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a><a class="ws-tile" href="./ai.html?q=Define%20this%20legal%20term%20and%20give%20an%20example%3A%20"><span class="ws-tile-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H20v15H5.5A1.5 1.5 0 0 0 4 19.5z"/><path d="M4 19.5A1.5 1.5 0 0 0 5.5 21H20v-3"/><path d="m9 13 2.5-6L14 13M10 11h3"/></svg></span><span class="ws-tile-text"><strong>Legal Dictionary</strong><small>Find legal terms</small></span><span class="ws-tile-go"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a><a class="ws-tile" data-go="ai-chat" href="#ai-chat"><span class="ws-tile-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></span><span class="ws-tile-text"><strong>Research Desk</strong><small>Search authorities</small></span><span class="ws-tile-go"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a><a class="ws-tile" data-go="exams" href="#exams"><span class="ws-tile-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M8.5 12.5l2 2 4-4.5"/></svg></span><span class="ws-tile-text"><strong>Examination Centre</strong><small>Past questions &amp; CBT</small></span><span class="ws-tile-go"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a><a class="ws-tile ws-tile-wide" data-go="memory" href="#memory"><span class="ws-tile-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><rect x="3" y="7" width="13" height="14" rx="2" transform="rotate(-8 9.5 14)"/><path d="M10 4.2 18.8 3a2 2 0 0 1 2.2 1.7l1.5 10.9a2 2 0 0 1-1.7 2.3L19 18"/></svg></span><span class="ws-tile-text"><strong>Flashcards</strong><small>Memorise key concepts</small></span><span class="ws-tile-go"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a><a class="ws-tile ws-tile-wide" data-go="planner" href="#planner"><span class="ws-tile-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M7.5 14h2M11 14h2M14.5 14h2M7.5 17.5h2M11 17.5h2"/></svg></span><span class="ws-tile-text"><strong>Study Planner</strong><small>Plan your study</small></span><span class="ws-tile-go"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a></section>
+<div class="ws-bottom">
+<section aria-labelledby="ws-progress-title" class="ws-card ws-progress" id="ws-progress">
+<div class="ws-card-head"><h2 id="ws-progress-title"><span class="ws-head-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg></span><span id="ws-progress-heading">Your Academic Progress</span></h2><a class="ws-more" data-go="planner" href="#planner">View Details <span aria-hidden="true">&rarr;</span></a></div>
+<div class="ws-progress-body" id="ws-progress-body"><div class="ws-ring" style="--p:0"><span>0%</span></div><ul class="ws-checks"></ul></div>
+</section>
+<section aria-labelledby="ws-deadlines-title" class="ws-card ws-deadlines" id="ws-deadlines">
+<div class="ws-card-head"><h2 id="ws-deadlines-title"><span class="ws-head-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M7.5 14h2M11 14h2M14.5 14h2M7.5 17.5h2M11 17.5h2"/></svg></span><span id="ws-deadlines-heading">Upcoming Deadlines</span></h2><a class="ws-more" data-go="planner" href="#planner">View All <span aria-hidden="true">&rarr;</span></a></div>
+<ol class="ws-deadline-list" id="ws-deadline-list"><li class="ws-empty">No deadlines yet. Add your own in the <a data-go="planner" href="#planner">Study Planner</a>.</li></ol>
+</section>
 </div>
-<div class="stats-grid">
-<article class="card stat-card"><div class="stat-icon violet">&sect;</div><div><span>Courses</span><strong id="stat-subjects">6</strong><small>Available to study</small></div></article>
-<article class="card stat-card"><div class="stat-icon cyan">▤</div><div><span>My local files</span><strong id="stat-materials">0</strong><small>On this device</small></div></article>
-<article class="card stat-card"><div class="stat-icon pink">✧</div><div><span>Recall cards</span><strong id="stat-cards">0</strong><small>Saved on this device</small></div></article>
-<article class="card stat-card"><div class="stat-icon green">◷</div><div><span>Focus sessions</span><strong id="stat-sessions">0</strong><small>Tracked locally</small></div></article>
+<section aria-labelledby="ws-courses-title" class="ws-card ws-courses" id="student-courses">
+<div class="ws-card-head"><h2 id="ws-courses-title"><span class="ws-head-icon"><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="M12 6.5C10 5 7 4.5 3 5v13c4-.5 7 0 9 1.5 2-1.5 5-2 9-1.5V5c-4-.5-7 0-9 1.5Z"/><path d="M12 6.5v13"/></svg></span><span id="ws-courses-heading">Continue studying</span></h2><label class="course-select ws-course-select">Studying now <select aria-label="Active course" id="active-course-select"></select></label></div>
+<div class="course-grid subject-grid" id="dashboard-subjects"></div>
+</section>
+<p class="ws-privacy" id="student-privacy">Your files, flashcards, planner and progress stay in this browser. Only what you send to Fire Counsel AI goes to the AI service.</p>
 </div>
-<div class="section-row" id="student-courses"><div><h2 class="section-title">Pick up where you left off</h2><p class="section-subtitle">Choose a course for this study session. Your selection stays on this device.</p></div><label class="course-select">Studying <select aria-label="Choose a course" id="active-course-select"></select></label></div>
-<div class="student-layout"><div class="course-grid subject-grid" id="dashboard-subjects"></div><aside class="card study-panel"><div class="panel-head"><div><h3>Today&rsquo;s gentle plan</h3><p>A little progress goes a long way.</p></div><a class="mini-link" data-page="exams" href="#exams">Focus timer</a></div><div class="today-item"><span class="today-icon">&sect;</span><div class="today-copy"><strong>Review one legal principle</strong><span>Choose a course and continue a topic</span></div><span class="task-pill">15 min</span></div><div class="today-item"><span class="today-icon">✎</span><div class="today-copy"><strong>Try one past question</strong><span>Practise issue spotting</span></div><span class="task-pill">1 question</span></div><div class="today-item"><span class="today-icon">✧</span><div class="today-copy"><strong>Refresh your case cards</strong><span>Active recall practice</span></div><span class="task-pill">Your pace</span></div></aside></div>
-<div class="section-row" id="student-tools"><div><h2 class="section-title">Study tools, ready when you are</h2><p class="section-subtitle">Personal learning work is designed to stay on your device.</p></div></div>
-<div class="quick-grid"><button class="card quick-card" data-go="exams"><span class="quick-icon">▤</span><span><strong>Past questions</strong><small>Practise and review exam work.</small></span></button><button class="card quick-card" data-go="memory"><span class="quick-icon">✧</span><span><strong>Case flashcards</strong><small>Create a personal case recall set.</small></span></button></div>
-<div class="privacy-strip" id="student-privacy"><span class="privacy-icon">&checkmark;</span><div><strong>Local-first learning by design</strong><p>Personal files, flashcards, subjects and progress stay in this browser. Authenticated course access is checked by the server; signing in does not upload your personal study work. Only what you send in the Fire Counsel AI studio goes to the AI service (Google Gemini, with free backup models).</p></div></div>
-<footer class="page-footer"><span>FIRE COUNSEL <b>&bull;</b> Legal study workspace</span><span>Study data stays close to you.</span></footer>
+<aside aria-label="Fire Counsel AI and motivation" class="ws-side">
+<section aria-labelledby="ws-ai-title" class="ws-ai-card" id="ws-ai-card">
+<div class="ws-ai-head"><div aria-hidden="true" class="fc-fire ws-mini-fire"><i class="fl fl1"></i><i class="fl fl2"></i><i class="fl fl3"></i><i class="fl fl4"></i><i class="em em1"></i><i class="em em2"></i><i class="em em3"></i></div><div><h2 id="ws-ai-title">FIRE COUNSEL AI</h2><p id="ws-ai-subtitle">Your Intelligent Law Tutor</p></div></div>
+<div class="ws-ai-bubble"><span aria-hidden="true">&#10022;</span><p id="ws-ai-intro">Ask me any legal question&hellip; I&rsquo;ll help you with accurate and reliable legal insights.</p></div>
+<form class="ws-ai-form" id="ws-ai-form"><input aria-label="Ask Fire Counsel AI" autocomplete="off" id="ws-ai-input" maxlength="2000" placeholder="Type your question&hellip;" type="text"/><button aria-label="Ask" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12 20 4l-4 16-4-7z"/><path d="m12 13 8-9"/></svg></button></form>
+<p class="ws-ai-foot"><i aria-hidden="true"></i><span id="ws-ai-footer">Powered by Gemini</span></p>
+</section>
+<section aria-label="Motivation" class="ws-quote" id="ws-quote">
+<img alt="" class="ws-quote-img" decoding="async" height="1376" id="ws-quote-img" loading="lazy" src="./assets/images/workspace-quote.jpg" width="520"/>
+<div class="ws-quote-copy"><span aria-hidden="true" class="ws-quote-mark">&ldquo;</span><blockquote id="ws-quote-text">Dream Big, Study Hard, Graduate Great!</blockquote><div aria-hidden="true" class="ws-quote-rule"><i></i><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="M12 3v18M7 21h10M5 7h14M12 4.5 5 7M12 4.5 19 7"/><path d="m5 7-3 6a3 3 0 0 0 6 0zM19 7l-3 6a3 3 0 0 0 6 0z"/></svg><i></i></div><strong id="ws-quote-brand">FIRE COUNSEL</strong><small id="ws-quote-subline">Your Legal Success Partner</small></div>
+</section>
+</aside>
+</div>
+<div class="ws-legacy-stats" hidden><span id="stat-subjects">6</span><span id="stat-materials">0</span><span id="stat-cards">0</span><span id="stat-sessions">0</span></div>
+</section>
+<section aria-label="Study planner and progress" class="page ws-planner-page" id="planner-page">
+<div class="page-heading"><div><div class="eyebrow">STUDY PLANNER &middot; SAVED ON THIS DEVICE</div><h1>Plan your study</h1><p>Add your own deadlines and study tasks. They stay in this browser. Deadlines from your administrator appear here too.</p></div></div>
+<div class="ws-planner">
+<section aria-labelledby="planner-heading" class="ws-card">
+<div class="ws-card-head"><h2 id="planner-heading">Add a deadline or task</h2></div>
+<form class="ws-planner-form" id="planner-form">
+<label>What is due?<input id="planner-title" maxlength="120" placeholder="e.g. Submit Contract Law assignment" required type="text"/></label>
+<label>Due date<input id="planner-date" required type="date"/></label>
+<label>Type<select id="planner-type"><option value="assignment">Assignment</option><option value="test">Test / CBT</option><option value="reading">Reading</option><option value="exam">Exam</option><option value="other">Other</option></select></label>
+<button class="ws-cta" type="submit">Add to my planner</button>
+</form>
+<ol class="ws-planner-list" id="planner-list"></ol>
+</section>
+<div class="ws-planner-side">
+<section aria-labelledby="planner-progress-title" class="ws-card" id="planner-progress"><div class="ws-card-head"><h2 id="planner-progress-title">My progress</h2></div><div class="ws-progress-body" id="planner-progress-body"></div><p class="ws-hint">Progress counts what you do in this browser: flashcards, focus sessions (Examination Centre), saved files and planner tasks.</p></section>
+<section aria-labelledby="planner-admin-title" class="ws-card"><div class="ws-card-head"><h2 id="planner-admin-title">From your administrator</h2></div><ol class="ws-deadline-list" id="planner-admin"></ol></section>
+</div>
+</div>
 </section>
 <section aria-label="Fire Counsel AI and trusted sources" class="page ai-chat-page" id="ai-chat-page">
 <div class="page-heading ai-page-heading"><div><div class="eyebrow">FIRE COUNSEL AI &middot; TRUSTED SOURCES</div><h1>Make law click.</h1><p>Open the full-screen Fire Counsel AI, or search the verified library directly.</p></div></div>
@@ -170,6 +203,7 @@
 
 
 <script defer="" src="./app.js"></script>
+<script type="module" src="./workspace.mjs"></script>
 <script type="module" src="./study-materials.mjs"></script>
 <script type="module" src="./research-search.mjs"></script>
 <script type="module" src="./student-profile.mjs"></script>

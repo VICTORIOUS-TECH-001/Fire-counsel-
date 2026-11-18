@@ -7,9 +7,9 @@ const root = resolve(import.meta.dirname, "../..");
 const read = path => readFileSync(resolve(root, path), "utf8");
 const pages = ["index.html", "study.html", "admin.html", "auth.html", "ai.html"];
 const integrations = [
-  ["study.html", ["study-materials.mjs", "research-search.mjs", "student-profile.mjs", "presence.mjs"]],
+  ["study.html", ["study-materials.mjs", "research-search.mjs", "student-profile.mjs", "presence.mjs", "workspace.mjs"]],
   ["ai.html", ["ai-studio.mjs", "research-search.mjs", "presence.mjs"]],
-  ["admin.html", ["admin-auth.mjs", "admin-database.mjs", "admin-ai.mjs", "admin-courses.mjs", "admin-site.mjs", "admin-uploads.mjs", "presence.mjs"]],
+  ["admin.html", ["admin-auth.mjs", "admin-database.mjs", "admin-ai.mjs", "admin-courses.mjs", "admin-workspace.mjs", "admin-site.mjs", "admin-uploads.mjs", "presence.mjs"]],
   ["auth.html", ["auth-page.mjs"]]
 ];
 
@@ -97,4 +97,51 @@ test("the AI page lists every function and links back from the study space", () 
   // Every chat task offered in the page is accepted by the server.
   const studio = read("backend/src/services/ai/studio.js");
   for (const match of html.matchAll(/data-ai-task="([a-z]+)"/g)) assert.match(studio, new RegExp(`\\b${match[1]}: \\{ label:`), `${match[1]} exists on the server`);
+});
+
+test("every page shows the FIRE COUNSEL fire preloader first, and the student workspace is fully wired", () => {
+  for (const page of pages) {
+    const html = read(page);
+    const head = html.slice(0, html.indexOf("</head>"));
+    assert.match(head, /<link[^>]*href="\.\/preloader\.css"/, `${page} loads the preloader styles in <head>`);
+    const body = html.slice(html.indexOf("<body"));
+    assert.ok(body.indexOf('id="fc-preloader"') < 300, `${page}: the preloader is the first thing in <body>`);
+    assert.match(body, /class="fc-pre-fire"/, `${page}: the burning flame is shown`);
+    assert.match(body, /<script src="\.\/preloader\.js"><\/script>/, `${page}: the preloader script runs`);
+  }
+  const css = read("preloader.css");
+  assert.match(css, /fcPreFailsafe[^}]*10s|10s forwards/, "the preloader hides itself even without JavaScript");
+  assert.match(css, /prefers-reduced-motion/);
+  const study = read("study.html");
+  assert.match(study, /<link href="\.\/workspace\.css" rel="stylesheet"\/>/);
+  for (const id of ["ws-tiles", "ws-ai-form", "ws-deadline-list", "ws-progress-body", "planner-page", "student-nav", "course-nav-count", "today-label", "active-course-select", "dashboard-subjects"]) {
+    assert.match(study, new RegExp(`id="${id}"`), `${id} exists`);
+  }
+  for (const file of ["preloader.css", "preloader.js", "workspace.css", "workspace.mjs", "workspace-config.mjs", "admin-workspace.mjs"]) {
+    assert.match(read("backend/src/website.js"), new RegExp(`"${file.replace(".", "\\.")}"`), `${file} is served by the API server`);
+    assert.match(read("tools/dev_server.py"), new RegExp(`"${file.replace(".", "\\.")}"`), `${file} is served by the dev server`);
+  }
+});
+
+test("workspace settings keep only safe links and fall back to the built-in design", async () => {
+  const { mergeWorkspace, safeLink, menuHTML, tilesHTML, DEFAULT_WORKSPACE } = await import(resolve(root, "workspace-config.mjs"));
+  assert.equal(safeLink("javascript:alert(1)"), "#dashboard");
+  assert.equal(safeLink("//evil.example/x"), "#dashboard");
+  assert.equal(safeLink("http://insecure.example"), "#dashboard");
+  assert.equal(safeLink("https://nigerialii.org"), "https://nigerialii.org");
+  assert.equal(safeLink("./ai.html?mode=case"), "./ai.html?mode=case");
+  const defaults = mergeWorkspace(null);
+  assert.equal(defaults.tiles.length, DEFAULT_WORKSPACE.tiles.length);
+  const custom = mergeWorkspace({ welcome: { title: "Hello <b>class</b>" }, tiles: [{ icon: "nope", title: "<img src=x onerror=alert(1)>", link: "javascript:x" }], menu: [{ label: "Library", link: "#library" }, { label: "PDFs", link: "#library" }, { label: "AI", link: "./ai.html" }], deadlines: { items: [{ date: "2026-12-01", title: "CBT" }, { date: "soon", title: "bad" }] }, notices: ["Hi", 5, ""] });
+  assert.equal(custom.welcome.title, "Hello <b>class</b>", "text is kept as text (it is escaped when shown)");
+  assert.equal(custom.welcome.accent, DEFAULT_WORKSPACE.welcome.accent, "missing fields use the defaults");
+  const tiles = tilesHTML(custom);
+  assert.doesNotMatch(tiles, /<img|javascript:/);
+  assert.match(tiles, /data-go="dashboard"/);
+  const menu = menuHTML(custom, "6");
+  assert.equal((menu.match(/data-page="library"/g) || []).length, 1, "only the first link to a section is the highlighted one");
+  assert.match(menu, /data-go="library"/);
+  assert.match(menu, /id="course-nav-count" hidden>6</, "the course counter always exists");
+  assert.deepEqual(custom.deadlines.items.map((item) => item.title), ["CBT"]);
+  assert.deepEqual(custom.notices, ["Hi"]);
 });

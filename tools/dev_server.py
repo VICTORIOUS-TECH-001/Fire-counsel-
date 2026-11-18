@@ -23,6 +23,7 @@ PUBLIC_FILES = {
     "student-profile.mjs", "installation.mjs",
     "ai-studio.css", "ai-page.css", "ai-studio.mjs", "ai-markdown.mjs", "admin-ai.mjs", "admin-courses.mjs", "presence.mjs",
     "admin-site.mjs", "admin-uploads.mjs", "pdf-reader.mjs",
+    "preloader.css", "preloader.js", "workspace.css", "workspace.mjs", "workspace-config.mjs", "admin-workspace.mjs",
     "data/site-content.json",
     "firebase/client.mjs", "firebase/auth-client.mjs",
     "firebase/firebase-config.mjs", "firebase/firebase-config.example.mjs",

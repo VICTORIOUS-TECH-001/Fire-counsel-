@@ -7,11 +7,20 @@
   <meta name="robots" content="noindex,nofollow">
   <meta name="description" content="Sign in to your FIRE COUNSEL student or administrator account.">
   <title>Sign in · FIRE COUNSEL</title>
+  <link rel="stylesheet" href="./preloader.css">
   <link rel="icon" href="./assets/fire-counsel-192.png" type="image/png">
   <link rel="stylesheet" href="./auth.css">
   <script type="module" src="./auth-page.mjs"></script>
 </head>
 <body>
+<div class="fc-preloader" id="fc-preloader" role="status" aria-label="FIRE COUNSEL is loading">
+<div class="fc-pre-core" aria-hidden="true"><div class="fc-pre-ring"></div><div class="fc-pre-hex"><div class="fc-pre-fire"><i class="fl fl1"></i><i class="fl fl2"></i><i class="fl fl3"></i><i class="fl fl4"></i><i class="em em1"></i><i class="em em2"></i><i class="em em3"></i><i class="em em4"></i><i class="em em5"></i></div></div></div>
+<div class="fc-pre-name">FIRE <span>COUNSEL</span></div>
+<div class="fc-pre-tag">Ignite your legal intelligence</div>
+<div class="fc-pre-bar" aria-hidden="true"><i></i></div>
+<div class="fc-pre-status">Opening secure sign-in…</div>
+</div>
+<script src="./preloader.js"></script>
   <main class="auth-shell">
     <a class="auth-brand" href="./index.html"><img src="./assets/images/fire-counsel-brand.jpg" alt="" width="46" height="46"><span><strong>FIRE COUNSEL</strong><small>IGNITE YOUR LEGAL INTELLIGENCE</small></span></a>
     <section class="auth-card" aria-labelledby="auth-title">

@@ -82,7 +82,7 @@
     $("#scrim").classList.remove("show");
   }
   function showPage(name, updateHash = true) {
-    const studentPages = ["dashboard", "ai-chat", "subjects", "library", "memory", "exams", "profile"];
+    const studentPages = ["dashboard", "ai-chat", "subjects", "library", "memory", "exams", "planner", "profile"];
     const valid = studentPages.includes(name) ? name : "dashboard";
     $$(".page").forEach(page => page.classList.toggle("active-page", page.id === `${valid}-page`));
     const studentNav = $("#student-nav");
@@ -90,7 +90,8 @@
     $$("#student-nav .nav-link").forEach(link => link.classList.toggle("active", link.dataset.page === valid));
     $("#workspace-label").textContent = "Student workspace";
     $("#breadcrumb-workspace").textContent = "Student";
-    $("#page-breadcrumb").textContent = ({dashboard:"Overview","ai-chat":"Trusted sources",subjects:"My courses",library:"Study library",memory:"Case flashcards",exams:"Past questions",profile:"My profile"})[valid];
+    $("#page-breadcrumb").textContent = ({dashboard:"Overview","ai-chat":"Research desk",subjects:"My courses",library:"Study library",memory:"Case flashcards",exams:"Past questions",planner:"Study planner",profile:"My profile"})[valid];
+    document.dispatchEvent(new CustomEvent("fire-counsel:page", {detail:{page:valid}}));
     $("#mode-label").textContent = "LOCAL STUDY";
     closeSidebar();
     if (updateHash && location.hash !== `#${valid}`) history.replaceState(null, "", `#${valid}`);
@@ -262,8 +263,8 @@
   function setupCarousel() {
     const carousel = $(".hero");
     if (!carousel) return;
-    $("#prev-slide").addEventListener("click", () => showSlide(slideIndex - 1));
-    $("#next-slide").addEventListener("click", () => showSlide(slideIndex + 1));
+    $("#prev-slide")?.addEventListener("click", () => showSlide(slideIndex - 1));
+    $("#next-slide")?.addEventListener("click", () => showSlide(slideIndex + 1));
     $$(".carousel-dot").forEach((dot, index) => dot.addEventListener("click", () => showSlide(index)));
     carousel.addEventListener("mouseenter", () => clearInterval(slideTimer));
     carousel.addEventListener("mouseleave", startCarousel);
@@ -378,7 +379,7 @@
     const query = event.target.value.toLowerCase().trim();
     const page = $(".page.active-page");
     if (!page) return;
-    $$(".subject-card, .quick-card, .document-item, .today-item", page).forEach(item => {
+    $$(".subject-card, .quick-card, .document-item, .today-item, .ws-tile", page).forEach(item => {
       item.hidden = Boolean(query) && !item.textContent.toLowerCase().includes(query);
     });
   });

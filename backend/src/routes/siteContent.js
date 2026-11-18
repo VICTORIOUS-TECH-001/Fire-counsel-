@@ -41,6 +41,17 @@ export function validateSiteContent(content) {
   if (!Array.isArray(content.navigation)) fail("navigation must be a list of links.");
   if (!Array.isArray(content.hero?.slides) || !content.hero.slides.length) fail("hero.slides needs at least one slide.");
   if (!Array.isArray(content.learning?.cards)) fail("learning.cards must be a list.");
+  // Student workspace (Admin → Student workspace). Optional; the student page
+  // ignores anything it does not understand, but the shape must be sane.
+  if (content.workspace != null) {
+    const ws = content.workspace;
+    if (typeof ws !== "object" || Array.isArray(ws)) fail("workspace must be an object.");
+    for (const list of ["menu", "tiles", "notices"]) {
+      if (ws[list] != null && (!Array.isArray(ws[list]) || ws[list].length > 40)) fail(`workspace.${list} must be a list of at most 40 items.`);
+    }
+    if (ws.deadlines?.items != null && (!Array.isArray(ws.deadlines.items) || ws.deadlines.items.length > 60)) fail("workspace.deadlines.items must be a list of at most 60 items.");
+    if (/javascript:/i.test(JSON.stringify(ws))) fail("A workspace link uses javascript:, which is not allowed.");
+  }
   const json = JSON.stringify(content);
   if (Buffer.byteLength(json) > MAX_CONTENT_BYTES) fail("Website content is larger than 512 KB. Upload photos with the photo button instead of pasting them.");
   if (/"data:[^"]{0,40};base64,/i.test(json)) fail("A photo is pasted into the content as text (data:…base64). Re-upload it with the slide photo button so it is stored properly.");
