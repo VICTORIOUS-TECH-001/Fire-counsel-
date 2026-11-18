@@ -287,3 +287,13 @@ body[data-theme="light"] .fc-mock-score{color:#157459}
 .fc-exam-foot{position:fixed;left:0;right:0;bottom:0;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px max(12px,env(safe-area-inset-bottom));background:rgba(255,255,255,.96);box-shadow:0 -6px 20px rgba(20,20,40,.08)}
 .fc-exam-foot .fc-btn{min-height:46px;padding:0 22px;font-size:15px}
 .fc-ai .ai-option[data-task="mock"] input[type="number"]{width:78px}
+
+/* Word-by-word answers (shown while the AI is still writing) */
+.ai-streaming{position:relative}
+.fc-stream-bar{display:flex;align-items:center;gap:8px;margin:-2px 0 8px;padding-bottom:8px;border-bottom:1px solid rgba(255,138,46,.25);font-size:13px;min-width:0}
+.fc-stream-bar strong{color:#ffad4d;text-shadow:0 0 10px rgba(255,122,26,.45);animation:fcGlow 1.6s ease-in-out infinite alternate}
+.fc-stream-bar small{margin-left:auto;opacity:.7}
+.fc-stream-flame{display:inline-block;animation:fcFlicker .5s ease-in-out infinite alternate;transform-origin:50% 90%}
+.fc-caret{display:inline-block;width:8px;height:16px;margin-top:2px;border-radius:2px;background:#ff8a2e;box-shadow:0 0 10px rgba(255,122,26,.7);animation:fcBlink 1s steps(2,start) infinite;vertical-align:text-bottom}
+@keyframes fcBlink{to{visibility:hidden}}
+@media (prefers-reduced-motion:reduce){.fc-stream-flame,.fc-caret,.fc-stream-bar strong{animation:none}}
