@@ -7,7 +7,7 @@ import "dotenv/config";
 import { readFileSync } from "node:fs";
 import { getPool } from "../src/config/database.js";
 
-export const APPLY = ["002_ai_studio.sql", "003_site_and_documents.sql"];
+export const APPLY = ["002_ai_studio.sql", "003_site_and_documents.sql", "004_ai_instructions.sql"];
 export const EXPECTED_TABLES = [
   "ai_settings", "ai_prompts", "ai_user_limits", "ai_usage", "user_presence", "ai_conversations", "ai_messages", "schema_migrations",
   "site_content", "site_content_versions", "site_images", "uploaded_files"

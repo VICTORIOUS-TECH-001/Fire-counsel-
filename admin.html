@@ -20,6 +20,7 @@
       <div class="sidebar-label">ADMINISTRATION</div>
       <button class="admin-tab is-active" type="button" data-panel="overview"><span>⌂</span>Overview</button>
       <button class="admin-tab" type="button" data-panel="database"><span>▦</span>Database data</button>
+      <button class="admin-tab" type="button" data-panel="courses"><span>§</span>Courses</button>
       <button class="admin-tab" type="button" data-panel="uploads"><span>⇪</span>Upload documents</button>
       <button class="admin-tab" type="button" data-panel="content"><span>▤</span>Pages & JSON</button>
       <button class="admin-tab" type="button" data-panel="media"><span>▧</span>Slides & images</button>
@@ -38,7 +39,7 @@
       <section class="admin-panel is-visible" id="panel-overview" aria-labelledby="admin-title">
         <div class="admin-heading"><div><span class="eyebrow">FIRE COUNSEL · ADMIN STUDIO</span><h1 id="admin-title">Your study platform, in one place.</h1><p>Upload course materials, cases and past questions, edit and publish the website, and manage AI settings and student limits.</p></div><button class="button button-primary" type="button" data-switch="uploads">Upload documents →</button></div>
         <div class="admin-stat-grid"><article class="admin-stat"><span>01</span><strong>Website content</strong><small>Draft · preview · publish</small></article><article class="admin-stat"><span>02</span><strong>Documents</strong><small>PDF, Word & photos into Neon</small></article><article class="admin-stat"><span>03</span><strong>AI studio</strong><small>Key status · private prompts</small></article><article class="admin-stat"><span>04</span><strong>Users &amp; limits</strong><small>Active badges · daily allowances</small></article></div>
-        <div class="admin-card next-card"><div><span class="eyebrow">ADMIN WORKSPACE</span><h2>Set the rules. Give each student the right access.</h2><p>Set the default daily AI limits, see who is active right now, and give any account more or less. Changes apply to students immediately.</p><button class="button button-primary" type="button" data-switch="plans">Open users &amp; AI limits →</button></div><div class="step-stack"><span><b>1</b> Add courses in Database data, then upload materials, cases and past papers in Upload documents</span><span><b>2</b> Upload your private prompts in AI studio</span><span><b>3</b> Adjust any account&rsquo;s daily limits</span></div></div>
+        <div class="admin-card next-card"><div><span class="eyebrow">ADMIN WORKSPACE</span><h2>Set the rules. Give each student the right access.</h2><p>Set the default daily AI limits, see who is active right now, and give any account more or less. Changes apply to students immediately.</p><button class="button button-primary" type="button" data-switch="plans">Open users &amp; AI limits →</button></div><div class="step-stack"><span><b>1</b> Add courses in the Courses tab, then upload materials, cases and past papers in Upload documents</span><span><b>2</b> Import your AI instructions file and private prompts in AI studio</span><span><b>3</b> Adjust any account&rsquo;s daily limits</span></div></div>
       </section>
 
       <section class="admin-panel" id="panel-database" aria-labelledby="database-title" hidden>
@@ -62,6 +63,32 @@
           <form id="database-version-form"><label class="database-field" for="database-version-text">New material text<textarea id="database-version-text" rows="10" maxlength="700000" placeholder="Paste reviewed staging material text" disabled></textarea></label><p class="integration-status" id="database-version-status" role="status" aria-live="polite"></p><button class="button button-primary" type="submit" disabled>Save new text version</button></form>
         </section>
         <div class="info-card"><span class="info-mark">i</span><p>No account tables, passwords, personal study files, embeddings or raw SQL are exposed here. Deletions require confirmation; applicable records are deactivated or unpublished instead.</p></div>
+      </section>
+
+      <section class="admin-panel" id="panel-courses" aria-labelledby="courses-title" hidden>
+        <div class="admin-heading"><div><span class="eyebrow">SAVED IN NEON · SHOWN TO EVERY STUDENT</span><h1 id="courses-title">Courses.</h1><p>Add a new course or edit an existing one. Courses marked <b>Show to all students</b> appear on every student&rsquo;s <b>My courses</b> page and in the AI studio course list.</p></div><span class="panel-status" id="courses-panel-status">SIGN IN AS ADMIN</span></div>
+        <section class="fc-admin-card" aria-labelledby="course-list-title">
+          <span class="eyebrow">ALL COURSES</span><h2 id="course-list-title">Your courses</h2>
+          <div class="fc-row"><button class="button button-primary" id="course-add" type="button" disabled>＋ Add a course</button><label class="sr-only" for="course-search">Search courses</label><input id="course-search" type="search" placeholder="Search code or title" disabled><button class="button button-light" id="course-refresh" type="button" disabled>Refresh</button></div>
+          <p class="fc-status" id="course-list-status" role="status" aria-live="polite">Sign in as an administrator to load courses.</p>
+          <div class="fc-users-wrap"><table class="fc-users"><thead><tr><th scope="col">Code</th><th scope="col">Course</th><th scope="col">Students</th><th scope="col">Action</th></tr></thead><tbody id="course-rows"><tr><td colspan="4">No courses loaded.</td></tr></tbody></table></div>
+        </section>
+        <form class="fc-admin-card fc-course-form" id="course-form" hidden style="margin-top:16px" aria-labelledby="course-form-title">
+          <span class="eyebrow">COURSE DETAILS</span><h2 id="course-form-title">Add a new course</h2>
+          <div class="fc-course-grid">
+            <label>University<select id="course-university"></select></label>
+            <label id="course-new-university-field" hidden>New university name<input id="course-new-university" maxlength="200" placeholder="e.g. University of Nigeria, Nsukka"></label>
+            <label>Course code<input id="course-code" maxlength="40" placeholder="e.g. LAW 241"></label>
+            <label>Course title *<input id="course-title" maxlength="300" required placeholder="e.g. Law of Contract I"></label>
+            <label>Level<input id="course-level" maxlength="40" placeholder="e.g. 200 level"></label>
+            <label>Semester<input id="course-semester" maxlength="40" placeholder="e.g. First semester"></label>
+            <label>Academic session<input id="course-session" maxlength="40" placeholder="e.g. 2026/2027"></label>
+          </div>
+          <label class="fc-course-wide">Description (optional — the topics this course covers; the AI uses it to recognise the course)<textarea id="course-description" maxlength="12000" rows="4" placeholder="e.g. Formation of contract, offer and acceptance, consideration, intention to create legal relations…"></textarea></label>
+          <label class="fc-check"><input id="course-published" type="checkbox" checked> Show to all students</label>
+          <div class="fc-row"><button class="button button-primary" id="course-save" type="submit" disabled>Save course</button><button class="button button-light" id="course-cancel" type="button">Close</button><span class="fc-status" id="course-form-status" role="status" aria-live="polite"></span></div>
+          <p><small>To remove a course from students, untick <b>Show to all students</b> and save. Its materials and past questions stay in the database.</small></p>
+        </form>
       </section>
 
       <section class="admin-panel" id="panel-uploads" aria-labelledby="uploads-title" hidden>
@@ -146,6 +173,17 @@
           <textarea id="ai-prompt-text" maxlength="200000" placeholder="Sign in as an administrator to load the prompt." disabled></textarea>
           <div class="fc-row"><button class="button button-primary" id="ai-prompt-save" type="button" disabled>Save prompt</button><button class="button button-light" id="ai-prompt-reset" type="button" disabled>Go back to the built-in prompt</button><span class="fc-status" id="ai-prompt-status" role="status" aria-live="polite"></span></div>
         </section>
+        <section class="fc-admin-card" aria-labelledby="ai-instructions-title" style="margin-top:16px">
+          <span class="eyebrow">BACKGROUND INSTRUCTIONS · PRIVATE · STORED IN NEON, NOT IN GITHUB</span><h2 id="ai-instructions-title">How the AI must behave</h2>
+          <p>These rules are sent to the AI in the background every time a student asks a question. The <b>always used</b> rules go with every answer; the server adds the right <b>task</b> instructions for each question (for example <i>Case analysis</i> + <i>Legal research</i>). Your prompts above still decide the exact output format of each feature.</p>
+          <p><b>Fastest way:</b> press <b>Import my instructions file</b> and choose <code>Fire_Counsel_Master_Prompts_and_Guides.txt</code>. Every instruction in it is saved at once. You can then open and edit any one below.</p>
+          <div class="fc-row"><label class="button button-primary" id="ai-instr-import-label">Import my instructions file<input id="ai-instr-import" type="file" accept=".txt,.md,text/plain" hidden disabled></label><span class="fc-status" id="ai-instr-import-status" role="status" aria-live="polite"></span></div>
+          <div id="ai-instr-list" class="fc-instr-list"><p>Sign in as an administrator to load the instructions.</p></div>
+          <div class="fc-row"><label for="ai-instr-key"><b>Edit</b></label><select id="ai-instr-key" disabled></select><span class="fc-state" id="ai-instr-state">—</span></div>
+          <label class="sr-only" for="ai-instr-text">Instruction text</label>
+          <textarea id="ai-instr-text" maxlength="50000" placeholder="Sign in as an administrator to load the instruction." disabled></textarea>
+          <div class="fc-row"><button class="button button-primary" id="ai-instr-save" type="button" disabled>Save instruction</button><button class="button button-light" id="ai-instr-delete" type="button" disabled>Remove this instruction</button><span class="fc-status" id="ai-instr-status" role="status" aria-live="polite"></span></div>
+        </section>
         <section class="fc-admin-card" aria-labelledby="ai-extract-title" style="margin-top:16px">
           <span class="eyebrow">COURSE MATERIAL HELPER</span><h2 id="ai-extract-title">Turn a PDF or photo into text</h2>
           <p>Use this when adding course materials, statutes or past questions in <b>Database data</b>: upload a page, check the text, then copy it into the record.</p>
@@ -197,6 +235,7 @@
   <script type="module" src="./admin-auth.mjs"></script>
   <script type="module" src="./admin-database.mjs"></script>
   <script type="module" src="./admin-ai.mjs"></script>
+  <script type="module" src="./admin-courses.mjs"></script>
   <script type="module" src="./admin-site.mjs"></script>
   <script type="module" src="./admin-uploads.mjs"></script>
   <script type="module" src="./presence.mjs"></script>

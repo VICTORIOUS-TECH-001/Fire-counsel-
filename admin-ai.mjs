@@ -33,7 +33,7 @@ async function api(path, options = {}) {
 }
 
 function setEnabled(on) {
-  for (const id of ["#ai-test-button", "#ai-prompt-save", "#ai-prompt-reset", "#ai-extract-button", "#save-default-limits", "#refresh-accounts"]) {
+  for (const id of ["#ai-test-button", "#ai-prompt-save", "#ai-prompt-reset", "#ai-extract-button", "#save-default-limits", "#refresh-accounts", "#ai-instr-save", "#ai-instr-delete", "#ai-instr-key", "#ai-instr-import", "#ai-instr-text"]) {
     const node = $(id);
     if (node) node.disabled = !on;
   }
@@ -301,6 +301,106 @@ $("#account-adjustment-form")?.addEventListener("submit", async (event) => {
   }
 });
 
+// ------------------------------------------------- background instructions
+const GROUP_LABEL = { always: "Always used — sent with every answer", specialist: "Task instructions — added when the question needs them", research: "Web research step", reference: "Reference only (the server routes questions itself — faster, saves your free AI quota)" };
+let instructions = [];
+let instrSaved = false;
+
+function renderInstructions() {
+  const list = $("#ai-instr-list");
+  if (!list) return;
+  const saved = instructions.filter((item) => item.saved).length;
+  const groups = Object.keys(GROUP_LABEL).map((group) => {
+    const items = instructions.filter((item) => item.group === group);
+    if (!items.length) return "";
+    return `<div class="fc-instr-group">${escapeHTML(GROUP_LABEL[group])}</div>` + items.map((item) => `<button class="fc-instr-item" type="button" data-instr="${escapeHTML(item.key)}"><span class="fc-state" data-ok="${item.saved}">${item.saved ? "SAVED" : "NOT SAVED"}</span><b>${escapeHTML(item.label)}</b>${item.saved ? `<small>${Number(item.length).toLocaleString()} characters · ${item.updated_at ? new Date(item.updated_at).toLocaleDateString() : ""}</small>` : ""}</button>`).join("");
+  }).join("");
+  list.innerHTML = `<p class="fc-status" data-kind="${saved ? "ok" : "error"}">${saved ? `${saved} of ${instructions.length} instructions saved. The AI follows them for every student.` : "No background instructions saved yet — the AI uses short built-in rules. Import your instructions file."}</p>${groups}`;
+  const select = $("#ai-instr-key");
+  const current = select.value;
+  select.innerHTML = instructions.map((item) => `<option value="${escapeHTML(item.key)}">${escapeHTML(item.label)}${item.saved ? "" : " (not saved)"}</option>`).join("");
+  if (instructions.some((item) => item.key === current)) select.value = current;
+}
+
+async function loadInstructionList(mySession = session) {
+  try {
+    const body = await api("/api/v1/admin/ai/instructions");
+    if (mySession !== session) return;
+    instructions = body.data || [];
+    renderInstructions();
+    await loadInstruction(mySession);
+  } catch (error) {
+    if (mySession === session && $("#ai-instr-list")) $("#ai-instr-list").innerHTML = `<p class="fc-status" data-kind="error">${escapeHTML(error.message)}</p>`;
+  }
+}
+
+async function loadInstruction(mySession = session) {
+  const key = $("#ai-instr-key")?.value;
+  if (!key) return;
+  setText("#ai-instr-status", "Loading…", "");
+  try {
+    const body = await api(`/api/v1/admin/ai/instructions/${encodeURIComponent(key)}`);
+    if (mySession !== session || key !== $("#ai-instr-key").value) return;
+    instrSaved = body.data.saved;
+    $("#ai-instr-text").value = body.data.content;
+    $("#ai-instr-text").placeholder = "Not saved yet. Paste or type this instruction, or import your instructions file.";
+    const state = $("#ai-instr-state");
+    state.textContent = body.data.saved ? "IN USE" : "NOT SAVED";
+    state.dataset.ok = String(body.data.saved);
+    setText("#ai-instr-status", body.data.updated_at ? `Saved ${new Date(body.data.updated_at).toLocaleString()}` : "", "");
+  } catch (error) {
+    if (mySession === session) setText("#ai-instr-status", error.message, "error");
+  }
+}
+
+$("#ai-instr-key")?.addEventListener("change", () => { if (verified) loadInstruction(); });
+$("#ai-instr-list")?.addEventListener("click", (event) => {
+  const item = event.target.closest("[data-instr]");
+  if (!item || !verified) return;
+  $("#ai-instr-key").value = item.dataset.instr;
+  loadInstruction();
+  $("#ai-instr-text").scrollIntoView({ behavior: "smooth", block: "center" });
+});
+$("#ai-instr-import")?.addEventListener("change", async (event) => {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file || !verified) return;
+  if (file.size > 600_000) { setText("#ai-instr-import-status", "That file is too large (over 600 KB).", "error"); return; }
+  setText("#ai-instr-import-status", `Reading ${file.name}…`, "");
+  try {
+    const body = await api("/api/v1/admin/ai/instructions/import", { method: "POST", body: JSON.stringify({ text: await file.text() }) });
+    const { saved, missing } = body.data;
+    setText("#ai-instr-import-status", `Saved ${saved.length} instruction${saved.length === 1 ? "" : "s"} from ${file.name}.${missing.length ? ` Not in the file: ${missing.map((m) => m.label).join(", ")}.` : " Everything was found."} The AI uses them from the next question.`, "ok");
+    await loadInstructionList();
+  } catch (error) {
+    setText("#ai-instr-import-status", error.message, "error");
+  }
+});
+$("#ai-instr-save")?.addEventListener("click", async () => {
+  const key = $("#ai-instr-key").value;
+  const content = $("#ai-instr-text").value.trim();
+  if (content.length < 20) { setText("#ai-instr-status", "The instruction is too short (at least 20 characters).", "error"); return; }
+  try {
+    await api(`/api/v1/admin/ai/instructions/${encodeURIComponent(key)}`, { method: "PUT", body: JSON.stringify({ content }) });
+    await loadInstructionList();
+    setText("#ai-instr-status", "Saved. The AI follows it from the next question (within a minute).", "ok");
+  } catch (error) {
+    setText("#ai-instr-status", error.message, "error");
+  }
+});
+$("#ai-instr-delete")?.addEventListener("click", async () => {
+  if (!instrSaved) { setText("#ai-instr-status", "This instruction is not saved.", ""); return; }
+  if (!window.confirm("Remove this instruction? The AI will stop using it.")) return;
+  try {
+    const response = await authClient.apiRequest(`/api/v1/admin/ai/instructions/${encodeURIComponent($("#ai-instr-key").value)}`, { method: "DELETE" });
+    if (!response.ok && response.status !== 204) throw new Error(`Request failed (${response.status}).`);
+    await loadInstructionList();
+    setText("#ai-instr-status", "Removed.", "ok");
+  } catch (error) {
+    setText("#ai-instr-status", error.message, "error");
+  }
+});
+
 // ---------------------------------------------------------------- start
 function onAdminState(state) {
   session += 1;
@@ -311,6 +411,7 @@ function onAdminState(state) {
   const mySession = session;
   loadStatus(mySession);
   loadPrompt(mySession);
+  loadInstructionList(mySession);
   loadUsers(mySession);
 }
 

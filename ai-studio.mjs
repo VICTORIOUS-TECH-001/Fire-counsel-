@@ -190,6 +190,9 @@ function initStudio() {
     if (meta.web_search === false && mode === "chat") notes.push("Not web-verified");
     if (meta.course?.label) notes.push(`Course: ${meta.course.label}${meta.detection ? " (detected)" : ""}`);
     if (typeof meta.past_questions === "number" && mode === "questions") notes.push(meta.past_questions ? `${meta.past_questions} past questions used as the format` : "No past questions stored yet for this course");
+    const APPROACH = { concept_explanation: "concept explanation", case_analysis: "case analysis", legal_research: "legal research", statutory_interpretation: "statutory interpretation", case_comparison: "case comparison", exam_generation: "exam questions", answer_marking: "answer marking", law_coach: "exam coaching", legal_writing: "legal writing", socratic_tutoring: "guided tutoring" };
+    const approach = (Array.isArray(meta.instructions) ? meta.instructions : []).map((key) => APPROACH[key]).filter(Boolean);
+    if (approach.length) notes.push(`Approach: ${approach.join(" + ")}`);
     if (meta.pending_cases?.length) notes.push(`${meta.pending_cases.length} more case(s) waiting — send “continue”`);
     const candidates = (meta.candidates || []).map((c) => `<button class="button soft" type="button" data-pick-course="${escapeHTML(c.id)}">Use ${escapeHTML(c.label)}</button>`).join("");
     const speakButton = `<button class="button soft" type="button" data-speak="${escapeHTML(message.id)}"${speakingId === message.id ? ' data-speaking="true"' : ""}>${speakingId === message.id ? "⏹ Stop" : "🔊 Listen"}</button>`;

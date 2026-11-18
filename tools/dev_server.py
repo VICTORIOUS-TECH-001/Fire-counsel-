@@ -21,7 +21,7 @@ PUBLIC_FILES = {
     "auth-page.mjs", "admin-auth.mjs", "admin-database.mjs",
     "study-materials.mjs", "research-search.mjs", "request-scope.mjs",
     "student-profile.mjs", "installation.mjs",
-    "ai-studio.css", "ai-page.css", "ai-studio.mjs", "ai-markdown.mjs", "admin-ai.mjs", "presence.mjs",
+    "ai-studio.css", "ai-page.css", "ai-studio.mjs", "ai-markdown.mjs", "admin-ai.mjs", "admin-courses.mjs", "presence.mjs",
     "admin-site.mjs", "admin-uploads.mjs", "pdf-reader.mjs",
     "data/site-content.json",
     "firebase/client.mjs", "firebase/auth-client.mjs",

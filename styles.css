@@ -147,3 +147,5 @@ html.reader-open,html.reader-open body{overflow:hidden}
 .ai-launch-copy{display:grid;gap:4px;min-width:0;flex:1}.ai-launch-copy strong{font-size:18px}.ai-launch-copy small{color:rgba(255,255,255,.75);font-size:12px;line-height:1.5}
 .ai-launch-arrow{flex:none;font-size:24px;color:#ffb366}
 .ai-launch-card:hover{transform:translateY(-1px)}
+
+.subject-grid .subject-card.official-course small{color:#6f52c9;font-weight:700}.subject-grid .subject-card.official-course{border-color:#ddd2fb}

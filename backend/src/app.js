@@ -6,6 +6,7 @@ import { checkDatabase, databaseErrorCode } from "./config/database.js";
 import { verifyFirebaseToken } from "./middleware/verifyFirebaseToken.js";
 import { requireAdmin } from "./middleware/requireAdmin.js";
 import { createAdminDatabaseRouter } from "./routes/adminDatabase.js";
+import { createCoursesRouter } from "./routes/courses.js";
 import { createStudentMaterialsRouter } from "./routes/studentMaterials.js";
 import { createResearchSearchRouter } from "./routes/researchSearch.js";
 import { createStudentProfileRouter } from "./routes/studentProfile.js";
@@ -84,7 +85,7 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
   }));
   // AI uploads (photos/PDFs as base64) need a larger body than other routes.
   app.use(["/api/v1/ai/messages", "/api/v1/admin/ai/extract"], express.json({ limit: "26mb" }));
-  app.use(["/api/v1/admin/ai/prompts"], express.json({ limit: "1mb" }));
+  app.use(["/api/v1/admin/ai/prompts", "/api/v1/admin/ai/instructions"], express.json({ limit: "1mb" }));
   app.use(express.json({ limit: "2mb" }));
   // AI, presence and admin routes poll often (job status, heartbeats, upload
   // progress), so they get a looser per-visitor limit. Admin routes still need
@@ -207,6 +208,7 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
     }
   });
 
+  app.use("/api/v1/courses", createCoursesRouter({ configured: databaseConfigured }));
   app.use("/api/v1/presence", createPresenceRouter({ configured: () => Boolean(env.DATABASE_URL) }));
   app.use("/api/v1/ai", createAiRouter({ env, configured: () => Boolean(env.DATABASE_URL) }));
   app.use("/api/v1/admin/ai", createAdminAiRouter({ env, configured: () => Boolean(env.DATABASE_URL) }));

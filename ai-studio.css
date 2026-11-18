@@ -100,6 +100,18 @@ body[data-theme="dark"] .ai-sources{background:#262034;border-color:#3e3351}
 .fc-adjust{margin-top:16px;padding:16px;border:1px dashed #c9cede;border-radius:14px;background:#fafbfd}
 .fc-adjust[hidden]{display:none}
 @media (max-width:640px){.fc-users thead{display:none}.fc-users tr{display:block;border-top:1px solid #eceef3;padding:8px 0}.fc-users td{display:block;border:0;padding:4px 0}}
+/* Admin → Courses and AI background instructions */
+.fc-course-form[hidden]{display:none}
+.fc-course-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:12px 0}
+.fc-course-grid label,.fc-course-wide{display:grid;gap:5px;font-size:12px;font-weight:700;color:#3d4250}
+.fc-course-grid label[hidden]{display:none}
+.fc-course-form input:not([type="checkbox"]),.fc-course-form select{width:100%;padding:9px 10px;border:1px solid #d7dae4;border-radius:10px;font-size:14px;background:#fff;min-width:0}
+.fc-course-form textarea{min-height:96px;font:14px/1.5 inherit}
+.fc-check{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:14px;font-weight:700;color:#3d4250}
+.fc-instr-list{display:grid;gap:6px;margin:10px 0}
+.fc-instr-group{margin:8px 0 2px;font-size:11px;font-weight:800;letter-spacing:.06em;color:#6b7080;text-transform:uppercase}
+.fc-instr-item{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 10px;border:1px solid #eceef3;border-radius:10px;font-size:13px;background:#fafbfd;cursor:pointer;text-align:left;width:100%}
+.fc-instr-item small{color:#6b7080}
 /* The studio grid must never grow wider than the phone screen. */
 .ai-studio{grid-template-columns:minmax(0,1fr)}
 .ai-studio>*,.ai-workspace *{min-width:0}
