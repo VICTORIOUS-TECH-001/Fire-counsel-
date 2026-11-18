@@ -30,6 +30,11 @@ const firestoreRules = readFileSync(new URL("../firestore.rules", import.meta.ur
 const storageRules = readFileSync(new URL("../storage.rules", import.meta.url), "utf8");
 let testEnv;
 
+// All accepted application sessions originate with Google, including admins.
+function googleContext(uid, claims = {}) {
+  return testEnv.authenticatedContext(uid, { ...claims, firebase: { sign_in_provider: "google.com" } });
+}
+
 // A minimal document that satisfies every siteContent rule. Mirrors the
 // bundled data/site-content.json shape checked by firebase/content-schema.mjs.
 function validSiteContent(uid) {
@@ -100,8 +105,8 @@ beforeEach(async () => {
 
 test("Firestore allows public site-content reads and verified admin publishing only", async () => {
   const anonymousDb = testEnv.unauthenticatedContext().firestore();
-  const studentDb = testEnv.authenticatedContext("test-student").firestore();
-  const adminDb = testEnv.authenticatedContext("test-admin", { admin: true }).firestore();
+  const studentDb = googleContext("test-student").firestore();
+  const adminDb = googleContext("test-admin", { admin: true }).firestore();
 
   const publicContent = await assertSucceeds(getDoc(doc(anonymousDb, "siteContent", "public")));
   assert.equal(publicContent.exists(), true);
@@ -134,9 +139,9 @@ test("Firestore allows public site-content reads and verified admin publishing o
 });
 
 test("Firestore student pages are owned, validated and publish-gated", async () => {
-  const ownerDb = testEnv.authenticatedContext("test-student").firestore();
-  const otherDb = testEnv.authenticatedContext("other-student").firestore();
-  const adminDb = testEnv.authenticatedContext("test-admin", { admin: true }).firestore();
+  const ownerDb = googleContext("test-student").firestore();
+  const otherDb = googleContext("other-student").firestore();
+  const adminDb = googleContext("test-admin", { admin: true }).firestore();
   const anonymousDb = testEnv.unauthenticatedContext().firestore();
   const pageRef = db => doc(db, "studentPages", "test-student");
 
@@ -177,8 +182,8 @@ test("Firestore student pages are owned, validated and publish-gated", async () 
 });
 
 test("Firestore restricts account and quota reads to the admin claim and denies client writes", async () => {
-  const studentDb = testEnv.authenticatedContext("test-student").firestore();
-  const adminDb = testEnv.authenticatedContext("test-admin", { admin: true }).firestore();
+  const studentDb = googleContext("test-student").firestore();
+  const adminDb = googleContext("test-admin", { admin: true }).firestore();
 
   await assertFails(getDoc(doc(studentDb, "accounts", "test-student")));
   await assertSucceeds(getDoc(doc(adminDb, "accounts", "test-student")));
@@ -193,8 +198,8 @@ test("Firestore restricts account and quota reads to the admin claim and denies 
 });
 
 test("Firestore denies unlisted collections to students and admins", async () => {
-  const studentDb = testEnv.authenticatedContext("test-student").firestore();
-  const adminDb = testEnv.authenticatedContext("test-admin", { admin: true }).firestore();
+  const studentDb = googleContext("test-student").firestore();
+  const adminDb = googleContext("test-admin", { admin: true }).firestore();
 
   await assertFails(getDoc(doc(studentDb, "unlistedCollection", "private")));
   await assertFails(getDoc(doc(adminDb, "unlistedCollection", "private")));
@@ -202,8 +207,8 @@ test("Firestore denies unlisted collections to students and admins", async () =>
 
 test("Storage allows public slide reads and admin-only valid image uploads", async () => {
   const path = `site/slides/rules-test-${randomUUID()}.png`;
-  const adminStorage = testEnv.authenticatedContext("test-admin", { admin: true }).storage();
-  const studentStorage = testEnv.authenticatedContext("test-student").storage();
+  const adminStorage = googleContext("test-admin", { admin: true }).storage();
+  const studentStorage = googleContext("test-student").storage();
   const anonymousStorage = testEnv.unauthenticatedContext().storage();
   const pngBytes = new Uint8Array([137, 80, 78, 71]);
 
@@ -218,7 +223,7 @@ test("Storage allows public slide reads and admin-only valid image uploads", asy
 });
 
 test("Storage rejects non-image types, oversized images, and non-slide paths", async () => {
-  const adminStorage = testEnv.authenticatedContext("test-admin", { admin: true }).storage();
+  const adminStorage = googleContext("test-admin", { admin: true }).storage();
   const pngBytes = new Uint8Array([137, 80, 78, 71]);
 
   await assertFails(uploadBytes(
@@ -240,8 +245,8 @@ test("Storage rejects non-image types, oversized images, and non-slide paths", a
 
 test("Storage permits deletion only by an admin custom claim", async () => {
   const path = `site/slides/rules-test-${randomUUID()}.png`;
-  const studentStorage = testEnv.authenticatedContext("test-student").storage();
-  const adminStorage = testEnv.authenticatedContext("test-admin", { admin: true }).storage();
+  const studentStorage = googleContext("test-student").storage();
+  const adminStorage = googleContext("test-admin", { admin: true }).storage();
   const anonymousStorage = testEnv.unauthenticatedContext().storage();
   const pngBytes = new Uint8Array([1, 2, 3]);
 
@@ -257,4 +262,28 @@ test("Storage permits deletion only by an admin custom claim", async () => {
   // Public reads remain allowed; a successfully deleted object is missing,
   // not permission-denied. assertFails deliberately accepts permission errors only.
   await assert.rejects(getBytes(ref(anonymousStorage, path)), { code: "storage/object-not-found" });
+});
+
+
+test("non-Google sessions cannot access private Firestore data or change slides, even as admins", async () => {
+  const path = `site/slides/provider-test-${randomUUID()}.png`;
+  const bytes = new Uint8Array([1, 2, 3]);
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await uploadBytes(ref(context.storage(), path), bytes, { contentType: "image/png" });
+  });
+  for (const provider of ["password", "anonymous", "custom"]) {
+    const legacy = testEnv.authenticatedContext("test-student", {
+      admin: true,
+      firebase: { sign_in_provider: provider, identities: { "google.com": ["linked-google-id"] } }
+    });
+    const db = legacy.firestore();
+    await assertSucceeds(getDoc(doc(db, "siteContent", "public"))); // public remains public
+    await assertFails(getDoc(doc(db, "accounts", "test-student")));
+    await assertFails(setDoc(doc(db, "siteContent", "public"), validSiteContent("test-student")));
+    await assertFails(setDoc(doc(db, "studentPages", "test-student"), validStudentPage()));
+    await assertFails(uploadBytes(ref(legacy.storage(), path), bytes, { contentType: "image/png" }));
+    await assertFails(deleteObject(ref(legacy.storage(), path)));
+  }
+  const retained = await assertSucceeds(getBytes(ref(testEnv.unauthenticatedContext().storage(), path)));
+  assert.deepEqual([...new Uint8Array(retained)], [...bytes]);
 });

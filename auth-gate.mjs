@@ -1,29 +1,19 @@
-// App sign-in gate. Locked pages (the study workspace, the AI studio) never
-// render for a visitor who is not signed in: the page stays hidden behind a
-// lock screen until Firebase Auth confirms an account. A student who
-// previously signed in on this browser keeps access to the local, offline
-// study tools when the network is down; a fresh browser must sign in online at
-// least once. Server data stays protected regardless — every API route
-// requires a verified Firebase token, so skipping this screen never exposes
-// anyone else's content.
-export const AUTH_GATE_SESSION_KEY = "fire-counsel-auth-gate-v1";
+// Shared sign-in screen for the study workspace and AI studio. This is a UI
+// gate, not the security boundary: API tokens and direct Firebase writes are
+// independently checked on the server. A browser that signed in with Google
+// before may still open its local study tools when Firebase cannot be reached.
+export const AUTH_GATE_SESSION_KEY = "fire-counsel-auth-gate-v2";
 
-/**
- * Pure decision, kept separate so tests can drive it without a DOM.
- * @param {{user: object|null, authReady: boolean, hadSession: boolean}} state
- *   authReady is false when Firebase could not be loaded/verified (offline or
- *   misconfigured); hadSession means this browser signed in before.
- * @returns {"unlocked"|"locked"|"offline-unlocked"}
- */
-export function resolveGateAccess({ user, authReady, hadSession }) {
-  if (user) return "unlocked";
+/** A known non-Google session never unlocks, even with a past offline marker. */
+export function resolveGateAccess({ user, googleSession = false, authReady, hadSession }) {
+  if (user) return googleSession ? "unlocked" : "locked";
   if (authReady) return "locked";
   return hadSession ? "offline-unlocked" : "locked";
 }
 
 const MESSAGES = {
   locked: "This page is private. Sign in with your FIRE COUNSEL Google account to open it — there is no preview without an account.",
-  offlineLocked: "You are offline and this browser has not unlocked the app before. Connect once and sign in; after that your local tools work offline.",
+  offlineLocked: "Sign-in is unavailable and this browser has not unlocked the app with Google before. Connect and sign in once; after that your local tools work offline.",
   offlineUnlocked: "Offline mode — your local study tools are available. Sign-in-only features wait for the connection."
 };
 
@@ -35,45 +25,56 @@ function boot() {
   const signin = document.querySelector("#auth-gate-signin");
   if (!gate || !message || !status || !signin) return;
 
-  // Send the student back to this page after signing in.
-  const page = location.pathname.split("/").filter(Boolean).at(-1) || "study.html";
+  // Static hosts may canonicalize /ai.html to /ai (and /study.html to /study).
+  const file = location.pathname.split("/").filter(Boolean).at(-1);
+  const page = file === "ai" || file === "ai.html" ? "ai.html" : "study.html";
   signin.href = `./auth.html?next=${encodeURIComponent(page)}`;
+  let revision = 0;
 
   function apply(state) {
     body.dataset.authGate = state === "offline-unlocked" ? "unlocked" : state;
     if (state === "locked") {
       message.textContent = navigator.onLine === false ? MESSAGES.offlineLocked : MESSAGES.locked;
-      status.textContent = "";
     } else if (state === "offline-unlocked") {
-      status.textContent = "";
       const detail = document.getElementById("connection-detail");
       if (detail) detail.textContent = MESSAGES.offlineUnlocked;
     }
+    status.textContent = state === "pending" ? "Checking Google sign-in…" : "";
   }
 
   function remember(user) {
-    try { localStorage.setItem(AUTH_GATE_SESSION_KEY, user.uid || "1"); } catch { /* private mode: lock again next visit */ }
+    try { localStorage.setItem(AUTH_GATE_SESSION_KEY, user.uid); } catch { /* private mode: lock again next visit */ }
   }
   function forget() {
     try { localStorage.removeItem(AUTH_GATE_SESSION_KEY); } catch { /* ignore */ }
   }
-  function hadSession() {
-    try { return Boolean(localStorage.getItem(AUTH_GATE_SESSION_KEY)); } catch { return false; }
+  function hadSession(user = null) {
+    try {
+      const uid = localStorage.getItem(AUTH_GATE_SESSION_KEY);
+      return Boolean(uid && (!user || uid === user.uid));
+    } catch { return false; }
+  }
+  function unavailable(user = null) {
+    apply(resolveGateAccess({ user: null, authReady: false, hadSession: hadSession(user) }));
   }
 
   (async () => {
     try {
       const authClient = await import("./firebase/auth-client.mjs");
-      authClient.onAuthStateChanged(authClient.firebaseAuth, (user) => {
-        if (user) { remember(user); apply("unlocked"); }
-        else { forget(); apply("locked"); }
-      }, () => {
-        // Session could not be verified (usually offline).
-        apply(resolveGateAccess({ user: null, authReady: false, hadSession: hadSession() }));
-      });
-    } catch {
-      apply(resolveGateAccess({ user: null, authReady: false, hadSession: hadSession() }));
-    }
+      authClient.onIdTokenChanged(authClient.firebaseAuth, async user => {
+        const current = ++revision;
+        if (!user) { forget(); apply("locked"); return; }
+        apply("pending");
+        try {
+          const googleSession = await authClient.hasGoogleSession(user);
+          if (current !== revision) return; // A late token cannot undo sign-out.
+          if (googleSession) remember(user); else forget();
+          apply(resolveGateAccess({ user, googleSession, authReady: true, hadSession: false }));
+        } catch {
+          if (current === revision) unavailable(user);
+        }
+      }, () => { revision++; unavailable(); });
+    } catch { unavailable(); }
   })();
 }
 

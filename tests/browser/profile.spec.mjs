@@ -193,7 +193,7 @@ test("a delayed profile save cannot replace the next account's profile", async (
   await page.locator("#profile-save").click();
   await requestStarted;
   switched = true;
-  await page.evaluate(() => window.__auth.setUser({ uid: "next-user", email: "next@example.invalid", displayName: "Next Student", providerData: [{ providerId: "password" }] }));
+  await page.evaluate(() => window.__auth.setUser({ uid: "next-user", email: "next@example.invalid", displayName: "Next Student", providerData: [{ providerId: "google.com" }], signInProvider: "google.com" }));
   await expect(page.locator("#student-profile-name")).toHaveText("Next Student");
   const returned = page.waitForResponse(response => response.url().endsWith("/api/v1/profile") && response.request().method() === "PATCH");
   release(); await finish(page, await returned);
@@ -282,7 +282,7 @@ test("workspace stays locked for a signed-out visitor and unlocks on sign-in", a
   // Signing out locks it again and clears the offline-return marker.
   await page.evaluate(() => window.__auth.setUser(null));
   await expect(page.locator("#auth-gate")).toBeVisible();
-  expect(await page.evaluate(() => localStorage.getItem("fire-counsel-auth-gate-v1"))).toBe(null);
+  expect(await page.evaluate(() => localStorage.getItem("fire-counsel-auth-gate-v2"))).toBe(null);
 });
 
 test("workspace opens offline only for a browser that signed in before", async ({ page }) => {
@@ -292,7 +292,7 @@ test("workspace opens offline only for a browser that signed in before", async (
   await expect(page.locator("#auth-gate")).toBeVisible();
   await expect(page.locator("#main-content")).toBeHidden();
   // Mark a previous sign-in (what the gate stores after a real sign-in)…
-  await page.evaluate(() => localStorage.setItem("fire-counsel-auth-gate-v1", "synthetic-student"));
+  await page.evaluate(() => localStorage.setItem("fire-counsel-auth-gate-v2", "synthetic-student"));
   await page.reload();
   // …and the local study tools open without a network.
   await expect(page.locator("#auth-gate")).toBeHidden();

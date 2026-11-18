@@ -2,7 +2,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() {
-      return request.auth != null;
+      // Check this session, not linked identities; legacy password/custom
+      // sessions cannot write or read private data, even with an admin claim.
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider == 'google.com';
     }
 
     function isAdmin() {

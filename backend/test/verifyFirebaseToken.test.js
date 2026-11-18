@@ -50,6 +50,7 @@ test("trusts the admin claim only from a Firebase-verified decoded token", async
         uid: "test-admin",
         email: "admin@example.invalid",
         email_verified: true,
+        firebase: { sign_in_provider: "google.com" },
         admin: true
       };
     }
@@ -74,7 +75,7 @@ test("trusts the admin claim only from a Firebase-verified decoded token", async
 
 test("does not treat a string or request-body admin flag as an admin claim", async () => {
   const res = responseMock();
-  const auth = { async verifyIdToken() { return { uid: "test-student", admin: "true" }; } };
+  const auth = { async verifyIdToken() { return { uid: "test-student", firebase: { sign_in_provider: "google.com" }, admin: "true" }; } };
   const verify = createFirebaseTokenVerifier(() => auth);
   const req = { ...requestMock("Bearer example-token"), body: { admin: true } };
 
@@ -97,7 +98,7 @@ test("rejects invalid or revoked Firebase tokens", async () => {
 
 test("recent-installation registration time comes only from the verified Firebase auth_time claim", async () => {
   const res = responseMock();
-  const auth = { async verifyIdToken() { return { uid: "test-student", auth_time: 1_795_000_000 }; } };
+  const auth = { async verifyIdToken() { return { uid: "test-student", firebase: { sign_in_provider: "google.com" }, auth_time: 1_795_000_000 }; } };
   const req = { ...requestMock("Bearer example-token"), body: { auth_time: 9_999_999_999 } };
   await createFirebaseTokenVerifier(() => auth)(req, res, () => {});
   assert.equal(req.user.authTime, 1_795_000_000);
@@ -121,4 +122,22 @@ test("reports a broken server key as a setup problem, not a bad sign-in", async 
   const userAuth = { async verifyIdToken() { throw Object.assign(new Error("expired"), { code: "auth/id-token-expired" }); } };
   await createFirebaseTokenVerifier(() => userAuth)(requestMock("Bearer t"), expired, () => {});
   assert.equal(expired.statusCode, 401);
+});
+
+test("only a verified Google session is accepted, even for linked accounts or admins", async () => {
+  for (const provider of ["password", "anonymous", "custom", "google", undefined]) {
+    for (const admin of [false, true]) {
+      const decoded = { uid: "test-user", admin, firebase: { sign_in_provider: provider, identities: { "google.com": ["linked-google-id"] } } };
+      const auth = { async verifyIdToken() { return decoded; } };
+      const req = { ...requestMock("Bearer example-token"), body: { firebase: { sign_in_provider: "google.com" } } };
+      req.headers["x-sign-in-provider"] = "google.com";
+      const res = responseMock();
+      let nextCalled = false;
+      await createFirebaseTokenVerifier(() => auth)(req, res, () => { nextCalled = true; });
+      assert.equal(res.statusCode, 403, `${provider}, admin=${admin}`);
+      assert.equal(res.body.code, "GOOGLE_SIGN_IN_REQUIRED");
+      assert.equal(req.user, undefined);
+      assert.equal(nextCalled, false);
+    }
+  }
 });

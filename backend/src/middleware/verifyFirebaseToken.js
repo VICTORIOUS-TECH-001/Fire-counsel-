@@ -35,6 +35,15 @@ export function createFirebaseTokenVerifier(authProvider = getFirebaseAuth) {
       // Revocation checking keeps disabled/revoked accounts from continuing to
       // use protected routes with an otherwise unexpired ID token.
       const decodedToken = await auth.verifyIdToken(match[1], true);
+      // A linked Google identity is not enough: this particular session must
+      // have been established through Google. Never trust a provider in a
+      // request body/header, and do not exempt administrator accounts.
+      if (decodedToken.firebase?.sign_in_provider !== "google.com") {
+        return res.status(403).json({
+          error: "Sign in with Google to use FIRE COUNSEL. Other sign-in methods are not accepted.",
+          code: "GOOGLE_SIGN_IN_REQUIRED"
+        });
+      }
       req.user = {
         uid: decodedToken.uid,
         email: decodedToken.email ?? null,

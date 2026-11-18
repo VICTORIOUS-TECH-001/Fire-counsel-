@@ -410,7 +410,15 @@ function onAdminState(state) {
   // Until the sign-in client has loaded, wait: the start-up call below re-runs this.
   verified = state === "verified" && Boolean(authClient);
   setEnabled(verified);
-  if (!verified) return;
+  if (!verified) {
+    users = [];
+    defaults = null;
+    $("#student-account-rows")?.replaceChildren();
+    $("#account-adjustment-form").hidden = true;
+    $("#account-search").value = "";
+    setText("#accounts-summary", "Sign in as an administrator to load accounts.", "");
+    return;
+  }
   const mySession = session;
   loadStatus(mySession);
   loadPrompt(mySession);

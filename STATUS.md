@@ -3,10 +3,19 @@
 **Latest update:** 18 November 2026 (UTC), branch `arena/d4df7fc6-fire-counsel`
 
 **Access and paywall changes this round:**
-- Sign-in is **Google-only** (`auth.html` has no email/password form — nothing to phish or brute-force) and the button carries the official four-colour Google logo (inline SVG, offline-safe).
+- Sign-in is **Google-only** (`auth.html` has no email/password form or unsigned-continue link) and the button carries the official four-colour Google logo (inline SVG, offline-safe).
 - Locked pages (`study.html` workspace **and** `ai.html` AI studio) no longer render for signed-out visitors: a shared lock screen (`auth-gate.mjs`) hides the page until Firebase Auth confirms an account, and sign-out locks again instantly. A browser that has signed in before keeps its local study tools offline; a fresh browser must sign in online once. Server data was never exposed either way — every API route requires a verified Firebase token. The public homepage, the auth page and published student pages stay public; the admin page keeps its own server-verified admin gate.
 - AI features are now a premium plan, enforced server-side: `ai_user_limits.premium` (migration `005_premium.sql`, admin-granted in Admin → Users & AI limits) is checked inside `reserveUsage`, so free accounts get `403 PREMIUM_REQUIRED` before any AI spend and cannot enable it from a browser. `/api/v1/ai/me` exposes the flag; the AI studio shows a free-plan notice and locks its composer.
+- Google-only is enforced beyond the UI: verified API tokens and proposed Firestore/Storage rules require `firebase.sign_in_provider == "google.com"`, including for admins. Password/custom/anonymous sessions cannot use protected APIs or writes even when the account has a linked Google identity.
+- Admin → **Users & AI limits** lists Firebase accounts (including zero-use students), Active/Offline status and today's per-feature usage. API tests now verify day/failed-request filtering; a browser test covers the list, search, effective limits, and clearing it on sign-out while ignoring a delayed refresh.
+- **Owner guide:** [DEPLOYMENT.md](DEPLOYMENT.md) has the exact `NEON_API_KEY` secret / `NEON_PROJECT_ID` variable / `DATABASE_URL` secret and migration-workflow steps. The Neon management API 401 is still an owner credential/configuration issue; this session cannot inspect repository secret settings.
 - **Deploy step required:** run the Neon migration workflow (Actions → "Neon database migration") so the `premium` column exists before using the admin premium toggle; without it, reads simply report every account as free.
+
+**Latest local verification (18 November):** `npm test` passed — frontend **63/63**, backend **144/144**, proxy **14/14**, Firebase local **10/10**; syntax **101** modules. Chromium browser suite **40/40** passed with external services blocked and whole-test retries disabled. Google provider checks, direct-write rules, admin usage and stale-session tests are synthetic/emulator checks, not live project verification. The updated Firebase rules still require the Java-enabled CI gate and owner review/deployment.
+
+## Historical baseline (15 November 2026)
+
+The sections below record the earlier review. The latest access/Google-only/admin-usage changes above supersede its older email-registration, unsigned-local-access and disabled-AI descriptions.
 
 **Checked:** 15 November 2026 (UTC)
 

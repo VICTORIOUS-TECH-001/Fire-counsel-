@@ -126,7 +126,7 @@ function renderSetup() {
   $("#student-email").value = currentUser.email || "";
   $("#profile-initials").textContent = initials(currentUser.displayName);
   setPhoto(currentUser.photoURL);
-  setStatus("Your Firebase account is signed in. Confirm the details supplied by Google or your email registration, then accept the installation policy to create your student profile. No course or payment is involved.");
+  setStatus("Your Firebase account is signed in. Confirm the details supplied by Google, then accept the installation policy to create your student profile. No course or payment is involved.");
 }
 
 async function readBody(response) {
@@ -278,7 +278,7 @@ function accountChanged(user) {
   setSecurityStatus("");
   updateControls();
   if (user) loadProfile();
-  else setStatus("Sign in with Google or create an email/password account to create and edit your student profile. Your local study space remains available without signing in.");
+  else setStatus("Sign in with Google to create and edit your student profile. Your saved local study data is unaffected by signing out.");
 }
 
 try {

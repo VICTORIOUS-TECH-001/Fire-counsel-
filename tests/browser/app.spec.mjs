@@ -102,7 +102,7 @@ test("existing legacy study records and session counter remain readable and unch
 test("missing Firebase config degrades safely while the real proxy and authorization gates work", async ({ page }) => {
   // A returning (previously signed-in) browser keeps its local tools when
   // Firebase cannot load; the integration modules then degrade as before.
-  await page.addInitScript(key => { try { localStorage.setItem(key, "returning-student"); } catch { /* ignore */ } }, "fire-counsel-auth-gate-v1");
+  await page.addInitScript(key => { try { localStorage.setItem(key, "returning-student"); } catch { /* ignore */ } }, "fire-counsel-auth-gate-v2");
   await readyStudy(page, "library");
   await expect(page.locator("#server-materials-status")).toContainText("configuration is not available");
   await page.locator("[data-page=ai-chat]").click();
@@ -581,7 +581,7 @@ test("sign-in is Google-only: no email form, and the Google button signs in with
   await stubAuth(page);
   await page.route("**/api/v1/profile", route => json(route, { data: { full_name: student.displayName, email: student.email, installation: { registered: true } } }));
   await page.goto("/auth.html");
-  // No email/password path exists: nothing to phish or brute-force.
+  // Google is the only sign-in path; no password fields or anonymous link.
   await expect(page.locator("#google-signin-button")).toBeVisible();
   await expect(page.locator("#google-signin-button .google-logo")).toBeVisible();
   await expect(page.locator("#email-signin-form")).toHaveCount(0);
@@ -950,4 +950,94 @@ test("admin adds and edits a course, and imports and edits the AI background ins
   const put = writes.find(w => w.method === "PUT" && w.path.endsWith("/instructions/case_analysis"));
   expect(put.body).toEqual({ content: "Edited case analysis instruction for every student." });
   await expectNoHorizontalOverflow(page);
+});
+
+test("admin sees Google accounts, today's AI use and presence, and sign-out clears the list", async ({ page }) => {
+  await stubAuth(page, { user: admin });
+  const defaults = { chat: 30, case: 4, notes: 3, questions: 5 };
+  const account = {
+    uid: student.uid, email: "google@example.invalid", name: "Google Student", providers: ["google.com"],
+    email_verified: true, admin: false, online: true, last_seen_at: new Date().toISOString(),
+    limits: { chat: null, case: 10, notes: null, questions: null },
+    usage_today: { chat: 7, case: 2, notes: 1, questions: 0 }, premium: true, paused: false
+  };
+  let holdUsers = false, release, started;
+  const held = new Promise(resolve => { release = resolve; });
+  const requestStarted = new Promise(resolve => { started = resolve; });
+  await page.route("**/api/**", async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/health") return json(route, { database: "connected" });
+    if (path === "/api/v1/admin/me") return json(route, { user: { ...admin, role: "admin" } });
+    if (path.endsWith("/catalog")) return json(route, { data: catalog });
+    if (path === "/api/v1/presence") return route.fulfill({ status: 204 });
+    if (path === "/api/v1/admin/ai/users") {
+      if (holdUsers) { started(); await held; }
+      return json(route, { data: { users: [account], total: 1, online: 1, defaults } });
+    }
+    if (path === "/api/v1/admin/ai/status") return json(route, { data: {
+      providers: { gemini: { configured: false, models: [], search_models: [] }, openrouter: { configured: false, models: [] } },
+      schema_ready: true, prompts: [], limits: defaults, today: {}, timezone: "Africa/Lagos"
+    } });
+    return json(route, { data: [] });
+  });
+  await page.goto("/admin.html");
+  await expect(page.locator("#admin-auth-status")).toHaveAttribute("data-state", "verified");
+  await page.locator("[data-panel=plans]").click();
+  const row = page.locator("#student-account-rows tr");
+  await expect(page.locator("#accounts-summary")).toHaveText("1 account · 1 active now");
+  for (const text of ["Google Student", "google@example.invalid", "Active", "PREMIUM", "Chats: 7 / 30", "Cases: 2 / 10", "Notes: 1 / 3", "Questions: 0 / 5"]) {
+    await expect(row).toContainText(text);
+  }
+  await page.locator("#account-search").fill("unknown account");
+  await expect(row).toContainText("No account matches");
+  await page.locator("#account-search").fill("google@example.invalid");
+  await expect(row).toContainText("Google Student");
+  await row.getByRole("button", { name: "Change limits" }).click();
+  await expect(page.locator("#user-premium")).toBeChecked();
+  await expect(page.locator("#user-limit-case")).toHaveValue("10");
+  // A pending refresh must not restore private account data after sign-out.
+  holdUsers = true;
+  await page.locator("#refresh-accounts").click();
+  await requestStarted;
+  await page.locator("#admin-signout").click();
+  await expect(page.locator("#accounts-summary")).toContainText("Sign in as an administrator");
+  await expect(page.locator("#student-account-rows")).toBeEmpty();
+  await expect(page.locator("#account-adjustment-form")).toBeHidden();
+  const returned = page.waitForResponse("**/api/v1/admin/ai/users");
+  release();
+  await finishReply(page, await returned);
+  await expect(page.locator("#student-account-rows")).toBeEmpty();
+});
+
+test("a saved password session cannot open either app page or enable auth continuation", async ({ page }) => {
+  await stubAuth(page, { user: { ...student, signInProvider: "password" } });
+  for (const path of ["/study.html", "/ai.html"]) {
+    await page.goto(path);
+    await expect(page.locator("body")).toHaveAttribute("data-auth-gate", "locked");
+    await expect(page.locator("#auth-gate-signin")).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem("fire-counsel-auth-gate-v2"))).toBeNull();
+  }
+  await page.goto("/auth.html");
+  await expect(page.locator("#auth-message")).toContainText("did not sign in with Google");
+  await expect(page.locator("#google-signin-button")).toBeVisible();
+  await expect(page.locator("#signed-in-panel")).toBeHidden();
+  await expect(page.locator("#continue-button")).toBeHidden();
+});
+
+test("a delayed Google-session check cannot unlock an app page after sign-out", async ({ page }) => {
+  await stubAuth(page);
+  for (const path of ["/study.html", "/ai.html"]) {
+    await page.goto(path);
+    await expect(page.locator("body")).toHaveAttribute("data-auth-gate", "locked");
+    await page.evaluate(user => {
+      window.__auth.checkGoogleSession = () => new Promise(resolve => { window.__auth.releaseGoogleCheck = resolve; });
+      window.__auth.setUser(user);
+    }, student);
+    await expect(page.locator("body")).toHaveAttribute("data-auth-gate", "pending");
+    await page.evaluate(() => window.__auth.setUser(null));
+    await expect(page.locator("body")).toHaveAttribute("data-auth-gate", "locked");
+    await page.evaluate(() => window.__auth.releaseGoogleCheck(true));
+    await expect(page.locator("body")).toHaveAttribute("data-auth-gate", "locked");
+    expect(await page.evaluate(() => localStorage.getItem("fire-counsel-auth-gate-v2"))).toBeNull();
+  }
 });

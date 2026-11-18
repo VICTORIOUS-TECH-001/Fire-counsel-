@@ -1,10 +1,9 @@
 import { createRequestScope } from "./request-scope.mjs";
 import { authErrorText } from "./firebase/auth-errors.mjs";
 
-// Google-only sign-in: FIRE COUNSEL accounts are Google accounts, so there is
-// no email/password form here to phish or brute-force. The Google button is
-// the single way in; the TOTP step still appears when Firebase demands a
-// second factor for an enrolled account.
+// Google is the only sign-in option. The session's token provider is checked
+// as well, so a saved legacy password session cannot enable continuation.
+// TOTP still appears when Firebase requires an enrolled second factor.
 const $ = selector => document.querySelector(selector);
 const message = $("#auth-message");
 const googleButton = $("#google-signin-button");
@@ -41,6 +40,7 @@ function showMfa(info) {
   googleButton.hidden = true;
   signedInPanel.hidden = true;
   mfaForm.hidden = false;
+  $("#mfa-submit").disabled = false;
   $("#mfa-hint").textContent = `Enter the current 6-digit code from ${info.displayName}. Firebase Authentication with Identity Platform must have TOTP enabled, this email must be verified, and the account must already be enrolled. Codes change about every 30 seconds.`;
   setMessage(`Google accepted the first step. Finish with ${info.displayName}.`, "");
   $("#mfa-code").focus();
@@ -116,7 +116,7 @@ async function verifyServerAccess(user) {
       return { label: "Set up my student profile", url: new URL("./study.html#profile", location.href) };
     }
     if (response.status === 401 || response.status === 403) {
-      setMessage(body.error || "The server could not authorize this account on this browser installation. Local study is still available separately.", "error");
+      setMessage(body.error || "The server could not authorize this account on this browser installation.", "error");
       return null;
     }
     setMessage(`Firebase sign-in succeeded for ${userLabel}; student profiles are not ready on this server. Your local study space is still available.`);
@@ -158,19 +158,46 @@ if (authClient) {
   } catch (error) {
     handleAuthError(error);
   }
-  authClient.onAuthStateChanged(authClient.firebaseAuth, user => {
+  authClient.onIdTokenChanged(authClient.firebaseAuth, async user => {
     sessionScope.invalidate();
-    googleButton.disabled = false;
+    const isCurrent = sessionScope.capture();
     continueButton.hidden = true;
     continueButton.disabled = true;
-    if (user) showSignedIn(user);
-    else if (mfaForm.hidden) {
-      googleButton.hidden = false;
-      signedInPanel.hidden = true;
-      $("#signed-in-email").textContent = "";
-      setMessage("Sign in with your Google account to open FIRE COUNSEL.");
+    signedInPanel.hidden = true;
+    $("#signed-in-email").textContent = "";
+    if (!user) {
+      googleButton.disabled = false;
+      if (mfaForm.hidden) {
+        googleButton.hidden = false;
+        setMessage("Sign in with your Google account to open FIRE COUNSEL.");
+      }
+      return;
     }
-  }, error => handleAuthError(error));
+    googleButton.hidden = true;
+    setMessage("Checking your Google sign-in…");
+    try {
+      const googleSession = await authClient.hasGoogleSession(user);
+      if (!isCurrent()) return;
+      if (googleSession) showSignedIn(user);
+      else {
+        hideMfa();
+        googleButton.hidden = false;
+        setMessage("This saved session did not sign in with Google. Continue with Google to open FIRE COUNSEL.", "error");
+      }
+    } catch (error) {
+      if (!isCurrent()) return;
+      googleButton.hidden = false;
+      handleAuthError(error);
+    } finally {
+      if (isCurrent()) googleButton.disabled = false;
+    }
+  }, error => {
+    sessionScope.invalidate();
+    signedInPanel.hidden = true;
+    continueButton.hidden = true;
+    continueButton.disabled = true;
+    handleAuthError(error);
+  });
 }
 
 googleButton.addEventListener("click", async () => {

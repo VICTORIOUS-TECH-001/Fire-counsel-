@@ -464,6 +464,12 @@ test("admin AI studio: admin only, private prompts, default limits, per-user lim
   assert.equal((await getAllowance(pool, "user-a")).premium, false);
 
   assert.equal((await request("/api/v1/presence", { method: "POST", body: { page: "study" } })).status, 204);
+  await pool.query(`INSERT INTO ai_usage (firebase_uid, feature, status, created_at) VALUES
+    ('user-a', 'chat', 'completed', NOW()), ('user-a', 'chat', 'completed', NOW()),
+    ('user-a', 'case', 'started', NOW()), ('user-a', 'notes', 'failed', NOW()),
+    ('user-a', 'questions', 'completed', NOW() - INTERVAL '2 days'),
+    ('user-b', 'notes', 'completed', NOW())`);
+  assert.equal((await request("/api/v1/admin/ai/users")).status, 403);
   const users = (await (await request("/api/v1/admin/ai/users", { token: "admin" })).json()).data;
   assert.equal(users.total, 2);
   assert.equal(users.online, 1);
@@ -472,6 +478,9 @@ test("admin AI studio: admin only, private prompts, default limits, per-user lim
   assert.equal(users.users[1].note, "Exam week");
   assert.equal(users.users[1].premium, true);
   assert.equal(users.users[0].premium, false);
+  assert.deepEqual(users.users[0].usage_today, { chat: 2, case: 1 });
+  assert.deepEqual(users.users[1].usage_today, { notes: 1 });
+  assert.deepEqual(users.users[0].providers, ["google.com"]);
   const search = (await (await request("/api/v1/admin/ai/users?q=student%20a", { token: "admin" })).json()).data;
   assert.deepEqual(search.users.map(u => u.uid), ["user-a"]);
 });
