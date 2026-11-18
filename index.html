@@ -24,6 +24,7 @@
         <a class="nav-link" href="#library" data-page="library"><span class="nav-icon">▣</span> Study library</a>
         <a class="nav-link" href="#memory" data-page="memory"><span class="nav-icon">✳</span> Memory laboratory</a>
         <a class="nav-link" href="#exams" data-page="exams"><span class="nav-icon">◷</span> Exam practice</a>
+        <a class="nav-link" href="#ai" data-page="ai"><span class="nav-icon">⚖</span> Legal AI assistant</a>
       </nav>
       <div class="sidebar-bottom">
         <div class="offline-card">
@@ -43,6 +44,7 @@
         <div class="top-actions">
           <span class="local-chip"><span class="status-dot"></span> Local mode</span>
           <button class="icon-button" id="install-button" type="button" hidden aria-label="Install app" title="Install app">↓</button>
+          <button class="secondary-button" id="auth-signout" type="button" hidden>Sign out</button>
           <button class="help-button" id="help-button" type="button">Help & guide <span>↗</span></button>
         </div>
       </header>
@@ -127,10 +129,50 @@
           <div class="panel timer-panel"><span class="section-overline">FOCUS CLOCK</span><div class="timer-display" id="timer-display">25:00</div><p id="timer-status">Ready when you are.</p><div class="timer-actions"><button class="secondary-button" id="timer-pause" disabled>Pause</button><button class="quiet-button" id="timer-reset">Reset</button></div></div></div>
       </section>
 
+      <section class="page" id="ai-page">
+        <div class="page-title-row">
+          <div><div class="eyebrow">LEGAL RESEARCH & LEARNING</div><h1>FIRE COUNSEL AI</h1><p class="lead">Ask a legal question. Receive a structured explanation, relevant authorities, IRAC case analysis and examination guidance.</p></div>
+          <span class="count-pill">Nigerian law · Adaptive research</span>
+        </div>
+        <div class="panel auth-panel" id="ai-auth-gate">
+          <div class="panel-heading"><div><span class="section-overline">STUDENT ACCOUNT</span><h2>Sign in to use Legal AI</h2></div></div>
+          <p class="lead">Use your FIRE COUNSEL student account. Your existing local study library and recall cards remain available without signing in.</p>
+          <form id="ai-auth-form" class="stack-form auth-form">
+            <label>Email address<input id="ai-email" type="email" autocomplete="email" required maxlength="254" placeholder="student@example.com"></label>
+            <label>Password<input id="ai-password" type="password" autocomplete="current-password" required minlength="6" maxlength="128" placeholder="At least 6 characters"></label>
+            <div class="auth-actions">
+              <button class="primary-button" type="submit" data-auth-action="signin">Sign in</button>
+              <button class="secondary-button" type="submit" data-auth-action="signup">Create student account</button>
+            </div>
+          </form>
+          <p class="auth-status" id="ai-auth-status" role="status">Sign in with the email and password registered for FIRE COUNSEL.</p>
+        </div>
+        <div id="ai-chat-workspace" hidden>
+          <div class="panel ai-question-panel">
+            <div class="ai-user-line"><span class="section-overline">SIGNED IN AS</span><strong id="ai-user-label">Student</strong></div>
+            <form id="ai-question-form" class="stack-form">
+              <label>Legal question<textarea id="ai-question" rows="5" maxlength="6000" required placeholder="Example: Explain the distinction between an offer and an invitation to treat under Nigerian contract law. Include relevant authorities and an examination problem."></textarea></label>
+              <div class="ai-input-grid">
+                <label>Jurisdiction<select id="ai-jurisdiction"><option value="Nigeria" selected>Nigeria</option><option value="England and Wales">England and Wales</option><option value="Ghana">Ghana</option><option value="Other common-law jurisdiction">Other common-law jurisdiction</option></select></label>
+                <label>Course<select id="ai-course"><option value="">General legal research</option></select></label>
+                <label>Topic (optional)<input id="ai-topic" maxlength="200" placeholder="e.g. Offer and acceptance"></label>
+              </div>
+              <div class="ai-submit-row"><span class="auth-status">Detailed answers · Automatic research · IRAC · Lecturer-style practice questions</span><button class="primary-button" id="ai-ask-button" type="submit">Research and answer <span>→</span></button></div>
+            </form>
+          </div>
+          <div class="ai-response-wrap" id="ai-response-wrap" hidden>
+            <div class="section-heading"><div><span class="section-overline">YOUR LEGAL RESEARCH</span><h2 id="ai-response-title">Answer</h2></div><span class="muted-note" id="ai-response-jurisdiction"></span></div>
+            <div class="panel ai-response" id="ai-response" aria-live="polite"></div>
+          </div>
+          <div class="notice ai-config-notice" id="ai-api-notice"><span>ⓘ</span><div><strong>Backend connection</strong><p>The secure AI service must be deployed and its URL set in <code>config.js</code> before questions can be submitted.</p></div></div>
+        </div>
+      </section>
+
       <div class="toast" id="toast" role="status" aria-live="polite"></div>
     </main>
   </div>
   <div class="modal-backdrop" id="modal-backdrop" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><button class="modal-close" id="modal-close" aria-label="Close">×</button><span class="section-overline">FIRE COUNSEL</span><h2 id="modal-title">A little more detail</h2><div id="modal-body"></div><div class="modal-actions"><button class="secondary-button" id="modal-cancel">Cancel</button><button class="primary-button" id="modal-confirm">Continue</button></div></div></div>
+  <script src="./config.js" defer></script>
   <script src="./app.js" defer></script>
 </body>
 </html>
