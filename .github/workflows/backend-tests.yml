@@ -5,6 +5,12 @@ on:
     branches: [Step-2]
     paths:
       - "backend/**"
+      - "app.js"
+      - "index.html"
+      - "styles.css"
+      - "firebase-client.mjs"
+      - "config.js"
+      - "sw.js"
       - ".github/workflows/backend-tests.yml"
   pull_request:
     branches: [Step-2]
@@ -31,3 +37,10 @@ jobs:
         run: python -m compileall -q app tests
       - name: Run unit tests
         run: pytest -q
+      - name: Check frontend JavaScript syntax
+        run: |
+          cd ..
+          node --check app.js
+          node --check firebase-client.mjs
+          node --check config.js
+          node --check sw.js
