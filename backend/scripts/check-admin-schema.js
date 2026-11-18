@@ -64,6 +64,27 @@ async function main() {
       const tableChecks = checks.filter((c) => c.table_name === dataset.table).map((c) => c.def.slice(0, 220));
       detail.push(`${dataset.table}: ${types.join(", ")}${tableChecks.length ? `\n  checks: ${tableChecks.join(" ; ")}` : ""}`);
     }
+    // Supporting tables used by uploads, AI retrieval and admin writes.
+    const { rows: keys } = await client.query(`
+      SELECT rel.relname AS table_name, pg_get_constraintdef(con.oid) AS def
+        FROM pg_constraint con JOIN pg_class rel ON rel.oid = con.conrelid
+        JOIN pg_namespace ns ON ns.oid = rel.relnamespace
+       WHERE ns.nspname = 'public' AND con.contype IN ('u', 'c')
+         AND rel.relname IN ('material_chunks', 'material_versions', 'app_users')`);
+    const { rows: indexes } = await client.query(`
+      SELECT tablename, indexdef FROM pg_indexes
+       WHERE schemaname = 'public' AND tablename IN ('material_chunks', 'material_versions', 'app_users')`);
+    for (const table of ["material_chunks", "material_versions", "app_users"]) {
+      const live = byTable.get(table);
+      if (!live) { detail.push(`${table}: TABLE MISSING`); continue; }
+      const types = [...live.values()].map((c) => `${c.column_name}:${c.udt_name}${c.is_nullable === "NO" ? "!" : ""}${c.column_default != null ? "=" + String(c.column_default).slice(0, 40) : ""}`);
+      const cons = keys.filter((k) => k.table_name === table).map((k) => k.def.slice(0, 200));
+      const idx = indexes.filter((i) => i.tablename === table).map((i) => i.indexdef.replace(/^CREATE (UNIQUE )?INDEX /, (m, u) => (u ? "UNIQUE " : "")).slice(0, 160));
+      detail.push(`${table}: ${types.join(", ")}\n  constraints: ${cons.join(" ; ") || "none"}\n  indexes: ${idx.join(" ; ")}`);
+    }
+    const { rows: ext } = await client.query("SELECT extname FROM pg_extension ORDER BY 1");
+    const { rows: [size] } = await client.query("SELECT pg_size_pretty(pg_database_size(current_database())) AS size");
+    detail.push(`extensions: ${ext.map((e) => e.extname).join(", ")} | database size: ${size.size}`);
     await client.query("ROLLBACK");
   } finally {
     client.release();
