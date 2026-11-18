@@ -32,8 +32,11 @@ test("public homepage renders JSON, carousel, articles and mobile navigation", a
 
 test("local files, flashcards and personal subjects persist across a reload without uploading", async ({ page }) => {
   const mutations = [];
-  page.on("request", request => { if (request.method() !== "GET") mutations.push(request.url()); });
+  // The presence heartbeat is a signed-in ping, not study data; track every
+  // other non-GET request and require none (nothing is uploaded).
+  page.on("request", request => { if (request.method() !== "GET" && !request.url().includes("/api/v1/presence")) mutations.push(request.url()); });
   await stubAuth(page, { user: student });
+  await page.route("**/api/v1/presence", route => route.fulfill({ status: 204 }));
   await readyStudy(page, "memory");
   await page.locator("#card-front").fill("Synthetic case recall question");
   await page.locator("#card-back").fill("Synthetic local answer");
