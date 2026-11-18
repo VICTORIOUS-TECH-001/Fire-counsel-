@@ -41,3 +41,16 @@ def test_current_law_question_triggers_research():
         "statutes": [{"verification_status": "verified"}],
     }
     assert _needs_online_research("What is the current law in 2026?", evidence)
+
+
+def test_overruled_authorities_do_not_count_as_sufficient_current_evidence():
+    from app.main import _needs_online_research
+
+    evidence = {
+        "authorities": [
+            {"verification_status": "verified", "legal_status": "overruled"},
+            {"verification_status": "verified", "legal_status": "overruled"},
+        ],
+        "statutes": [],
+    }
+    assert _needs_online_research("Explain this doctrine", evidence)
