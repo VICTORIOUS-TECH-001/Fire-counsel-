@@ -26,9 +26,20 @@ export const BUILT_IN_PROMPTS = Object.freeze({
   question_setter: `Set practice examination questions that match the supplied past-question format exactly (instructions, number of questions, numbering style, marks, time allowed, mix of essay and problem questions, length and style of facts). Base the content on the student's notes. After the paper, give structured answer guides (issues, rules, authorities, application, likely conclusion). State clearly that these are practice questions, not predictions.`
 });
 
-export function composeSystem(kind, customPrompt, extra = "") {
+// Always kept, even when the owner's background instructions are saved: the
+// app only shows links that the server has checked.
+const LINKS = `CITATION LINKS: cite sources inline as Markdown links using ONLY the URLs supplied to you in the research notes, the checked source list or by the user. If you have no source for a statement, say so instead of inventing one.`;
+
+/**
+ * System prompt = background instructions (the owner's private master rules,
+ * stored in Neon; the short BASE rules until they are saved) + the task
+ * prompt for this feature + output rules.
+ */
+export function composeSystem(kind, customPrompt, extra = "", background = "") {
   const body = customPrompt && customPrompt.trim().length >= 20 ? customPrompt.trim() : BUILT_IN_PROMPTS[kind];
-  return [BASE, body, OUTPUT, extra].filter(Boolean).join("\n\n");
+  const head = background ? `${background}\n\n${LINKS}` : BASE;
+  const task = background ? `OUTPUT FORMAT FOR THIS FEATURE (follow it exactly; where it differs from the general formatting rules above, this format wins — the accuracy and safety rules above always apply):\n${body}` : body;
+  return [head, task, OUTPUT, extra].filter(Boolean).join("\n\n");
 }
 
 const cache = new Map();

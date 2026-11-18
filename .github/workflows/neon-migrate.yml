@@ -26,7 +26,7 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm --prefix backend ci --omit=dev
-      - name: Apply migrations 002 and 003
+      - name: Apply migrations 002, 003 and 004
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npm --prefix backend run db:migrate

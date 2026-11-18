@@ -70,7 +70,7 @@ test("website redirects friendly sign-in addresses to the sign-in page", async t
 
 test("the PDF reader engine is served from pdfjs-dist with a strict allowlist", async t => {
   const base = await serve(t, { SERVE_WEBSITE: "true" });
-  for (const [path, type] of [["/vendor/pdfjs/build/pdf.min.mjs", /javascript/], ["/vendor/pdfjs/build/pdf.worker.min.mjs", /javascript/], ["/vendor/pdfjs/wasm/jbig2.wasm", /wasm/], ["/pdf-reader.mjs", /javascript/], ["/admin-site.mjs", /javascript/], ["/admin-uploads.mjs", /javascript/]]) {
+  for (const [path, type] of [["/vendor/pdfjs/build/pdf.min.mjs", /javascript/], ["/vendor/pdfjs/build/pdf.worker.min.mjs", /javascript/], ["/vendor/pdfjs/wasm/jbig2.wasm", /wasm/], ["/pdf-reader.mjs", /javascript/], ["/admin-site.mjs", /javascript/], ["/admin-uploads.mjs", /javascript/], ["/admin-courses.mjs", /javascript/]]) {
     const response = await fetch(`${base}${path}`);
     assert.equal(response.status, 200, path);
     assert.match(response.headers.get("content-type"), type, path);

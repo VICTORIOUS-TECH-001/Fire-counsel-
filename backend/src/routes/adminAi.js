@@ -6,6 +6,7 @@ import { requireAdmin } from "../middleware/requireAdmin.js";
 import { AiError, aiConfig, describeProviders, generate as defaultGenerate, providerHealth, testModels } from "../services/ai/providers.js";
 import { createStudio } from "../services/ai/studio.js";
 import { BUILT_IN_PROMPTS, PROMPT_KINDS, clearPromptCache } from "../services/ai/prompts.js";
+import { INSTRUCTION_KEYS, clearInstructionCache, ensureInstructionsTable, parseInstructionFile, validInstruction } from "../services/ai/instructions.js";
 import { FEATURES, getDefaultLimits, timezone, validateLimit } from "../services/ai/quota.js";
 import { validateAttachments } from "../services/ai/attachments.js";
 import { publicAiError } from "./ai.js";
@@ -99,6 +100,87 @@ export function createAdminAiRouter({
       await poolProvider().query("DELETE FROM ai_prompts WHERE kind = $1", [req.params.kind]);
       clearPromptCache();
       res.status(204).end();
+    } catch (error) { publicAiError(res, error); }
+  });
+
+  // ------------------------------------------------ background instructions
+  // Private texts in Neon (ai_instructions). The table is created on the first
+  // save, so no migration has to be run by hand.
+  const noDatabase = (res) => res.status(503).json({ error: "Neon is not configured on this server.", code: "DATABASE_NOT_CONFIGURED" });
+  const actor = (req) => String(req.user.email || req.user.uid).slice(0, 200);
+  async function saveInstruction(db, key, content, who) {
+    await db.query(
+      `INSERT INTO ai_instructions (key, content, updated_by) VALUES ($1, $2, $3)
+       ON CONFLICT (key) DO UPDATE SET content = EXCLUDED.content, updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
+      [key, content, who]);
+  }
+  const ignoreMissingTable = (error) => { if (error?.code !== "42P01") throw error; return { rows: [] }; };
+
+  router.get("/instructions", async (req, res) => {
+    if (!configured()) return noDatabase(res);
+    try {
+      const { rows } = await poolProvider().query("SELECT key, char_length(content) AS length, updated_at, updated_by FROM ai_instructions").catch(ignoreMissingTable);
+      const saved = new Map(rows.map((row) => [row.key, row]));
+      res.json({ data: Object.entries(INSTRUCTION_KEYS).map(([key, info]) => ({
+        key, label: info.label, group: info.group, saved: saved.has(key),
+        length: Number(saved.get(key)?.length || 0), updated_at: saved.get(key)?.updated_at || null, updated_by: saved.get(key)?.updated_by || null
+      })) });
+    } catch (error) { publicAiError(res, error); }
+  });
+
+  router.get("/instructions/:key", async (req, res) => {
+    const info = INSTRUCTION_KEYS[req.params.key];
+    if (!info) return res.status(404).json({ error: "Unknown instruction.", code: "NOT_FOUND" });
+    if (!configured()) return noDatabase(res);
+    try {
+      const { rows } = await poolProvider().query("SELECT content, updated_at FROM ai_instructions WHERE key = $1", [req.params.key]).catch(ignoreMissingTable);
+      res.json({ data: { key: req.params.key, label: info.label, group: info.group, saved: Boolean(rows[0]), content: rows[0]?.content || "", updated_at: rows[0]?.updated_at || null } });
+    } catch (error) { publicAiError(res, error); }
+  });
+
+  router.put("/instructions/:key", async (req, res) => {
+    const known = Boolean(INSTRUCTION_KEYS[req.params.key]);
+    const content = typeof req.body?.content === "string" ? req.body.content.replace(/\r\n?/g, "\n").trim() : "";
+    const problem = validInstruction(req.params.key, content);
+    if (problem) return res.status(known ? 400 : 404).json({ error: problem, code: known ? "VALIDATION_ERROR" : "NOT_FOUND" });
+    if (!configured()) return noDatabase(res);
+    try {
+      const db = poolProvider();
+      await ensureInstructionsTable(db);
+      await saveInstruction(db, req.params.key, content, actor(req));
+      clearInstructionCache();
+      res.json({ data: { key: req.params.key, saved: true, length: content.length } });
+    } catch (error) { publicAiError(res, error); }
+  });
+
+  router.delete("/instructions/:key", async (req, res) => {
+    if (!INSTRUCTION_KEYS[req.params.key]) return res.status(404).json({ error: "Unknown instruction.", code: "NOT_FOUND" });
+    if (!configured()) return noDatabase(res);
+    try {
+      await poolProvider().query("DELETE FROM ai_instructions WHERE key = $1", [req.params.key]).catch(ignoreMissingTable);
+      clearInstructionCache();
+      res.status(204).end();
+    } catch (error) { publicAiError(res, error); }
+  });
+
+  // Reads every instruction out of the owner's "Master Prompts and Guides"
+  // .txt file and saves them all at once.
+  router.post("/instructions/import", async (req, res) => {
+    const text = typeof req.body?.text === "string" ? req.body.text : "";
+    if (!text.trim() || text.length > 600_000) return res.status(400).json({ error: "Choose the .txt file with your instructions (up to 600 KB).", code: "VALIDATION_ERROR" });
+    const found = parseInstructionFile(text);
+    const keys = Object.keys(found);
+    if (!keys.length) return res.status(400).json({ error: "No instructions were found in that file. Use the Fire Counsel Master Prompts .txt file (it contains blocks such as SYSTEM_INSTRUCTIONS = r''' ... ''').", code: "NOTHING_FOUND" });
+    if (!configured()) return noDatabase(res);
+    try {
+      const db = poolProvider();
+      await ensureInstructionsTable(db);
+      for (const key of keys) await saveInstruction(db, key, found[key], actor(req));
+      clearInstructionCache();
+      res.json({ data: {
+        saved: keys.map((key) => ({ key, label: INSTRUCTION_KEYS[key].label, length: found[key].length })),
+        missing: Object.keys(INSTRUCTION_KEYS).filter((key) => !found[key]).map((key) => ({ key, label: INSTRUCTION_KEYS[key].label }))
+      } });
     } catch (error) { publicAiError(res, error); }
   });
 

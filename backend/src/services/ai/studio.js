@@ -8,6 +8,7 @@
 import { AiError, generate as defaultGenerate, parseJsonReply } from "./providers.js";
 import { extractUrls, termsFrom, verifySources as defaultVerify } from "./linkCheck.js";
 import { composeSystem, loadPrompt } from "./prompts.js";
+import { backgroundInstructions, detectIntents, loadInstructions as defaultLoadInstructions, researchGuidance } from "./instructions.js";
 
 const RESEARCHER = `You are a meticulous legal research assistant with Google Search. Search the whole web (court and law-report websites, Nigerian legal databases, university repositories, law-firm notes, blogs and other secondary sources). Run several searches with different wording (party names, citation formats such as NWLR/SC/CA/LPELR, court, year, key phrases).
 Return concise research notes:
@@ -160,7 +161,15 @@ async function mapLimit(items, limit, fn) {
 const RESEARCH_CACHE = new Map();
 export function clearResearchCache() { RESEARCH_CACHE.clear(); }
 
-export function createStudio({ db, env = process.env, generate = defaultGenerate, verify = defaultVerify, fetchImpl, researchCache = generate === defaultGenerate } = {}) {
+export function createStudio({ db, env = process.env, generate = defaultGenerate, verify = defaultVerify, fetchImpl, researchCache = generate === defaultGenerate, loadInstructions = defaultLoadInstructions } = {}) {
+  // The owner's background instructions (Admin Studio → AI instructions).
+  // A database problem must never stop an answer: fall back to built-in rules.
+  async function instructions() {
+    try { return await loadInstructions(db); } catch { return {}; }
+  }
+  function background(saved, text, routing) {
+    return backgroundInstructions(saved, { intents: routing.intents, text });
+  }
   const gen = (request) => generate(request, { env, fetchImpl });
   const cacheMs = clampInt(env.AI_RESEARCH_CACHE_MINUTES, 0, 24 * 60, 360) * 60_000;
   const researchParallel = clampInt(env.AI_RESEARCH_PARALLEL, 1, 6, 3);
@@ -170,7 +179,8 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     const hit = key ? RESEARCH_CACHE.get(key) : null;
     if (hit && hit.until > Date.now()) return { ...hit.value, cached: true };
     try {
-      const result = await gen({ search: true, searchQuery, system: RESEARCHER, messages: [{ role: "user", text: query, attachments }], maxTokens: 6000, temperature: 0.2, timeoutMs });
+      const guidance = researchGuidance(await instructions());
+      const result = await gen({ search: true, searchQuery, system: guidance ? `${RESEARCHER}\n\n${guidance}` : RESEARCHER, messages: [{ role: "user", text: query, attachments }], maxTokens: 6000, temperature: 0.2, timeoutMs });
       const value = { ok: true, notes: result.text, sources: result.sources, queries: result.searchQueries, model: result.model };
       if (key && value.sources.length) {
         if (RESEARCH_CACHE.size >= 300) RESEARCH_CACHE.delete(RESEARCH_CACHE.keys().next().value);
@@ -362,7 +372,9 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       library.length ? libraryBlock(library) : ""
     ].filter(Boolean).join("\n\n");
     onProgress("writing");
-    const answer = await gen({ json: true, system: MOCK_SETTER, messages: [{ role: "user", text: brief, attachments }], maxTokens: 12000, temperature: 0.5, timeoutMs: CHAT_WRITER_MS });
+    const saved = await instructions();
+    const mockBackground = backgroundInstructions(saved, { intents: ["exam_generation"], text, json: true });
+    const answer = await gen({ json: true, system: mockBackground ? `${mockBackground}\n\nOUTPUT FOR THIS FEATURE (JSON only, exactly this shape — put any practice-question label inside the "instructions" field, not in each question):\n${MOCK_SETTER}` : MOCK_SETTER, messages: [{ role: "user", text: brief, attachments }], maxTokens: 12000, temperature: 0.5, timeoutMs: CHAT_WRITER_MS });
     const parsed = normalizeQuiz(parseJsonReply(answer.text), { type, count, minutes: quiz.minutes ?? null });
     if (!parsed) throw new AiError(502, "Fire Counsel AI could not build the mock exam this time. Please send it again — this was not counted.", "QUIZ_FAILED");
     return {
@@ -375,8 +387,9 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
 
   async function chat({ history = [], text, attachments = [], options = {}, onProgress = () => {}, onPartial }) {
     if (options.task === "mock") return mockExam({ text, attachments, options, onProgress });
-    const custom = await loadPrompt(db, "chat");
+    const [custom, saved] = await Promise.all([loadPrompt(db, "chat"), instructions()]);
     const task = CHAT_TASKS[options.task] || null;
+    const routing = detectIntents(text, { task: options.task, mode: "chat", attachments });
     let researchResult = null;
     let checked = [];
     const terms = termsFrom(text);
@@ -399,14 +412,14 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     const libraryContext = library.length ? `\n\n---\n${libraryBlock(library)}` : "";
     const messages = [...history.slice(-12), { role: "user", text: `${text || "(see the attached files)"}${libraryContext}${context}`, attachments }];
     onProgress("writing");
-    const system = composeSystem("chat", custom) + (task ? `\n\n${task.instruction}` : "");
+    const system = composeSystem("chat", custom, task ? task.instruction : "", background(saved, text, routing));
     const answer = await gen({ system, messages, maxTokens: 8192, timeoutMs: CHAT_WRITER_MS, onText: onPartial });
     onProgress("finishing");
     return {
       content: answer.text + lengthNote(answer),
       sources: await finalSources(answer.text, checked, terms),
       provider: answer.provider, model: answer.model,
-      meta: { task: task ? options.task : null, web_search: Boolean(researchResult?.ok), search_queries: researchResult?.queries || [], library_passages: library.length, fallback: Boolean(answer.fallback) }
+      meta: { task: task ? options.task : null, instructions: Object.keys(saved).length ? routing.intents : [], web_search: Boolean(researchResult?.ok), search_queries: researchResult?.queries || [], library_passages: library.length, fallback: Boolean(answer.fallback) }
     };
   }
 
@@ -456,7 +469,8 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     const allSources = researched.flatMap(({ research: r }) => r.sources);
     onProgress("checking", `${allSources.length} sources`);
     const checked = await verify(allSources, { terms, limit: 30 });
-    const custom = await loadPrompt(db, "case_research");
+    const [custom, saved] = await Promise.all([loadPrompt(db, "case_research"), instructions()]);
+    const routing = detectIntents(query, { mode: "case", attachments });
     const brief = [
       `STUDENT REQUEST:\n${query || "Analyse every case and authority in the attached pages."}`,
       subject ? `SUBJECT / TOPIC (from the uploaded material): ${subject}` : "",
@@ -470,12 +484,12 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     ].filter(Boolean).join("\n\n");
     const messages = [...history.slice(-4), { role: "user", text: brief, attachments }];
     onProgress("writing");
-    const answer = await gen({ system: composeSystem("case_research", custom), messages, maxTokens: 32768, temperature: 0.2, onText: onPartial });
+    const answer = await gen({ system: composeSystem("case_research", custom, "", background(saved, query, routing)), messages, maxTokens: 32768, temperature: 0.2, onText: onPartial });
     return {
       content: answer.text + lengthNote(answer),
       sources: await finalSources(answer.text, checked, terms),
       provider: answer.provider, model: answer.model,
-      meta: { cases: selected.map((item) => item.name), pending_cases: remaining.map((item) => item.name), database_matches: records.length, library_passages: library.length + judgments.length, web_search: researched.some(({ research: r }) => r.ok), fallback: Boolean(answer.fallback) }
+      meta: { instructions: Object.keys(saved).length ? routing.intents : [], cases: selected.map((item) => item.name), pending_cases: remaining.map((item) => item.name), database_matches: records.length, library_passages: library.length + judgments.length, web_search: researched.some(({ research: r }) => r.ok), fallback: Boolean(answer.fallback) }
     };
   }
 
@@ -498,7 +512,8 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       ]);
       if (researchResult.ok) checked = await verify(researchResult.sources, { terms, limit: 15 });
     }
-    const custom = await loadPrompt(db, "exam_note");
+    const [custom, saved] = await Promise.all([loadPrompt(db, "exam_note"), instructions()]);
+    const routing = detectIntents(options.topic || "", { mode: "notes", attachments });
     const brief = [
       `STUDENT REQUEST: Build exam-ready notes${options.topic ? ` on: ${options.topic}` : ""} from the supplied material.`,
       course ? `COURSE: ${courseLabel(course)}` : "COURSE: not specified (do not invent a course code).",
@@ -510,12 +525,12 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       researchResult?.ok ? `RESEARCH NOTES:\n${truncate(researchResult.notes, 15000)}\n\nCHECKED SOURCES:\n${sourceBlock(checked)}` : ""
     ].filter(Boolean).join("\n\n");
     onProgress("writing");
-    const answer = await gen({ system: composeSystem("exam_note", custom), messages: [...history.slice(-4), { role: "user", text: brief, attachments }], maxTokens: 32768, temperature: 0.2, onText: onPartial });
+    const answer = await gen({ system: composeSystem("exam_note", custom, "", background(saved, text, routing)), messages: [...history.slice(-4), { role: "user", text: brief, attachments }], maxTokens: 32768, temperature: 0.2, onText: onPartial });
     return {
       content: answer.text + lengthNote(answer),
       sources: checked.length || extractUrls(answer.text).length ? await finalSources(answer.text, checked, terms) : [],
       provider: answer.provider, model: answer.model,
-      meta: { course: course ? { id: course.id, label: courseLabel(course) } : null, past_questions: questions.length, research: Boolean(researchResult?.ok), library_passages: library.length, fallback: Boolean(answer.fallback) }
+      meta: { instructions: Object.keys(saved).length ? routing.intents : [], course: course ? { id: course.id, label: courseLabel(course) } : null, past_questions: questions.length, research: Boolean(researchResult?.ok), library_passages: library.length, fallback: Boolean(answer.fallback) }
     };
   }
 
@@ -549,7 +564,8 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     ]);
     const profile = formatProfile(questions);
     const count = Math.min(Math.max(Number(options.count) || 0, 0), 20);
-    const custom = await loadPrompt(db, "question_setter");
+    const [custom, saved] = await Promise.all([loadPrompt(db, "question_setter"), instructions()]);
+    const routing = detectIntents("", { mode: "questions", attachments });
     const brief = [
       course ? `COURSE: ${courseLabel(course)}${detection ? ` (auto-detected, confidence ${Math.round(detection.confidence * 100)}%: ${detection.reason})` : " (chosen by the student)"}` : "COURSE: none in the database yet.",
       profile
@@ -560,12 +576,12 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       library.length ? `${libraryBlock(library)}\n(Use these course passages only to keep the questions within this course's syllabus.)` : ""
     ].filter(Boolean).join("\n\n");
     onProgress("writing");
-    const answer = await gen({ system: composeSystem("question_setter", custom), messages: [...history.slice(-4), { role: "user", text: brief, attachments }], maxTokens: 24576, temperature: 0.5, onText: onPartial });
+    const answer = await gen({ system: composeSystem("question_setter", custom, "", background(saved, text, routing)), messages: [...history.slice(-4), { role: "user", text: brief, attachments }], maxTokens: 24576, temperature: 0.5, onText: onPartial });
     return {
       content: answer.text + lengthNote(answer),
       sources: [],
       provider: answer.provider, model: answer.model,
-      meta: { course: course ? { id: course.id, label: courseLabel(course) } : null, detection, past_questions: questions.length, library_passages: library.length, fallback: Boolean(answer.fallback) }
+      meta: { instructions: Object.keys(saved).length ? routing.intents : [], course: course ? { id: course.id, label: courseLabel(course) } : null, detection, past_questions: questions.length, library_passages: library.length, fallback: Boolean(answer.fallback) }
     };
   }
 

@@ -362,7 +362,9 @@ test("authenticated materials and verified source search render safe text from s
   await page.locator("#research-search-button").click();
   await expect(page.locator("#research-search-status")).toContainText("1 source result");
   await expect(page.locator(".research-result-card pre")).toHaveText("First paragraph\n\nSecond paragraph");
-  expect(requests.every(request => request.headers().authorization === "Bearer synthetic-test-token")).toBe(true);
+  // The published course list is public (the same for everyone); every other call is authenticated.
+  expect(requests.filter(request => new URL(request.url()).pathname !== "/api/v1/courses").every(request => request.headers().authorization === "Bearer synthetic-test-token")).toBe(true);
+  expect(requests.filter(request => new URL(request.url()).pathname === "/api/v1/courses").every(request => !request.headers().authorization)).toBe(true);
   expect(requests.find(request => request.method() === "POST" && request.url().endsWith("/research/search")).postDataJSON()).toEqual({ query: "contract law" });
 });
 
@@ -810,4 +812,134 @@ test("admin saves a website draft, previews it and publishes it to Neon", async 
   expect(upload.body.startsWith("%PDF")).toBe(true);
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("students see the administrator's published courses next to their personal ones, kept in sync", async ({ page }) => {
+  let official = [
+    { id: "c1", course_code: "LAW 241", title: "Contract Law", academic_level: "200 level", university: "UNN" },
+    { id: "c2", course_code: "LAW 311", title: "Law of Evidence", academic_level: null, university: "UNN" }
+  ];
+  await page.route("**/api/v1/courses", route => json(route, { data: official }));
+  await page.goto("/study.html#subjects");
+  // 2 official courses + 6 personal areas, minus the personal "Contract Law" duplicate.
+  await expect(page.locator("#course-nav-count")).toHaveText("7");
+  const cards = page.locator("#all-subjects .subject-card");
+  await expect(cards.first()).toContainText("LAW 241 · Contract Law");
+  await expect(cards.first()).toContainText("Official course · 200 level · UNN");
+  await expect(page.locator("#all-subjects .official-course")).toHaveCount(2);
+  await expect(page.locator("#active-course-select option").first()).toHaveText("LAW 241 · Contract Law");
+  // An admin edit reaches the student when the page is shown again.
+  official = [{ ...official[1], title: "Law of Evidence (revised)" }];
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await expect(page.locator("#all-subjects .official-course")).toHaveCount(1);
+  await expect(page.locator("#all-subjects .official-course")).toContainText("Law of Evidence (revised)");
+  await expect(page.locator("#course-nav-count")).toHaveText("7");
+  // Offline: the last list is kept.
+  await page.unroute("**/api/v1/courses");
+  await page.route("**/api/v1/courses", route => route.abort());
+  await page.reload();
+  await expect(page.locator("#all-subjects .official-course")).toContainText("Law of Evidence (revised)");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectNoHorizontalOverflow(page);
+});
+
+test("admin adds and edits a course, and imports and edits the AI background instructions", async ({ page }) => {
+  await stubAuth(page, { user: admin });
+  const writes = [];
+  const uni = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const courseId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  let courses = [];
+  let universities = [];
+  const instructionList = () => [
+    { key: "system_instructions", label: "Master system instructions", group: "always", saved: writes.some(w => w.path.endsWith("/import")), length: 3999, updated_at: "2026-11-18T10:00:00Z" },
+    { key: "case_analysis", label: "Case analysis", group: "specialist", saved: writes.some(w => w.path.endsWith("/import")), length: 1299, updated_at: "2026-11-18T10:00:00Z" },
+    { key: "socratic_tutoring", label: "Socratic tutoring", group: "specialist", saved: false, length: 0, updated_at: null }
+  ];
+  await page.route("**/api/**", async route => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const method = request.method();
+    if (method !== "GET") writes.push({ method, path, body: request.postDataJSON() });
+    if (path === "/api/health") return json(route, { database: "connected" });
+    if (path === "/api/v1/admin/me") return json(route, { user: { ...admin, role: "admin" } });
+    if (path.endsWith("/catalog")) return json(route, { data: catalog });
+    if (path === "/api/v1/presence") return route.fulfill({ status: 204 });
+    if (path === "/api/v1/admin/database/options/universities") return json(route, { data: universities });
+    if (path === "/api/v1/admin/database/universities" && method === "POST") {
+      universities = [{ id: uni, label: request.postDataJSON().name }];
+      return json(route, { data: { id: uni } }, 201);
+    }
+    if (path === "/api/v1/admin/database/courses" && method === "GET") return json(route, { data: courses, pagination: { total: courses.length } });
+    if (path === "/api/v1/admin/database/courses" && method === "POST") {
+      courses = [{ id: courseId, ...request.postDataJSON() }];
+      return json(route, { data: courses[0] }, 201);
+    }
+    if (path === `/api/v1/admin/database/courses/${courseId}` && method === "GET") return json(route, { data: courses[0] });
+    if (path === `/api/v1/admin/database/courses/${courseId}` && method === "PATCH") {
+      courses = [{ ...courses[0], ...request.postDataJSON() }];
+      return json(route, { data: courses[0] });
+    }
+    if (path === "/api/v1/admin/ai/instructions") return json(route, { data: instructionList() });
+    if (path === "/api/v1/admin/ai/instructions/import") return json(route, { data: { saved: [{ key: "system_instructions", label: "Master system instructions", length: 50 }, { key: "case_analysis", label: "Case analysis", length: 40 }], missing: [{ key: "socratic_tutoring", label: "Socratic tutoring" }] } });
+    if (path.startsWith("/api/v1/admin/ai/instructions/")) {
+      const key = path.split("/").pop();
+      if (method === "PUT") return json(route, { data: { key, saved: true } });
+      const saved = instructionList().find(item => item.key === key);
+      return json(route, { data: { key, saved: saved?.saved || false, content: saved?.saved ? `Saved text for ${key}.` : "", updated_at: null } });
+    }
+    return json(route, { data: [] });
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/admin.html");
+  await expect(page.locator("#admin-auth-status")).toHaveAttribute("data-state", "verified");
+
+  // Courses: first course with a brand-new university.
+  await page.locator("[data-panel=courses]").click();
+  await expect(page.locator("#course-rows")).toContainText("No courses yet");
+  await page.locator("#course-add").click();
+  await expect(page.locator("#course-new-university-field")).toBeVisible();
+  await page.locator("#course-new-university").fill("University of Nigeria");
+  await page.locator("#course-code").fill("LAW 241");
+  await page.locator("#course-title").fill("Law of Contract I");
+  await page.locator("#course-level").fill("200 level");
+  await page.locator("#course-save").click();
+  await expect(page.locator("#course-form-status")).toContainText("Every student now sees this course");
+  const created = writes.find(w => w.path === "/api/v1/admin/database/courses");
+  expect(created.body).toMatchObject({ university_id: uni, course_code: "LAW 241", title: "Law of Contract I", academic_level: "200 level", semester: null, is_published: true });
+  expect(writes.find(w => w.path === "/api/v1/admin/database/universities").body).toMatchObject({ name: "University of Nigeria", slug: "university-of-nigeria" });
+  await expect(page.locator("#course-rows")).toContainText("Law of Contract I");
+  await expect(page.locator("#course-rows")).toContainText("VISIBLE TO STUDENTS");
+  // Edit it: hide from students.
+  await page.locator("#course-cancel").click();
+  await expect(page.locator("#course-form")).toBeHidden();
+  await page.locator("[data-edit-course]").click();
+  await expect(page.locator("#course-form")).toBeVisible();
+  await expect(page.locator("#course-title")).toHaveValue("Law of Contract I");
+  await page.locator("#course-title").fill("Law of Contract (Part I)");
+  await page.locator("#course-published").uncheck();
+  await page.locator("#course-save").click();
+  await expect(page.locator("#course-form-status")).toContainText("HIDDEN");
+  const patched = writes.find(w => w.method === "PATCH");
+  expect(patched.path).toBe(`/api/v1/admin/database/courses/${courseId}`);
+  expect(patched.body).toMatchObject({ title: "Law of Contract (Part I)", is_published: false });
+  await expect(page.locator("#course-rows")).toContainText("HIDDEN");
+  await expectNoHorizontalOverflow(page);
+
+  // AI background instructions: import the file, then edit one.
+  await page.locator("[data-panel=ai]").click();
+  await expect(page.locator("#ai-instr-list")).toContainText("No background instructions saved yet");
+  await page.locator("#ai-instr-import").setInputFiles({ name: "Fire_Counsel_Master_Prompts_and_Guides.txt", mimeType: "text/plain", buffer: Buffer.from("SYSTEM_INSTRUCTIONS = r'''\nSample master rules for the test.\n'''\n") });
+  await expect(page.locator("#ai-instr-import-status")).toContainText("Saved 2 instructions");
+  await expect(page.locator("#ai-instr-import-status")).toContainText("Not in the file: Socratic tutoring");
+  expect(writes.find(w => w.path.endsWith("/import")).body.text).toContain("SYSTEM_INSTRUCTIONS");
+  await expect(page.locator("#ai-instr-list")).toContainText("2 of 3 instructions saved");
+  await page.locator("[data-instr=case_analysis]").click();
+  await expect(page.locator("#ai-instr-text")).toHaveValue("Saved text for case_analysis.");
+  await expect(page.locator("#ai-instr-state")).toHaveText("IN USE");
+  await page.locator("#ai-instr-text").fill("Edited case analysis instruction for every student.");
+  await page.locator("#ai-instr-save").click();
+  await expect(page.locator("#ai-instr-status")).toContainText("Saved");
+  const put = writes.find(w => w.method === "PUT" && w.path.endsWith("/instructions/case_analysis"));
+  expect(put.body).toEqual({ content: "Edited case analysis instruction for every student." });
+  await expectNoHorizontalOverflow(page);
 });

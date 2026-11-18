@@ -19,6 +19,11 @@
   let documents = [];
   let cards = [];
   let activeCourse = "";
+  // Courses published by the administrator (Neon). They are the same for every
+  // student and refresh automatically; personal study areas stay local.
+  const OFFICIAL_CACHE_KEY = "fire-counsel-official-courses";
+  let officialCourses = [];
+  try { const cached = JSON.parse(localStorage.getItem(OFFICIAL_CACHE_KEY) || "[]"); if (Array.isArray(cached)) officialCourses = cached; } catch { officialCourses = []; }
   let currentCardIndex = 0;
   let showingAnswer = false;
   let deferredInstallPrompt = null;
@@ -95,9 +100,39 @@
     const seed = subjectSeeds[index % subjectSeeds.length];
     const color = /^#[\da-f]{3,8}$/i.test(subject.color || "") ? subject.color : seed.color;
     const bg = /^#[\da-f]{3,8}$/i.test(subject.bg || "") ? subject.bg : seed.bg;
-    return `<button class="subject-card" type="button" data-subject="${escapeHTML(subject.name)}" style="--card-accent:${color};--card-bg:${bg};--card-glow:${color}22"><span class="subject-symbol">${escapeHTML(subject.symbol || "§")}</span><strong>${escapeHTML(subject.name)}</strong><small>${escapeHTML(subject.area || "Law subject")}</small></button>`;
+    return `<button class="subject-card${subject.official ? " official-course" : ""}" type="button" data-subject="${escapeHTML(subject.name)}"${subject.official ? ' data-official="true"' : ""} style="--card-accent:${color};--card-bg:${bg};--card-glow:${color}22"><span class="subject-symbol">${escapeHTML(subject.symbol || "§")}</span><strong>${escapeHTML(subject.name)}</strong><small>${escapeHTML(subject.area || "Law subject")}</small></button>`;
+  }
+  function officialSubject(course) {
+    const title = String(course.title || "").trim();
+    const code = String(course.course_code || "").trim();
+    return {
+      name: code ? `${code} · ${title}` : title,
+      title,
+      area: ["Official course", course.academic_level, course.semester, course.university].filter(Boolean).join(" · "),
+      symbol: "⚖", official: true
+    };
+  }
+  function visibleSubjects() {
+    const official = officialCourses.filter(course => course && course.title).map(officialSubject);
+    const taken = new Set(official.flatMap(subject => [subject.name.toLowerCase(), subject.title.toLowerCase()]));
+    return [...official, ...subjects.filter(subject => !taken.has(String(subject.name).toLowerCase()))];
+  }
+  async function refreshOfficialCourses() {
+    if (location.protocol === "file:") return;
+    try {
+      const response = await fetch("/api/v1/courses", { cache: "no-store", headers: { Accept: "application/json" } });
+      if (!response.ok) return;
+      const body = await response.json();
+      if (!Array.isArray(body?.data)) return;
+      const next = body.data.map(course => ({ id: course.id, course_code: course.course_code, title: course.title, academic_level: course.academic_level, semester: course.semester, university: course.university }));
+      if (JSON.stringify(next) === JSON.stringify(officialCourses)) return;
+      officialCourses = next;
+      try { localStorage.setItem(OFFICIAL_CACHE_KEY, JSON.stringify(next)); } catch { /* storage full: still shown this visit */ }
+      renderSubjects();
+    } catch { /* offline or a static copy without the API: keep the last list */ }
   }
   function renderSubjects() {
+    const subjects = visibleSubjects();
     const dashboard = $("#dashboard-subjects");
     const allSubjects = $("#all-subjects");
     if (dashboard) dashboard.innerHTML = subjects.slice(0, 6).map(subjectCard).join("");
@@ -189,7 +224,7 @@
     openModal("Add a personal study area", `<p>This subject is saved in the existing local study database on this device. It is not an administrator-managed course.</p><input id="new-subject-name" maxlength="48" placeholder="e.g. Equity and Trusts" aria-label="Subject name">`, async () => {
       const name = $("#new-subject-name").value.trim();
       if (!name) { toast("Enter a subject name first."); return false; }
-      if (subjects.some(subject => subject.name.toLowerCase() === name.toLowerCase())) { toast("That subject already exists."); return false; }
+      if (visibleSubjects().some(subject => subject.name.toLowerCase() === name.toLowerCase() || String(subject.title || "").toLowerCase() === name.toLowerCase())) { toast("That subject already exists."); return false; }
       const seed = subjectSeeds[subjects.length % subjectSeeds.length];
       subjects.push({name, area:"Personal study area", symbol:seed.symbol, color:seed.color, bg:seed.bg});
       if (db) await put("settings", {key:"subjects", value:subjects});
@@ -250,6 +285,9 @@
       console.error(error); toast("Local database unavailable. Some saving features may not work.");
     }
     renderSubjects(); renderDocuments(); renderCards(); updateStats(); renderConnection();
+    refreshOfficialCourses();
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") refreshOfficialCourses(); });
+    setInterval(() => { if (document.visibilityState === "visible") refreshOfficialCourses(); }, 5 * 60 * 1000);
     setupCarousel();
     const initialPage = location.hash.replace("#", "");
     showPage(initialPage, false);
@@ -268,7 +306,16 @@
     const toastButton = event.target.closest("[data-toast]");
     if (toastButton) { toast(toastButton.dataset.toast); return; }
     const subject = event.target.closest("[data-subject]");
-    if (subject) { toast(`${subject.dataset.subject} selected. Choose it from the course menu to study.`); return; }
+    if (subject) {
+      if (subject.dataset.official === "true") {
+        activeCourse = subject.dataset.subject;
+        renderSubjects();
+        if (db) put("settings", {key:"active-course", value:activeCourse}).catch(() => {});
+        toast(`${subject.dataset.subject} selected. Open the AI studio or the study library to study it.`);
+        return;
+      }
+      toast(`${subject.dataset.subject} selected. Choose it from the course menu to study.`); return;
+    }
     const openButton = event.target.closest("[data-open-doc]");
     if (openButton) {
       const item = documents.find(entry => entry.id === openButton.dataset.openDoc);
