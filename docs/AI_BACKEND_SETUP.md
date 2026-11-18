@@ -88,15 +88,20 @@ The response follows the Pydantic `LegalAnswer` schema. It contains sections,
 case IRAC fields, statutory authorities, exam tips, generated practice
 questions, research links and limitations.
 
-## Current integration boundary
+## Frontend integration
 
-The checked-in Stage 1 frontend has no Firebase web SDK configuration or
-sign-in flow and its README accurately describes AI as not yet connected.
-Therefore this commit establishes the secure backend and database foundation;
-it does not expose an unauthenticated browser chat. Frontend integration
-must follow once the Firebase web app configuration and sign-in experience
-are connected. This is deliberate: API keys and the legal database must not
-be exposed to anonymous browser requests.
+The PWA now includes Firebase Email/Password sign-in and a Legal AI workspace.
+The client obtains a Firebase ID token and sends it as a Bearer token to
+`POST /api/ask`. The backend verifies that token before using Gemini or Neon.
+
+Set `window.FIRE_COUNSEL_CONFIG.apiBaseUrl` in the root `config.js` to the
+HTTPS URL of the deployed Render API. Set `CORS_ORIGINS` on Render to the
+exact HTTPS origin serving the PWA. Keep Gemini, Firebase service-account and
+Neon credentials exclusively in Render environment secrets.
+
+The Firebase web config in `firebase-client.mjs` is public client config,
+not a server secret. The Gemini API key and Neon connection string must never
+be placed in browser files.
 
 ## Tests
 
