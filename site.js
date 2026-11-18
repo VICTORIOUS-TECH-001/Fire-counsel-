@@ -1,12 +1,14 @@
 (() => {
   "use strict";
-  const DRAFT_KEY = "fire-counsel-site-draft-v1";
+  const PREVIEW = new URLSearchParams(location.search).get("preview") === "1";
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
   const esc = value => String(value ?? "").replace(/[&<>\"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'\"':"&quot;","'":"&#39;"}[ch]));
   const photo = value => {
     const path = String(value || "");
     if (/^(\.\/)?assets\/[a-zA-Z0-9_./-]+\.(?:png|jpe?g|webp)$/i.test(path)) return path.startsWith("./") ? path : `./${path}`;
+    // Photos uploaded in the admin studio (stored in Neon, served by this site).
+    if (/^\/media\/[0-9a-f-]{36}\.(?:png|jpg|webp)$/i.test(path)) return path;
     try {
       const url = new URL(path, location.href);
       const decodedPath = decodeURIComponent(url.pathname);
@@ -31,15 +33,44 @@
   let activeSlide = 0;
   let carouselTimer = null;
 
+  // Preview: the admin page that opened this tab sends its unsaved draft. Only
+  // messages from this same site (the admin studio) are accepted; the draft is
+  // rendered with the same escaping as published content and never stored.
+  function receivePreview(timeoutMs = 5000) {
+    const opener = window.opener;
+    if (!opener) return Promise.resolve(null);
+    return new Promise(resolve => {
+      const done = value => { clearTimeout(timer); window.removeEventListener("message", onMessage); resolve(value); };
+      const onMessage = event => {
+        if (event.origin !== location.origin || event.source !== opener) return;
+        const data = event.data;
+        if (data?.type === "fire-counsel-preview" && data.content && typeof data.content === "object") done(data.content);
+      };
+      const timer = setTimeout(() => done(null), timeoutMs);
+      window.addEventListener("message", onMessage);
+      try { opener.postMessage({type:"fire-counsel-preview-ready"}, location.origin); } catch { done(null); }
+    });
+  }
+  function showPreviewBanner(text) {
+    let bar = $("#preview-banner");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "preview-banner";
+      bar.setAttribute("role", "status");
+      bar.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:9999;padding:10px 14px;background:#c55a11;color:#fff;font:600 14px/1.4 system-ui,sans-serif;text-align:center;box-shadow:0 -4px 16px rgba(0,0,0,.25)";
+      document.body.append(bar);
+    }
+    bar.textContent = text;
+  }
   async function loadContent() {
+    if (PREVIEW) {
+      const draft = await receivePreview();
+      if (draft) { showPreviewBanner("PREVIEW — only you can see this. Go back to the admin tab and press Publish to make it live."); return draft; }
+      showPreviewBanner("Preview not received — this shows the live site. Open the preview from the admin page (Pages & JSON → Preview).");
+    }
     const response = await fetch("./data/site-content.json", {cache:"no-cache"});
     if (!response.ok) throw new Error(`Content request failed: ${response.status}`);
-    const published = await response.json();
-    try {
-      const draft = localStorage.getItem(DRAFT_KEY);
-      if (draft) return JSON.parse(draft);
-    } catch (error) { console.warn("Ignoring an invalid local site draft.", error); }
-    return published;
+    return response.json();
   }
   function renderNavigation(data) {
     const nav = $("#main-nav-links");
@@ -180,7 +211,6 @@
       renderNavigation(siteData); renderHero(siteData); renderQuickFacts(siteData);
       renderLearning(siteData); renderCaseNotes(siteData); renderArticles(siteData); renderResources(siteData); renderFooter(siteData);
       initArticleDialog(siteData);
-      if (new URLSearchParams(location.search).has("draft")) toast("Local preview draft loaded on this device only.");
     } catch (error) {
       console.error("FIRE COUNSEL website content could not be loaded.", error);
       toast("Some page content could not be loaded. Please try refreshing.");

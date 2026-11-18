@@ -3,6 +3,7 @@ import { getPool } from "../config/database.js";
 import { getAdminDatabaseCatalog, getAdminDataset } from "../config/databaseCatalog.js";
 import { requireAdmin } from "../middleware/requireAdmin.js";
 import { verifyFirebaseToken } from "../middleware/verifyFirebaseToken.js";
+import { chunkPages, textToPages } from "../services/documents/extract.js";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const IDENTIFIER_RE = /^[a-z_][a-z0-9_]*$/;
@@ -227,19 +228,37 @@ async function validateRelationships(db, dataset, values, { normalize = true, re
   return normalized;
 }
 
-async function ensureAdminUser(db, user) {
+// Returns the app_users.id for the signed-in administrator, creating the row on
+// first write. If the same (verified) email already belongs to an older
+// Firebase account (e.g. the account was recreated), that row is relinked
+// instead of failing with a unique-email conflict.
+export async function ensureAdminUser(db, user) {
   if (!user?.uid || !user?.email) throw new HttpError(403, "This Firebase administrator needs an email-backed account to write Neon content.", "ADMIN_PROFILE_REQUIRED");
-  const fullName = String(user.name || user.email).slice(0, 255);
-  const result = await db.query(
-    `INSERT INTO app_users (firebase_uid, email, full_name)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (firebase_uid) DO UPDATE
-       SET firebase_uid = app_users.firebase_uid
-     RETURNING id, account_status`,
-    [user.uid, user.email, fullName]
+  const email = String(user.email).trim();
+  const fullName = String(user.name || email).slice(0, 255);
+  const found = await db.query(
+    `SELECT id, firebase_uid, account_status FROM app_users
+      WHERE firebase_uid = $1 OR lower(email) = lower($2)
+      ORDER BY (firebase_uid = $1) DESC LIMIT 1`,
+    [user.uid, email]
   );
-  const actor = result.rows[0];
-  if (!actor?.id || actor.account_status !== "active") throw new HttpError(403, "This Neon account is not active for administrator writes.", "ADMIN_ACCOUNT_DISABLED");
+  let actor = found.rows[0];
+  if (actor && actor.firebase_uid !== user.uid) {
+    if (user.emailVerified !== true) throw new HttpError(403, "Verify this administrator email in Firebase first: an older account already uses it in Neon.", "ADMIN_EMAIL_NOT_VERIFIED");
+    const relinked = await db.query("UPDATE app_users SET firebase_uid = $1 WHERE id = $2 RETURNING id, account_status", [user.uid, actor.id]);
+    actor = relinked.rows[0];
+  } else if (!actor) {
+    const created = await db.query(
+      `INSERT INTO app_users (firebase_uid, email, full_name)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (firebase_uid) DO UPDATE
+         SET firebase_uid = app_users.firebase_uid
+       RETURNING id, account_status`,
+      [user.uid, email, fullName]
+    );
+    actor = created.rows[0];
+  }
+  if (!actor?.id || (actor.account_status && actor.account_status !== "active")) throw new HttpError(403, "This Neon account is not active for administrator writes.", "ADMIN_ACCOUNT_DISABLED");
   return actor.id;
 }
 
@@ -289,12 +308,17 @@ async function addMaterialVersion(client, { materialId, contentText, actorId }) 
      RETURNING id, material_id, version_number, extraction_status`,
     [materialId, versionNumber, contentText.trim(), actorId]
   );
-  const chunks = splitMaterialText(contentText);
+  // Text copied from the document reader keeps its "[Page N]" markers, so each
+  // chunk remembers its page for AI citations.
+  const pages = textToPages(contentText);
+  const chunks = pages.some((page) => page.page != null)
+    ? chunkPages(pages)
+    : splitMaterialText(contentText).map((content) => ({ page: null, content }));
   for (let index = 0; index < chunks.length; index++) {
     await client.query(
-      `INSERT INTO material_chunks (material_id, version_id, chunk_number, content)
-       VALUES ($1, $2, $3, $4)`,
-      [materialId, version.rows[0].id, index, chunks[index]]
+      `INSERT INTO material_chunks (material_id, version_id, chunk_number, content, page_number)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [materialId, version.rows[0].id, index, chunks[index].content, chunks[index].page]
     );
   }
   return { ...version.rows[0], chunk_count: chunks.length };

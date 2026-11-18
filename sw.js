@@ -1,15 +1,18 @@
-const CACHE_NAME = "fire-counsel-shell-v13";
+const CACHE_NAME = "fire-counsel-shell-v14";
 const APP_CACHE_PREFIX = "fire-counsel-shell-";
 const APP_SHELL = [
   "./", "./index.html", "./study.html",
   "./site.css", "./site.js", "./styles.css", "./app.js", "./integrations.css",
   "./study-materials.mjs", "./research-search.mjs", "./student-profile.mjs", "./installation.mjs", "./request-scope.mjs",
-  "./ai-studio.css", "./ai-studio.mjs", "./ai-markdown.mjs", "./presence.mjs",
+  "./ai-studio.css", "./ai-studio.mjs", "./ai-markdown.mjs", "./presence.mjs", "./pdf-reader.mjs",
   "./data/site-content.json", "./manifest.webmanifest",
   "./assets/fire-counsel-192.png", "./assets/fire-counsel-512.png",
   "./assets/images/fire-counsel-brand.jpg", "./assets/images/pexels-law-judge.jpg", "./assets/images/pexels-law-student.jpg"
 ];
 const SHELL_PATHS = new Set(APP_SHELL.map(path => new URL(path, self.location.href).pathname));
+// The PDF engine is cached the first time a student opens a PDF (not at
+// install: static copies of the site do not have it), so saved PDFs open offline.
+const RUNTIME_PATHS = new Set(["/vendor/pdfjs/build/pdf.min.mjs", "/vendor/pdfjs/build/pdf.worker.min.mjs"]);
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
@@ -27,7 +30,7 @@ self.addEventListener("fetch", event => {
   const url = new URL(request.url);
   // Never cache authenticated replies, runtime Firebase config, admin pages, or
   // arbitrary same-origin responses. Only the explicit public/study shell is cached.
-  if (request.method !== "GET" || url.origin !== self.location.origin || url.pathname === "/api" || url.pathname.startsWith("/api/") || request.headers.has("authorization") || request.cache === "no-store" || !SHELL_PATHS.has(url.pathname)) return;
+  if (request.method !== "GET" || url.origin !== self.location.origin || url.pathname === "/api" || url.pathname.startsWith("/api/") || request.headers.has("authorization") || request.cache === "no-store" || !(SHELL_PATHS.has(url.pathname) || RUNTIME_PATHS.has(url.pathname))) return;
 
   async function updateFromNetwork() {
     const response = await fetch(request);

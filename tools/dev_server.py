@@ -5,6 +5,7 @@ Never use Python's unrestricted directory server for this credential-bearing rep
 """
 import argparse
 import json
+import re
 from http.client import HTTPConnection, HTTPException
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -21,10 +22,32 @@ PUBLIC_FILES = {
     "study-materials.mjs", "research-search.mjs", "request-scope.mjs",
     "student-profile.mjs", "installation.mjs",
     "ai-studio.css", "ai-studio.mjs", "ai-markdown.mjs", "admin-ai.mjs", "presence.mjs",
+    "admin-site.mjs", "admin-uploads.mjs", "pdf-reader.mjs",
     "data/site-content.json",
     "firebase/client.mjs", "firebase/auth-client.mjs",
     "firebase/firebase-config.mjs", "firebase/firebase-config.example.mjs",
 }
+
+
+PDFJS_ROOT = ROOT / "backend" / "node_modules" / "pdfjs-dist"
+PDFJS_FILES = {
+    "build": re.compile(r"^pdf(?:\.worker)?\.min\.mjs$"),
+    "standard_fonts": re.compile(r"^[A-Za-z0-9_-]+\.(?:pfb|ttf)$"),
+    "cmaps": re.compile(r"^[A-Za-z0-9_-]+\.bcmap$"),
+    "iccs": re.compile(r"^[A-Za-z0-9_-]+\.icc$"),
+    "wasm": re.compile(r"^[A-Za-z0-9_-]+\.(?:wasm|js)$"),
+}
+PDFJS_TYPES = {".mjs": "text/javascript", ".js": "text/javascript", ".wasm": "application/wasm"}
+
+
+def pdfjs_file(url_path):
+    """Mirror of backend/src/website.js resolvePdfjsFile: /vendor/pdfjs/<folder>/<file>."""
+    match = re.match(r"^/vendor/pdfjs/([a-z_]+)/([^/]+)$", url_path)
+    if not match or match.group(1) not in PDFJS_FILES or not PDFJS_FILES[match.group(1)].match(match.group(2)):
+        return None
+    folder = "legacy/build" if match.group(1) == "build" else match.group(1)
+    target = PDFJS_ROOT / folder / match.group(2)
+    return target if target.is_file() else None
 
 
 class FireCounselDevHandler(SimpleHTTPRequestHandler):
@@ -42,6 +65,15 @@ class FireCounselDevHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def send_head(self):
+        vendor = pdfjs_file(urlsplit(self.path).path)
+        if vendor is not None:
+            data = vendor.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", PDFJS_TYPES.get(vendor.suffix, "application/octet-stream"))
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            from io import BytesIO
+            return BytesIO(data)
         target = Path(self.translate_path(self.path)).resolve()
         try:
             relative = target.relative_to(ROOT)

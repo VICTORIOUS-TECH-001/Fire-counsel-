@@ -53,7 +53,7 @@ function renderStatus(data) {
     <dt>Web-search model</dt><dd>${escapeHTML(p.gemini.search_models.join(", "))}</dd>
     <dt>OpenRouter (backup)</dt><dd>${state(p.openrouter.configured, "KEY ADDED", "NO KEY")} ${escapeHTML(p.openrouter.models.join(", "))}</dd>
     <dt>Database tables</dt><dd>${state(data.schema_ready, "READY", "NOT INSTALLED")}</dd>
-  </dl>${data.schema_ready ? "" : `<p class="fc-status" data-kind="error">The AI tables are not in Neon yet. On GitHub open <b>Actions → “Neon AI tables migration” → Run workflow</b>.</p>`}`;
+  </dl>${data.schema_ready ? "" : `<p class="fc-status" data-kind="error">The AI tables are not in Neon yet. On GitHub open <b>Actions → “Neon database migration (AI, website, uploads)” → Run workflow</b>.</p>`}`;
   const today = data.today || {};
   $("#ai-today").innerHTML = `<dl class="fc-kv">${FEATURES.map(([key, label]) => `<dt>${label}</dt><dd>${today[key]?.used || 0} used${today[key]?.failed ? ` · ${today[key].failed} failed` : ""}</dd>`).join("")}</dl><p>Time zone: ${escapeHTML(data.timezone)}</p>`;
   if (data.limits) {
@@ -160,7 +160,10 @@ $("#ai-extract-button")?.addEventListener("click", async () => {
     const mimeType = file.type || (/\.pdf$/i.test(file.name) ? "application/pdf" : "text/plain");
     const body = await api("/api/v1/admin/ai/extract", { method: "POST", body: JSON.stringify({ attachment: { name: file.name, mimeType, data } }) });
     $("#ai-extract-output").value = body.data.text;
-    setText("#ai-extract-status", body.data.truncated ? "Done, but the text was cut short: split the file and try again for the rest." : "Done. Check the text carefully before using it.", body.data.truncated ? "error" : "ok");
+    const d = body.data;
+    const how = !d.method ? "" : d.method === "pdf_text" ? "read directly from the PDF (no AI needed)" : d.method.includes("ai_ocr") ? "scanned pages read by AI" : d.method.includes("ocr_space") ? "read by OCR.space" : `read as ${d.method}`;
+    const info = [d.pages ? `${d.pages} page${d.pages === 1 ? "" : "s"}` : "", how, ...(d.warnings || [])].filter(Boolean).join(" · ");
+    setText("#ai-extract-status", `${d.truncated ? "Done, but the text was cut short: split the file and try again for the rest." : "Done. Check the text carefully before using it."}${info ? ` (${info})` : ""} To save files into the library, use Upload documents.`, d.truncated ? "error" : "ok");
   } catch (error) {
     setText("#ai-extract-status", error.message, "error");
   } finally {

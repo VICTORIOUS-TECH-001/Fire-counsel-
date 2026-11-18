@@ -1,8 +1,8 @@
-name: Neon AI tables migration
+name: Neon database migration (AI, website, uploads)
 
-# Creates the Fire Counsel AI tables in Neon (additive and safe to re-run:
+# Creates the Fire Counsel AI, website-publishing and upload tables in Neon (additive and safe to re-run:
 # existing tables and data are never changed or deleted).
-# Run it from: Actions -> "Neon AI tables migration" -> Run workflow.
+# Run it from: Actions -> "Neon database migration (AI, website, uploads)" -> Run workflow.
 # Uses the DATABASE_URL repository secret.
 on:
   workflow_dispatch:
@@ -26,7 +26,7 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm --prefix backend ci --omit=dev
-      - name: Apply AI tables migration
+      - name: Apply migrations 002 and 003
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npm --prefix backend run db:migrate

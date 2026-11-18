@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import test from "node:test";
 import { createApp } from "../src/app.js";
-import { resolvePublicFile } from "../src/website.js";
+import { resolvePdfjsFile, resolvePublicFile } from "../src/website.js";
 
 async function serve(t, env) {
   const server = createApp({ env }).listen(0, "127.0.0.1");
@@ -66,4 +66,20 @@ test("website redirects friendly sign-in addresses to the sign-in page", async t
     assert.equal(response.status, 301, path);
     assert.equal(response.headers.get("location"), "/auth.html", path);
   }
+});
+
+test("the PDF reader engine is served from pdfjs-dist with a strict allowlist", async t => {
+  const base = await serve(t, { SERVE_WEBSITE: "true" });
+  for (const [path, type] of [["/vendor/pdfjs/build/pdf.min.mjs", /javascript/], ["/vendor/pdfjs/build/pdf.worker.min.mjs", /javascript/], ["/vendor/pdfjs/wasm/jbig2.wasm", /wasm/], ["/pdf-reader.mjs", /javascript/], ["/admin-site.mjs", /javascript/], ["/admin-uploads.mjs", /javascript/]]) {
+    const response = await fetch(`${base}${path}`);
+    assert.equal(response.status, 200, path);
+    assert.match(response.headers.get("content-type"), type, path);
+  }
+  for (const path of ["/vendor/pdfjs/package.json", "/vendor/pdfjs/build/pdf.mjs.map", "/vendor/pdfjs/build/../package.json", "/vendor/pdfjs/web/viewer.html", "/vendor/pdfjs/cmaps/..%2f..%2fpackage.json"]) {
+    const response = await fetch(`${base}${path}`);
+    assert.equal(response.status, 404, path);
+  }
+  assert.equal(resolvePdfjsFile("/vendor/pdfjs/build/pdf.min.mjs"), "legacy/build/pdf.min.mjs");
+  assert.equal(resolvePdfjsFile("/vendor/pdfjs/cmaps/78-H.bcmap"), "cmaps/78-H.bcmap");
+  assert.equal(resolvePdfjsFile("/vendor/pdfjs/cmaps/../x.bcmap"), null);
 });

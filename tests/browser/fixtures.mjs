@@ -72,7 +72,7 @@ export async function stubAuth(page, { user = null } = {}) {
         const headers = new Headers(options.headers);
         headers.set('Authorization', 'Bearer synthetic-test-token');
         if (needsStudentInstallation(new URL(path, location.origin).pathname)) headers.set(INSTALLATION_HEADER, await browserInstallation());
-        if (options.body) headers.set('Content-Type', 'application/json');
+        if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
         return fetch(path, { ...options, headers, cache: 'no-store' });
       }
     `

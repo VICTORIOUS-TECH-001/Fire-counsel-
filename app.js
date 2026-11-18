@@ -126,7 +126,7 @@
       list.innerHTML = `<div class="empty-state"><span>▤</span><strong>Your library is ready</strong><p>Add a PDF, text file or Markdown note to keep a local copy for your own study.</p></div>`;
       return;
     }
-    list.innerHTML = documents.sort((a,b) => b.addedAt-a.addedAt).map(document => `<div class="document-item"><span class="file-icon">▤</span><div class="document-meta"><strong>${escapeHTML(document.name)}</strong><small>${formatSize(document.size)} · Added ${new Date(document.addedAt).toLocaleDateString()} · on this device</small></div><button class="delete-file" type="button" data-delete-doc="${escapeHTML(document.id)}" aria-label="Delete ${escapeHTML(document.name)}" title="Delete">×</button></div>`).join("");
+    list.innerHTML = documents.sort((a,b) => b.addedAt-a.addedAt).map(document => `<div class="document-item"><span class="file-icon">▤</span><button class="document-meta document-open" type="button" data-open-doc="${escapeHTML(document.id)}" aria-label="Open ${escapeHTML(document.name)}"><strong>${escapeHTML(document.name)}</strong><small>${formatSize(document.size)} · Added ${new Date(document.addedAt).toLocaleDateString()} · on this device · tap to read</small></button><button class="delete-file" type="button" data-delete-doc="${escapeHTML(document.id)}" aria-label="Delete ${escapeHTML(document.name)}" title="Delete">×</button></div>`).join("");
   }
   function renderCards() {
     $("#stat-cards").textContent = cards.length;
@@ -269,6 +269,21 @@
     if (toastButton) { toast(toastButton.dataset.toast); return; }
     const subject = event.target.closest("[data-subject]");
     if (subject) { toast(`${subject.dataset.subject} selected. Choose it from the course menu to study.`); return; }
+    const openButton = event.target.closest("[data-open-doc]");
+    if (openButton) {
+      const item = documents.find(entry => entry.id === openButton.dataset.openDoc);
+      if (!item?.blob) { toast("This file's contents are missing on this device. Add it again."); return; }
+      try {
+        const reader = await import("./pdf-reader.mjs");
+        reader.openReader({ name: item.name, type: item.type, blob: item.blob });
+      } catch (error) {
+        console.error(error);
+        const url = URL.createObjectURL(item.blob);
+        if (!window.open(url, "_blank", "noopener")) toast("Could not open the reader. Check your connection and try again.");
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      }
+      return;
+    }
     const deleteButton = event.target.closest("[data-delete-doc]");
     if (deleteButton && db) {
       await remove("documents", deleteButton.dataset.deleteDoc);

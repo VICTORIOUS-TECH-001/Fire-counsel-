@@ -82,6 +82,35 @@ function materialCard(material) {
     }
   });
   article.append(details);
+
+  if (material.has_original) {
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "button soft server-material-open";
+    const kind = /pdf/i.test(material.file_mime_type || material.original_file_name || "") ? "PDF" : "file";
+    open.textContent = `📖 Open the original ${kind}`;
+    open.addEventListener("click", async () => {
+      if (!currentUser || !authClient) { setStatus("Sign in again to open this material.", true); return; }
+      try {
+        const reader = await import("./pdf-reader.mjs");
+        reader.openReader({
+          name: material.original_file_name || `${material.title || "material"}.pdf`,
+          type: material.file_mime_type || "",
+          load: async () => {
+            const response = await authClient.apiRequest(`/api/v1/materials/${encodeURIComponent(material.id)}/file`);
+            if (!response.ok) {
+              const body = await readJson(response);
+              throw new Error(body.error || ([502, 503, 504].includes(response.status) ? "The server is waking up. Wait a minute and try again." : `Could not load the file (${response.status}).`));
+            }
+            return response.blob();
+          }
+        });
+      } catch {
+        setStatus("The reader could not start. Check your connection and try again.", true);
+      }
+    });
+    article.append(open);
+  }
   return article;
 }
 

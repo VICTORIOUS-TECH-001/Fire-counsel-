@@ -34,7 +34,7 @@ The website listens on `0.0.0.0:8080`; the API listens on `0.0.0.0:4000`. On you
 | Student workspace | `/study.html` | Personal local files, flashcards, subjects and focus timer |
 | Account access | `/auth.html` | Firebase email/password registration, Google sign-in and reset emails |
 | My profile | `/study.html#profile` | Self-service name edits, Firebase email/password security and installation status; no courses/payments required |
-| Admin studio | `/admin.html` | Local previews plus the server-protected Database data panel |
+| Admin studio | `/admin.html` | Website draft → preview → publish, document uploads (PDF/Word/photos), Database data, AI settings — all server-protected |
 | Database readiness | `/api/health` | `503 / not_configured` is expected without Neon |
 
 An admin-first preview is available with `npm run dev:admin` on port 8093. Both preview servers use the same restricted file server and loopback-only API proxy. Optional port overrides:
@@ -97,14 +97,19 @@ Backend endpoint/security details are in [backend/README.md](backend/README.md);
 
 The student database deliberately retains **`lexmaster-ai-stage1`**, version **1**, stores **`documents`, `cards`, `settings`**, and counter **`lexmaster-sessions`**. No study-store migration, deletion or localStorage clearing is performed. The independent `fire-counsel-installation-v1` marker persists across sign-out; clearing it can lock the student profile to a lost installation. Automated browser tests seed and verify disposable legacy records; they do not inspect anyone's real browser profile. Local study data is shared by accounts using that browser, not encrypted or separated by Firebase UID; sign-out does not hide/delete it. Clearing browser site data can delete local work and the account installation marker, so keep independent backups.
 
-Website drafts use `fire-counsel-site-draft-v1`. Quota/account examples use `fire-counsel-admin-quota-preview-v1`. They are local previews only, with synthetic account IDs. None publishes the site globally or enforces a student's allowance.
+## Website publishing, uploads and the PDF reader
 
-The Gemini key field, AI/OCR operations, slideshow cloud uploads/deletes, quotas, administrative account adjustments, payments and public JSON publishing remain disabled. Students' own profile/security edits are implemented separately. Never paste provider keys into a static page, localStorage, site JSON, Firestore documents or chat.
+- **Website edits** (admin → Pages & JSON): *Save draft* stores the draft in Neon (`site_content`), *Preview* opens `index.html?preview=1`, which receives the unsaved draft from the admin tab (same origin only, never stored), and *Publish* makes it live. The public `/data/site-content.json` is then served from Neon, with the bundled file as the fallback. Every publish is kept in `site_content_versions` and can be restored. Slide photos are stored in `site_images` and served at `/media/<id>.<ext>`. No Firebase Storage (Blaze plan) is needed.
+- **Document uploads** (admin → Upload documents): PDFs, Word files, photos and text are sent raw to `/api/v1/admin/documents` and read in the background. Digital PDFs are read with pdf.js (free, no AI). Scanned pages are read by Gemini (with the existing key) in page batches, with OCR.space as an optional fallback if `OCR_SPACE_API_KEY` is set. The text goes into the Neon library (materials + page-numbered chunks, case records or past questions), and the AI studio quotes it as `[Library: title, p. N]`. Optional limits: `FILE_STORAGE_LIMIT_MB` (default 350), `DOCUMENT_MAX_FILE_MB` (25), `DOCUMENT_OCR_MAX_PAGES`, `DOCUMENT_OCR_BATCH_PAGES`.
+- **Student reader** (`pdf-reader.mjs`): personal library files and published materials' original PDFs open in an in-page reader (pdf.js served from `backend/node_modules/pdfjs-dist` at `/vendor/pdfjs/`, allowlisted). Static copies of the site without the backend fall back to the phone's PDF viewer.
+- Run the **Neon database migration** workflow once after deploying (migration `003_site_and_documents.sql`).
+
+Never paste provider keys into a static page, localStorage, site JSON, Firestore documents or chat.
 
 ## Product decisions retained
 
 - Adults-only (18+) audience and Gemini were selected, but age verification and provider/privacy approval are not active. Do not use Gemini Free for student work.
-- The project owner previously confirmed the existing Firebase Blaze plan; no billing change or Firebase deployment is made here. Proposed Storage rules cover public slide reads and admin-claim-only writes, a 10 MiB per-file limit and no photo-count cap. This is not a spending limit or a live upload feature.
+- Firebase is used for sign-in only. Since February 2026, Cloud Storage for Firebase needs the Blaze plan, so website photos and uploaded documents are stored in Neon instead. The proposed Storage rules remain in the repository but are unused.
 - Administrator-chosen Free/paid per-feature counts, reset periods and individual adjustments are previews only. No preset live quotas are imposed.
 - Archived questions must be exact verified questions, not generated variants. New practice scenarios must be separately labelled and grounded in approved material.
 - Nigeria was selected, but additional jurisdictions and school-approved source domains remain to be specified. External legal-web fallback stays off.

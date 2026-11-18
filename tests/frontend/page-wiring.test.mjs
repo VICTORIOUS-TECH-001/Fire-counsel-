@@ -8,7 +8,7 @@ const read = path => readFileSync(resolve(root, path), "utf8");
 const pages = ["index.html", "study.html", "admin.html", "auth.html"];
 const integrations = [
   ["study.html", ["study-materials.mjs", "research-search.mjs", "student-profile.mjs", "ai-studio.mjs", "presence.mjs"]],
-  ["admin.html", ["admin-auth.mjs", "admin-database.mjs", "admin-ai.mjs", "presence.mjs"]],
+  ["admin.html", ["admin-auth.mjs", "admin-database.mjs", "admin-ai.mjs", "admin-site.mjs", "admin-uploads.mjs", "presence.mjs"]],
   ["auth.html", ["auth-page.mjs"]]
 ];
 
