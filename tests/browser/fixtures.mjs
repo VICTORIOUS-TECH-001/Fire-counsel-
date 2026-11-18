@@ -16,29 +16,28 @@ export const test = base.extend({
 export { expect };
 
 export async function expectNoHorizontalOverflow(page) {
-  // Resize/navigation can expose the new innerWidth before all responsive styles
-  // have settled. Recheck the actual layout, not a fixed sleep or a test retry.
-  // A persistent overflow still fails and reports the offending element bounds.
-  let layout;
+  // Resize and same-document navigation update viewport/styles on render frames.
+  // Wait on that actual browser condition instead of issuing timed CDP samples
+  // through expect.poll (which could time out without completing a measurement).
+  // No fixed sleep, clipping CSS, relaxed width threshold or whole-test retry.
   try {
-    await expect.poll(async () => {
-      layout = await page.evaluate(() => {
-        const viewport = window.innerWidth;
-        const width = document.documentElement.scrollWidth;
-        const overflowing = width <= viewport ? [] : [...document.querySelectorAll("body *")].flatMap(element => {
-          const rect = element.getBoundingClientRect();
-          return rect.width > 0 && rect.right > viewport + 0.5
-            ? [{ element: element.id ? `#${element.id}` : element.tagName.toLowerCase(), right: Math.round(rect.right), width: Math.round(rect.width) }]
-            : [];
-        }).slice(0, 12);
-        return { fits: width <= viewport, viewport, width, overflowing };
-      });
-      return layout.fits;
-    }, { message: "Responsive layout fits the viewport without horizontal overflow" }).toBe(true);
+    const fits = await page.waitForFunction(() => document.documentElement.scrollWidth <= window.innerWidth,
+      null, { polling: "raf", timeout: 7_000 });
+    await fits.dispose();
   } catch (error) {
-    // Always include the measured bounds; partial-object matchers omit them.
-    error.message += `\nLast measured layout: ${JSON.stringify(layout)}`;
-    throw error;
+    // Collect bounds once on failure; do not force layout on every descendant
+    // for every passing check. Evaluation errors are not swallowed by a poll.
+    const layout = await page.evaluate(() => ({
+      viewport: window.innerWidth,
+      width: document.documentElement.scrollWidth,
+      overflowing: [...document.querySelectorAll("body *")].flatMap(element => {
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.right > window.innerWidth + 0.5
+          ? [{ element: element.id ? `#${element.id}` : element.tagName.toLowerCase(), right: Math.round(rect.right), width: Math.round(rect.width) }]
+          : [];
+      }).slice(0, 12)
+    }));
+    throw new Error(`Responsive layout fits the viewport without horizontal overflow: ${JSON.stringify(layout)}`, { cause: error });
   }
 }
 
