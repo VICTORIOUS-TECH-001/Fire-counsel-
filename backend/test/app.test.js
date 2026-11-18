@@ -145,7 +145,7 @@ test("pasted database URLs are cleaned and failures get a secret-free reason", a
   assert.equal(response.status, 503);
   assert.equal(body.database, "unavailable");
   assert.equal(body.database_error, "wrong_password_or_user");
-  assert.deepEqual(body.setup, { website: true, firebase_admin_key: false, gemini_key: true, openrouter_key: false, admin_emails: false });
+  assert.deepEqual(body.setup, { website: true, firebase_admin_key: false, gemini_key: true, openrouter_key: false, groq_key: false, tavily_key: false, admin_emails: false });
   assert.equal(body.firebase_admin_error, "web_config_not_admin_key");
   assert.doesNotMatch(JSON.stringify(body), /neondb_owner|secret-detail|AIza-hidden/);
 });
@@ -156,4 +156,21 @@ test("SERVE_WEBSITE accepts true however it was typed, and nothing else", async 
     const response = await fetch(`${base}/`);
     assert.equal(response.status === 200, served, `SERVE_WEBSITE=${JSON.stringify(value)}`);
   }
+});
+
+test("health page shows whether the Groq and Tavily keys are set, under any common name, without showing them", async t => {
+  const base = await serve(t, { env: { DATABASE_URL: "x", GROK_API_KEY: "gsk_secret-groq", TRIVILY_API_KEY: "secret-tavily" }, databaseCheck: async () => true });
+  const body = await (await fetch(`${base}/api/health`)).json();
+  assert.equal(body.setup.groq_key, true);
+  assert.equal(body.setup.tavily_key, true);
+  assert.deepEqual(body.ai_key_notes.map((n) => [n.provider, n.setting_name, Boolean(n.problem)]), [["groq", "GROK_API_KEY", false], ["tavily", "TRIVILY_API_KEY", true]]);
+  assert.match(body.ai_key_notes[1].problem, /tvly-/);
+  assert.doesNotMatch(JSON.stringify(body), /secret-groq|secret-tavily/);
+  const clean = await serve(t, { env: { DATABASE_URL: "x", GROQ_API_KEY: "gsk_a", TAVILY_API_KEY: "tvly-a" }, databaseCheck: async () => true });
+  const ok = await (await fetch(`${clean}/api/health`)).json();
+  assert.deepEqual([ok.setup.groq_key, ok.setup.tavily_key, ok.ai_key_notes], [true, true, undefined]);
+  const xai = await serve(t, { env: { DATABASE_URL: "x", GROK_API_KEY: "xai-abc" }, databaseCheck: async () => true });
+  const wrong = await (await fetch(`${xai}/api/health`)).json();
+  assert.equal(wrong.setup.groq_key, false);
+  assert.match(wrong.ai_key_notes[0].problem, /xAI Grok key/);
 });
