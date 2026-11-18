@@ -3,7 +3,7 @@ import { getPool } from "../config/database.js";
 import { getFirebaseAuth } from "../config/firebaseAdmin.js";
 import { verifyFirebaseToken } from "../middleware/verifyFirebaseToken.js";
 import { requireAdmin } from "../middleware/requireAdmin.js";
-import { AiError, describeProviders, generate as defaultGenerate } from "../services/ai/providers.js";
+import { AiError, aiConfig, describeProviders, generate as defaultGenerate, providerHealth, testModels } from "../services/ai/providers.js";
 import { createStudio } from "../services/ai/studio.js";
 import { BUILT_IN_PROMPTS, PROMPT_KINDS, clearPromptCache } from "../services/ai/prompts.js";
 import { FEATURES, getDefaultLimits, timezone, validateLimit } from "../services/ai/quota.js";
@@ -20,6 +20,7 @@ export function createAdminAiRouter({
   authProvider = getFirebaseAuth,
   env = process.env,
   generate = defaultGenerate,
+  fetchImpl = fetch,
   studioFactory = createStudio,
   configured = () => Boolean(env.DATABASE_URL)
 } = {}) {
@@ -29,7 +30,7 @@ export function createAdminAiRouter({
 
   router.get("/status", async (req, res) => {
     const providers = describeProviders(env);
-    const data = { providers, database: configured() ? "configured" : "not_configured", schema_ready: false, prompts: [], limits: null, today: {}, timezone: timezone(env) };
+    const data = { providers, skipped_models: providerHealth(), database: configured() ? "configured" : "not_configured", schema_ready: false, prompts: [], limits: null, today: {}, timezone: timezone(env) };
     if (!configured()) return res.json({ data });
     try {
       const db = poolProvider();
@@ -51,19 +52,22 @@ export function createAdminAiRouter({
     }
   });
 
+  // Tests every model one by one so the admin can see exactly which one works.
   router.post("/test", async (req, res) => {
     try {
-      const result = await generate({ messages: [{ role: "user", text: "Reply with exactly this sentence: FIRE COUNSEL AI is connected." }], maxTokens: 64, temperature: 0 }, { env });
-      let search = null;
-      if (req.body?.search === true) {
-        try {
-          const grounded = await generate({ search: true, messages: [{ role: "user", text: "Find the official website of the Supreme Court of Nigeria. Reply in one sentence." }], maxTokens: 256 }, { env });
-          search = { ok: true, model: grounded.model, sources: grounded.sources.length };
-        } catch (error) {
-          search = { ok: false, error: error.message };
-        }
-      }
-      res.json({ data: { ok: true, provider: result.provider, model: result.model, reply: result.text.slice(0, 200), fallback: Boolean(result.fallback), search } });
+      if (!aiConfig(env).configured) throw new AiError(503, "No AI key is set in Render. Add GEMINI_API_KEY (and optionally OPENROUTER_API_KEY), then redeploy.", "AI_NOT_CONFIGURED");
+      const models = await testModels({ env, fetchImpl, search: req.body?.search === true });
+      const first = models.find((item) => item.ok && item.role !== "web search");
+      const searchResult = models.find((item) => item.role === "web search");
+      res.json({ data: {
+        ok: Boolean(first),
+        provider: first?.provider || null,
+        model: first?.model || null,
+        reply: first?.reply || "",
+        fallback: first?.provider === "openrouter",
+        search: searchResult ? (searchResult.ok ? { ok: true, model: searchResult.model, sources: searchResult.sources } : { ok: false, error: searchResult.error }) : null,
+        models
+      } });
     } catch (error) { publicAiError(res, error); }
   });
 

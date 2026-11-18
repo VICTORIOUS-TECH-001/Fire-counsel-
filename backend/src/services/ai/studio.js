@@ -24,6 +24,71 @@ const DETECTOR = `You classify study material or an exam question into the corre
 {"course_id":"<id from the list or null>","confidence":0.0,"reason":"one sentence","alternatives":["<id>","<id>"]}
 Use confidence below 0.55 when the material could belong to more than one listed course.`;
 
+// Quick study tools that run through the chat allowance. The student's text
+// (or uploaded file) is the material; the instruction shapes the answer.
+export const CHAT_TASKS = {
+  mnemonics: { label: "Mnemonics", instruction: "TASK — MNEMONICS: Create memorable mnemonics (acronyms, rhymes or short stories) for the topic, list of elements or cases given. For each: the mnemonic in bold, what each letter/part stands for, the case or statutory authority for each element, and one line on how to use it in an exam answer. Finish with a 3-question self-test." },
+  summary: { label: "Summary", instruction: "TASK — SUMMARY: Summarise the material or judgment for exam revision. For a case use: Citation · Court · Facts · Issues · Holding · Ratio decidendi · Obiter · Significance. For notes use short headed sections with the key rules and authorities. End with 5 key takeaways." },
+  irac: { label: "IRAC answer", instruction: "TASK — PROBLEM QUESTION (IRAC): Answer the problem question like a top Nigerian law exam script: identify every Issue, state the Rule with authorities (cases and statutes), Apply them to the facts step by step (consider both sides), and Conclude for each issue. Add a short 'Marks boosters' list." },
+  flashcards: { label: "Flashcards", instruction: "TASK — FLASHCARDS: Make 10–20 question-and-answer flashcards from the material. Format each as '**Q:** …' then '**A:** …' (answers short, with the case or section). Mix definitions, elements, case facts → principle, and exceptions." },
+  compare: { label: "Compare cases", instruction: "TASK — COMPARE / DISTINGUISH: Compare the cases or doctrines given. Use a Markdown table (facts, issue, decision, ratio, court/year), then explain how they can be reconciled or distinguished and which binds a Nigerian court." },
+  statute: { label: "Explain a section", instruction: "TASK — STATUTE EXPLAINER: Explain the statutory or constitutional provision in plain English: what it says (quote it if you are sure of the wording, otherwise say so), its elements, exceptions/limits, leading Nigerian cases interpreting it, and a short exam example." },
+  essay: { label: "Essay plan", instruction: "TASK — ESSAY PLAN: Plan an essay answer: thesis, introduction points, 4–6 headed body sections each with the authorities to cite, counter-arguments, and a conclusion. Keep it in outline form the student can expand in the exam." },
+  explain: { label: "Explain simply", instruction: "TASK — EXPLAIN SIMPLY: Explain the topic or the uploaded notes/photo step by step in simple language for a law student, with one everyday example, the leading authorities, and a 3-question quick check at the end." },
+  marker: { label: "Mark my answer", instruction: "TASK — MARK MY ANSWER: You are a strict but encouraging Nigerian university law lecturer marking an exam script. The student's message (or attached photo of a handwritten script) contains the question and their answer; it may also include marking points. Respond with: 1) **Score: X / Y** — use the marks stated in the question, otherwise mark out of 20 — and the grade band (A–F); 2) **What you did well**; 3) **What was missing or wrong** — issues not spotted, rules misstated, and the cases and statutes that should have been cited; 4) **Structure and technique** (IRAC for problem questions, argument flow for essays, use of authority, time management); 5) **Model answer outline** the student can learn from; 6) **Three specific tips** for the next attempt. Be fair and specific. If no answer is given, say so and ask for it instead of inventing one." },
+  mock: { label: "Mock exam", instruction: "TASK — MOCK EXAM (JSON)." },
+  library: { label: "Course library", instruction: "TASK — COURSE LIBRARY ANSWER: Answer mainly from the FIRE COUNSEL LIBRARY passages supplied, citing each point as [Library: title, p. N]. If the library does not cover something, say so clearly before adding general knowledge." }
+};
+
+const MOCK_SETTER = `You set timed mock examinations for Nigerian law students. Use the student's notes, topic or uploaded pages (and any FIRE COUNSEL LIBRARY passages supplied) to set fair, exam-standard questions. Respond with JSON only:
+{"title":"short exam title","instructions":"one or two lines of rubric","questions":[
+ {"type":"mcq","question":"...","options":["...","...","...","..."],"answer":0,"explanation":"why this is right, citing the case or section","marks":1},
+ {"type":"essay","question":"essay or problem question (with facts for problem questions)","marks":10,"guide":"marking points: issues, rules and authorities a strong answer must cover"}
+]}
+Rules: "answer" is the 0-based index of the single correct option; give exactly 4 options for MCQs, with plausible distractors; do not repeat questions; never invent case names or citations — use only well-known authorities you are sure of.`;
+
+const clampInt = (value, min, max, fallback) => (Number.isFinite(Number(value)) ? Math.min(Math.max(Math.round(Number(value)), min), max) : fallback);
+
+/** Validates an AI-made mock exam so the page can always render it safely. */
+export function normalizeQuiz(raw, { type = "mcq", minutes = null, count = 10 } = {}) {
+  if (!raw || !Array.isArray(raw.questions)) return null;
+  const text = (value, max) => String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+  const questions = [];
+  for (const item of raw.questions.slice(0, 30)) {
+    const question = text(item?.question, 3000);
+    if (!question) continue;
+    const options = Array.isArray(item?.options) ? item.options.map((o) => text(o, 500)).filter(Boolean).slice(0, 6) : [];
+    const answer = Number.isInteger(item?.answer) ? item.answer : Number.isInteger(Number(item?.answer)) ? Number(item.answer) : -1;
+    if (item?.type !== "essay" && options.length >= 2 && answer >= 0 && answer < options.length) {
+      questions.push({ type: "mcq", question, options, answer, explanation: text(item.explanation, 1500), marks: clampInt(item.marks, 1, 10, 1) });
+    } else if (item?.type === "essay" || type !== "mcq") {
+      questions.push({ type: "essay", question, marks: clampInt(item?.marks, 1, 50, 10), guide: text(item?.guide, 3000) });
+    }
+  }
+  if (!questions.length) return null;
+  const limited = questions.slice(0, Math.max(count, 1));
+  const essays = limited.filter((q) => q.type === "essay").length;
+  const suggested = Math.round((limited.length - essays) * 1.5) + essays * 20;
+  return {
+    title: text(raw.title, 160) || "Mock exam",
+    instructions: text(raw.instructions, 600) || "Answer all questions.",
+    minutes: clampInt(minutes ?? suggested, 2, 180, 15),
+    total_marks: limited.reduce((sum, q) => sum + q.marks, 0),
+    questions: limited
+  };
+}
+
+function quizMarkdown(quiz) {
+  const letters = "ABCDEF";
+  const body = quiz.questions.map((q, i) => q.type === "mcq"
+    ? `**${i + 1}.** ${q.question} *(${q.marks} mark${q.marks === 1 ? "" : "s"})*\n\n${q.options.map((o, j) => `- ${letters[j]}. ${o}`).join("\n")}`
+    : `**${i + 1}.** ${q.question} *(${q.marks} marks)*`).join("\n\n");
+  const key = quiz.questions.map((q, i) => q.type === "mcq"
+    ? `${i + 1}. **${letters[q.answer]}** — ${q.explanation || ""}`
+    : `${i + 1}. Marking points: ${q.guide || "—"}`).join("\n");
+  return `## ${quiz.title}\n\n> ⏱ Time allowed: **${quiz.minutes} minutes** · Total: **${quiz.total_marks} marks**. ${quiz.instructions}\n\nTap **Start timed exam** to sit it with a countdown.\n\n${body}\n\n---\n\n### Answer key\n\n${key}`;
+}
+
 const MAX_CASES = (env) => Math.min(Math.max(Number(env.AI_MAX_CASES_PER_RUN) || 5, 1), 12);
 const truncate = (value, max) => (String(value || "").length > max ? `${String(value).slice(0, max)}…` : String(value || ""));
 
@@ -60,9 +125,9 @@ export function librarySearchTerms(query, max = 12) {
 export function createStudio({ db, env = process.env, generate = defaultGenerate, verify = defaultVerify, fetchImpl } = {}) {
   const gen = (request) => generate(request, { env, fetchImpl });
 
-  async function research(query, attachments = []) {
+  async function research(query, attachments = [], { timeoutMs } = {}) {
     try {
-      const result = await gen({ search: true, system: RESEARCHER, messages: [{ role: "user", text: query, attachments }], maxTokens: 6000, temperature: 0.2 });
+      const result = await gen({ search: true, system: RESEARCHER, messages: [{ role: "user", text: query, attachments }], maxTokens: 6000, temperature: 0.2, timeoutMs });
       return { ok: true, notes: result.text, sources: result.sources, queries: result.searchQueries, model: result.model };
     } catch (error) {
       return { ok: false, notes: "", sources: [], queries: [], error: error.message };
@@ -216,35 +281,74 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
 
   // ---------------- modes ----------------
 
-  async function chat({ history = [], text, attachments = [], options = {} }) {
+  // Chat must feel quick: web research and each writer model get short time
+  // limits (a slow model is skipped for the next student, see providers.js).
+  const CHAT_RESEARCH_MS = Math.min(Math.max(Number(env.AI_CHAT_RESEARCH_TIMEOUT_MS) || 60_000, 10_000), 240_000);
+  const CHAT_WRITER_MS = Math.min(Math.max(Number(env.AI_CHAT_WRITER_TIMEOUT_MS) || 100_000, 10_000), 300_000);
+
+  async function mockExam({ text, attachments = [], options = {}, onProgress = () => {} }) {
+    const quiz = options.quiz || {};
+    const count = clampInt(quiz.count, 1, 30, 10);
+    const type = ["mcq", "essay", "mixed"].includes(quiz.type) ? quiz.type : "mcq";
+    onProgress("library");
+    const library = await libraryExcerpts(text || attachments.map((a) => a.name).join(" "), { courseId: options.courseId || null, limit: 4, maxChars: 8_000 });
+    const brief = [
+      `SET A MOCK EXAM: ${count} question(s); type: ${type === "mcq" ? "multiple-choice only" : type === "essay" ? "essay and problem questions only" : "a mix of multiple-choice and essay/problem questions"}.`,
+      `TOPIC / STUDENT MATERIAL:\n${truncate(text, 40000) || "(see the attached files)"}`,
+      library.length ? libraryBlock(library) : ""
+    ].filter(Boolean).join("\n\n");
+    onProgress("writing");
+    const answer = await gen({ json: true, system: MOCK_SETTER, messages: [{ role: "user", text: brief, attachments }], maxTokens: 12000, temperature: 0.5, timeoutMs: CHAT_WRITER_MS });
+    const parsed = normalizeQuiz(parseJsonReply(answer.text), { type, count, minutes: quiz.minutes ?? null });
+    if (!parsed) throw new AiError(502, "Fire Counsel AI could not build the mock exam this time. Please send it again — this was not counted.", "QUIZ_FAILED");
+    return {
+      content: quizMarkdown(parsed),
+      sources: [],
+      provider: answer.provider, model: answer.model,
+      meta: { task: "mock", quiz: parsed, library_passages: library.length, fallback: Boolean(answer.fallback) }
+    };
+  }
+
+  async function chat({ history = [], text, attachments = [], options = {}, onProgress = () => {} }) {
+    if (options.task === "mock") return mockExam({ text, attachments, options, onProgress });
     const custom = await loadPrompt(db, "chat");
+    const task = CHAT_TASKS[options.task] || null;
     let researchResult = null;
     let checked = [];
     const terms = termsFrom(text);
+    onProgress("library");
+    const library = await libraryExcerpts(text || attachments.map((a) => a.name).join(" "), { courseId: options.courseId || null });
     if (options.webSearch !== false) {
-      researchResult = await research(`Student question: ${text}`, attachments);
-      if (researchResult.ok) checked = await verify(researchResult.sources, { terms, limit: 12 });
+      onProgress("searching");
+      researchResult = await research(`Student question${task ? ` (${task.label})` : ""}: ${text}`, attachments, { timeoutMs: CHAT_RESEARCH_MS });
+      if (researchResult.ok && researchResult.sources.length) {
+        onProgress("checking", `${researchResult.sources.length} sources`);
+        checked = await verify(researchResult.sources, { terms, limit: 12 });
+      }
     }
     const context = researchResult?.ok
       ? `\n\n---\nLIVE WEB RESEARCH NOTES (Google Search):\n${truncate(researchResult.notes, 20000)}\n\nCHECKED SOURCES (cite only these, as Markdown links):\n${sourceBlock(checked)}`
       : options.webSearch !== false ? "\n\n---\nLive web search was unavailable for this answer. Do not include URLs; tell the student the answer is not web-verified." : "";
-    const library = await libraryExcerpts(text, { courseId: options.courseId || null });
     const libraryContext = library.length ? `\n\n---\n${libraryBlock(library)}` : "";
-    const messages = [...history.slice(-12), { role: "user", text: `${text}${libraryContext}${context}`, attachments }];
-    const answer = await gen({ system: composeSystem("chat", custom), messages, maxTokens: 8192 });
+    const messages = [...history.slice(-12), { role: "user", text: `${text || "(see the attached files)"}${libraryContext}${context}`, attachments }];
+    onProgress("writing");
+    const system = composeSystem("chat", custom) + (task ? `\n\n${task.instruction}` : "");
+    const answer = await gen({ system, messages, maxTokens: 8192, timeoutMs: CHAT_WRITER_MS });
+    onProgress("finishing");
     return {
       content: answer.text + lengthNote(answer),
       sources: await finalSources(answer.text, checked, terms),
       provider: answer.provider, model: answer.model,
-      meta: { web_search: Boolean(researchResult?.ok), search_queries: researchResult?.queries || [], library_passages: library.length, fallback: Boolean(answer.fallback) }
+      meta: { task: task ? options.task : null, web_search: Boolean(researchResult?.ok), search_queries: researchResult?.queries || [], library_passages: library.length, fallback: Boolean(answer.fallback) }
     };
   }
 
-  async function caseAnalysis({ history = [], text, attachments = [], options = {} }) {
+  async function caseAnalysis({ history = [], text, attachments = [], options = {}, onProgress = () => {} }) {
     const query = String(options.caseQuery || text || "").trim();
     let register = [];
     let subject = "";
     if (attachments.length) {
+      onProgress("reading");
       const extraction = await gen({ json: true, system: EXTRACTOR, messages: [{ role: "user", text: `Extract every case and authority from the attached pages.${query ? ` Student note: ${query}` : ""}`, attachments }], maxTokens: 6000, temperature: 0 });
       const parsed = parseJsonReply(extraction.text) || {};
       subject = [parsed.subject, parsed.topic].filter(Boolean).join(" — ");
@@ -258,7 +362,8 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     const remaining = register.slice(limit);
     const records = [];
     const researched = [];
-    for (const item of selected) {
+    for (const [index, item] of selected.entries()) {
+      onProgress("researching_case", `${index + 1} of ${selected.length}: ${truncate(item.name, 80)}`);
       const found = await findCases(item.name);
       records.push(...found.filter((row) => !records.some((r) => r.id === row.id)));
       const r = await research(`Research this case/authority for a Nigerian law student${subject ? ` (subject: ${subject})` : ""}: ${item.name}${item.citation ? ` — citation as printed: ${item.citation}` : ""}${item.proposition ? `. The textbook cites it for: ${item.proposition}` : ""}.`);
@@ -277,6 +382,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     }
     const terms = termsFrom(...selected.map((item) => item.name));
     const allSources = researched.flatMap(({ research: r }) => r.sources);
+    onProgress("checking", `${allSources.length} sources`);
     const checked = await verify(allSources, { terms, limit: 30 });
     const custom = await loadPrompt(db, "case_research");
     const brief = [
@@ -291,6 +397,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       remaining.length ? `NOT PROCESSED IN THIS RUN (daily processing limit of ${limit} cases per run): ${remaining.map((item) => item.name).join("; ")}. Keep them in the register marked "pending — run again" and tell the student to send "continue" to process them.` : ""
     ].filter(Boolean).join("\n\n");
     const messages = [...history.slice(-4), { role: "user", text: brief, attachments }];
+    onProgress("writing");
     const answer = await gen({ system: composeSystem("case_research", custom), messages, maxTokens: 32768, temperature: 0.2 });
     return {
       content: answer.text + lengthNote(answer),
@@ -300,7 +407,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     };
   }
 
-  async function notes({ history = [], text, attachments = [], options = {} }) {
+  async function notes({ history = [], text, attachments = [], options = {}, onProgress = () => {} }) {
     if (!attachments.length && String(text || "").trim().length < 200) {
       throw new AiError(400, "Upload your notes, textbook pages or photos, or paste at least a full paragraph of notes.", "VALIDATION_ERROR");
     }
@@ -311,6 +418,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     let checked = [];
     const terms = termsFrom(options.topic || text);
     if (options.allowResearch) {
+      onProgress("searching");
       researchResult = await research(`Find authoritative sources for these study notes${options.topic ? ` on ${options.topic}` : ""}: ${truncate(text, 3000)}`, attachments);
       if (researchResult.ok) checked = await verify(researchResult.sources, { terms, limit: 15 });
     }
@@ -326,6 +434,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       library.length ? libraryBlock(library) : "",
       researchResult?.ok ? `RESEARCH NOTES:\n${truncate(researchResult.notes, 15000)}\n\nCHECKED SOURCES:\n${sourceBlock(checked)}` : ""
     ].filter(Boolean).join("\n\n");
+    onProgress("writing");
     const answer = await gen({ system: composeSystem("exam_note", custom), messages: [...history.slice(-4), { role: "user", text: brief, attachments }], maxTokens: 32768, temperature: 0.2 });
     return {
       content: answer.text + lengthNote(answer),
@@ -335,7 +444,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     };
   }
 
-  async function questionSet({ history = [], text, attachments = [], options = {} }) {
+  async function questionSet({ history = [], text, attachments = [], options = {}, onProgress = () => {} }) {
     if (!attachments.length && String(text || "").trim().length < 20) {
       throw new AiError(400, "Paste your notes or a sample question, or upload your notes, so the AI knows what to set questions on.", "VALIDATION_ERROR");
     }
@@ -346,6 +455,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       course = courses.find((c) => c.id === options.courseId) || null;
       if (!course) throw new AiError(400, "The selected course was not found.", "VALIDATION_ERROR");
     } else if (courses.length) {
+      onProgress("detecting_course");
       detection = await detectCourse(text, attachments, courses);
       course = detection.course_id && detection.confidence >= 0.55 ? courses.find((c) => c.id === detection.course_id) : null;
       if (!course) {
@@ -372,6 +482,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       `STUDENT'S NOTES / SOURCE MATERIAL TO SET QUESTIONS FROM:\n${truncate(text, 60000) || "(see attached files)"}`,
       library.length ? `${libraryBlock(library)}\n(Use these course passages only to keep the questions within this course's syllabus.)` : ""
     ].filter(Boolean).join("\n\n");
+    onProgress("writing");
     const answer = await gen({ system: composeSystem("question_setter", custom), messages: [...history.slice(-4), { role: "user", text: brief, attachments }], maxTokens: 24576, temperature: 0.5 });
     return {
       content: answer.text + lengthNote(answer),

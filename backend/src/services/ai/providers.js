@@ -172,6 +172,30 @@ export async function callOpenRouter(request, { key, models, referer, fetchImpl 
   return { text, sources: [], searchQueries: [], provider: "openrouter", model: String(data.model || models[0]), truncated: data?.choices?.[0]?.finish_reason === "length" };
 }
 
+// ------------------------------------------------------------ model health
+// A model that is missing (404), rate-limited or hanging is skipped for a
+// while, so the next student does not wait for it again. When every model is
+// marked unhealthy they are all tried anyway (never refuse outright).
+const SKIP_MS = { MODEL_UNAVAILABLE: 30 * 60_000, PROVIDER_TIMEOUT: 5 * 60_000, PROVIDER_QUOTA: 2 * 60_000, PROVIDER_UNAVAILABLE: 60_000 };
+const unhealthy = new Map();
+
+function markModel(model, error, now = Date.now()) {
+  const ms = SKIP_MS[error?.code];
+  if (ms) unhealthy.set(model, { until: now + ms, code: error.code, message: error.message });
+}
+
+function orderModels(models, now = Date.now()) {
+  const healthy = models.filter((model) => !(unhealthy.get(model)?.until > now));
+  return healthy.length ? healthy : models;
+}
+
+export function providerHealth(now = Date.now()) {
+  return [...unhealthy.entries()].filter(([, info]) => info.until > now)
+    .map(([model, info]) => ({ model, code: info.code, message: info.message, retry_in_seconds: Math.ceil((info.until - now) / 1000) }));
+}
+
+export function resetProviderHealth() { unhealthy.clear(); }
+
 /**
  * Generate text. `search: true` uses a Gemini model with Google Search
  * grounding (no fallback: other providers cannot produce verified sources).
@@ -182,12 +206,15 @@ export async function generate(request, { env = process.env, fetchImpl = fetch }
   if (!config.configured) throw new AiError(503, "No AI provider key is configured on the server.", "AI_NOT_CONFIGURED");
   const errors = [];
   if (config.gemini.configured) {
-    const models = request.search ? config.gemini.searchModels : config.gemini.models;
+    const models = orderModels(request.search ? config.gemini.searchModels : config.gemini.models);
     for (const model of models) {
       try {
-        return await callGemini(model, request, { key: config.gemini.key, fetchImpl, timeoutMs: config.timeoutMs });
+        const result = await callGemini(model, request, { key: config.gemini.key, fetchImpl, timeoutMs: request.timeoutMs || config.timeoutMs });
+        unhealthy.delete(model);
+        return result;
       } catch (error) {
         errors.push(error);
+        markModel(model, error);
         if (!(error instanceof AiError) || !error.retryable) throw error;
       }
     }
@@ -197,7 +224,7 @@ export async function generate(request, { env = process.env, fetchImpl = fetch }
   }
   if (config.openrouter.configured) {
     try {
-      const result = await callOpenRouter(request, { key: config.openrouter.key, models: config.openrouter.models, referer: config.openrouter.referer, fetchImpl, timeoutMs: config.timeoutMs });
+      const result = await callOpenRouter(request, { key: config.openrouter.key, models: config.openrouter.models, referer: config.openrouter.referer, fetchImpl, timeoutMs: request.timeoutMs || config.timeoutMs });
       return { ...result, fallback: true };
     } catch (error) {
       errors.push(error);
@@ -205,6 +232,39 @@ export async function generate(request, { env = process.env, fetchImpl = fetch }
   }
   const last = errors[errors.length - 1];
   throw last instanceof AiError ? last : new AiError(503, "All AI providers are unavailable right now. Please try again shortly.", "PROVIDERS_UNAVAILABLE");
+}
+
+/**
+ * Admin diagnostics: asks every configured model for a one-line reply, one by
+ * one, and reports which work and how long each took.
+ */
+export async function testModels({ env = process.env, fetchImpl = fetch, search = false, timeoutMs = 30_000 } = {}) {
+  const config = aiConfig(env);
+  const ask = { messages: [{ role: "user", text: "Reply with exactly this sentence: FIRE COUNSEL AI is connected." }], maxTokens: 64, temperature: 0 };
+  const results = [];
+  const run = async (provider, model, role, call) => {
+    const started = Date.now();
+    try {
+      const reply = await call();
+      unhealthy.delete(model);
+      results.push({ provider, model: reply.model || model, role, ok: true, ms: Date.now() - started, reply: reply.text.slice(0, 120), sources: reply.sources?.length || 0 });
+    } catch (error) {
+      markModel(model, error);
+      results.push({ provider, model, role, ok: false, ms: Date.now() - started, code: error?.code || "ERROR", error: String(error?.message || error).slice(0, 240) });
+    }
+  };
+  if (config.gemini.configured) {
+    for (const model of config.gemini.models) await run("gemini", model, "writer", () => callGemini(model, ask, { key: config.gemini.key, fetchImpl, timeoutMs }));
+    if (search) {
+      for (const model of config.gemini.searchModels) {
+        await run("gemini", model, "web search", () => callGemini(model, { search: true, messages: [{ role: "user", text: "Find the official website of the Supreme Court of Nigeria. Reply in one sentence." }], maxTokens: 256 }, { key: config.gemini.key, fetchImpl, timeoutMs: Math.max(timeoutMs, 60_000) }));
+      }
+    }
+  }
+  if (config.openrouter.configured) {
+    await run("openrouter", config.openrouter.models.join(", "), "backup", () => callOpenRouter(ask, { key: config.openrouter.key, models: config.openrouter.models, referer: config.openrouter.referer, fetchImpl, timeoutMs }));
+  }
+  return results;
 }
 
 // Parse a JSON object from a model reply (tolerates ```json fences).

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" name="viewport"/>
+<meta content="#07060c" name="theme-color"/>
+<meta content="Fire Counsel AI — ask legal questions, analyse cases, build exam-ready notes, mnemonics and past-question style practice." name="description"/>
+<title>Fire Counsel AI</title>
+<link href="./manifest.webmanifest" rel="manifest"/>
+<link href="./assets/fire-counsel-192.png" rel="icon" type="image/png"/>
+<link href="./integrations.css" rel="stylesheet"/>
+<link href="./ai-studio.css" rel="stylesheet"/>
+<link href="./ai-page.css" rel="stylesheet"/>
+</head>
+<body class="fc-ai" data-theme="dark" data-view="home" data-presence-page="ai" data-signed-in="false">
+<a class="sr-only" href="#ai-input">Skip to the message box</a>
+
+<div class="fc-shell">
+  <!-- ======================= top bar (Ella style) ======================= -->
+  <header class="fc-top">
+    <button class="fc-round" id="fc-menu" type="button" aria-label="Open menu" aria-controls="fc-drawer" aria-expanded="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <button class="fc-title" id="fc-mode-switch" type="button" aria-label="Choose an AI function">
+      <span id="fc-mode-name">Fire Counsel</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5z"/></svg>
+    </button>
+    <div class="fc-pill">
+      <button class="fc-pill-btn" id="fc-open-functions-top" type="button" aria-label="All AI functions" title="All AI functions">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
+      </button>
+      <button class="fc-pill-btn" id="fc-theme" type="button" aria-label="Switch light and dark" title="Light / dark">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/><path d="M17 3v3M15.5 4.5h3"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ======================= conversation area ======================= -->
+  <main class="fc-main" id="ai-workspace" data-mode="chat" aria-labelledby="ai-workspace-title">
+    <section class="fc-home" id="fc-home" aria-label="Welcome">
+      <div class="fc-logo" aria-hidden="true">
+        <div class="fc-fire fc-fire-big"><i class="fl fl1"></i><i class="fl fl2"></i><i class="fl fl3"></i><i class="fl fl4"></i><i class="em em1"></i><i class="em em2"></i><i class="em em3"></i></div>
+      </div>
+      <h1>Hi! I'm Fire Counsel</h1>
+      <p class="fc-sub">All-in-one AI for law students: legal questions, case analysis, exam-ready notes, mnemonics and past-question practice.</p>
+      <button class="fc-unlock" id="fc-open-functions" type="button">
+        <span>Tap to unlock Fire Counsel's full power</span>
+        <span class="fc-orb" aria-hidden="true"><span class="fc-orb-main">🔍</span><span class="fc-orb-a">⚖️</span><span class="fc-orb-b">✦</span></span>
+      </button>
+      <div class="fc-suggest" aria-label="Quick starts">
+        <button class="fc-chip" type="button" data-ai-mode="chat" data-ai-task="mnemonics" data-prompt="Create a mnemonic for the elements of a valid contract"><span class="fc-chip-icon fc-ic-violet">🧠</span>Mnemonic: elements of a valid contract</button>
+        <button class="fc-chip" type="button" data-ai-mode="case" data-prompt="Donoghue v Stevenson [1932] AC 562"><span class="fc-chip-icon fc-ic-new">NEW</span>Analyse Donoghue v Stevenson with links</button>
+        <button class="fc-chip" type="button" data-ai-mode="notes" data-open-files="true"><span class="fc-chip-icon fc-ic-cyan">📷</span>Photo of notes → exam-ready notes</button>
+      </div>
+      <a class="fc-signin" href="./auth.html?next=ai.html">Sign in to start using Fire Counsel AI →</a>
+    </section>
+
+    <header class="fc-mode-bar" id="fc-mode-bar">
+      <span class="fc-eyebrow" id="ai-mode-eyebrow">FIRE COUNSEL AI · CHAT</span>
+      <h2 id="ai-workspace-title">Ask Fire Counsel AI</h2>
+      <p id="ai-mode-help">Ask a legal question or upload notes, textbook photos or a PDF.</p>
+    </header>
+
+    <p class="fc-status ai-connection" id="ai-status" role="status" aria-live="polite">Checking sign-in…</p>
+    <div class="ai-thread fc-thread" id="ai-thread" aria-live="polite" aria-label="Conversation"></div>
+  </main>
+
+  <!-- ======================= composer ======================= -->
+  <form class="fc-composer" id="ai-form" novalidate>
+    <div class="fc-task" id="fc-task" hidden><span id="fc-task-label">Mnemonics</span><button id="fc-task-clear" type="button" aria-label="Stop using this tool">×</button></div>
+    <div class="ai-options fc-options" id="fc-options">
+      <label class="ai-option" data-for="chat" data-not-task="mock"><input id="ai-web-search" type="checkbox" checked> Search the web &amp; check links</label>
+      <label class="ai-option" data-for="chat" data-task="mock">Questions <input id="ai-quiz-count" type="number" min="1" max="30" value="10"></label>
+      <label class="ai-option" data-for="chat" data-task="mock">Type <select id="ai-quiz-type"><option value="mcq">Objective (MCQ)</option><option value="essay">Essay / problem</option><option value="mixed">Mixed</option></select></label>
+      <label class="ai-option" data-for="chat" data-task="mock">Minutes <input id="ai-quiz-minutes" type="number" min="2" max="180" placeholder="Auto"></label>
+      <label class="ai-option ai-option-wide" data-for="case">Case name or citation <input id="ai-case-query" type="text" maxlength="500" placeholder="e.g. Carlill v Carbolic Smoke Ball Co — or upload textbook pages"></label>
+      <label class="ai-option ai-option-wide" data-for="notes">Topic <input id="ai-topic" type="text" maxlength="300" placeholder="e.g. Offer and acceptance"></label>
+      <label class="ai-option" data-for="notes"><input id="ai-allow-research" type="checkbox"> Allow outside research</label>
+      <label class="ai-option" data-for="notes"><input id="ai-question-bank" type="checkbox"> Include a question bank</label>
+      <label class="ai-option" data-for="notes questions">Course <select id="ai-course-select"><option value="auto">Detect automatically</option></select></label>
+      <label class="ai-option" data-for="questions">Questions <input id="ai-question-count" type="number" min="1" max="20" placeholder="Like a real paper"></label>
+    </div>
+    <div class="ai-files" id="ai-files" aria-live="polite"></div>
+    <div class="fc-inputbar">
+      <label class="fc-icon-btn fc-plus" title="Add notes, photos or PDF" aria-label="Add notes, photos or PDF">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        <input id="ai-file-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf,text/plain,.txt,.heic,.heif" multiple hidden>
+      </label>
+      <label class="sr-only" for="ai-input">Your message</label>
+      <textarea id="ai-input" maxlength="60000" rows="1" placeholder="Ask me anytime…"></textarea>
+      <button class="fc-icon-btn" id="fc-mic" type="button" aria-label="Speak your question" title="Speak" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      </button>
+      <button class="fc-send" id="ai-send" type="submit" aria-label="Send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg><span class="sr-only fc-send-label">Send</span></button>
+    </div>
+    <p class="fc-hint"><span id="ai-allowance-inline" class="ai-allowance-inline"></span><span class="fc-hint-ai">AI can be wrong — open the verification links.</span></p>
+  </form>
+</div>
+
+<!-- ======================= side drawer ======================= -->
+<div class="fc-scrim" id="fc-scrim" hidden></div>
+<aside class="fc-drawer" id="fc-drawer" aria-label="Fire Counsel AI menu" hidden>
+  <div class="fc-drawer-head">
+    <a class="fc-brand" href="./study.html"><img alt="" height="36" width="36" src="./assets/images/fire-counsel-brand.jpg"/><span><strong>FIRE COUNSEL</strong><small>AI · LEGAL STUDY</small></span></a>
+    <button class="fc-round fc-small" id="fc-drawer-close" type="button" aria-label="Close menu">×</button>
+  </div>
+  <button class="fc-new" id="ai-new-conversation" type="button">＋ New conversation</button>
+  <section class="fc-drawer-card">
+    <label for="ai-history-select" class="fc-drawer-label">Saved conversations · <span id="fc-history-mode">Chat</span></label>
+    <select id="ai-history-select"><option value="">New conversation</option></select>
+    <button class="fc-link-btn fc-danger" id="ai-delete-conversation" type="button" hidden>Delete this conversation</button>
+  </section>
+  <section class="fc-drawer-card" id="ai-allowance-card">
+    <div class="fc-drawer-row"><strong>My AI allowance</strong><span class="ai-preview-badge fc-badge-pill" id="ai-allowance-badge">SIGN IN</span></div>
+    <div class="ai-allowance-list" id="ai-allowance-list"><p class="ai-account-hint">Sign in to see how many AI chats, case analyses, notes and question sets you have left today.</p></div>
+    <small class="fc-muted">Resets every midnight (Lagos time). Need more? Ask the administrator.</small>
+  </section>
+  <nav class="fc-drawer-links" aria-label="Pages">
+    <button type="button" id="fc-drawer-functions">✦ All AI functions</button>
+    <button type="button" id="fc-open-research">🔎 Search trusted sources</button>
+    <a href="./study.html#dashboard">⌂ My study space</a>
+    <a href="./study.html#profile">◎ My profile</a>
+    <a class="fc-signin" href="./auth.html?next=ai.html">→ Sign in / create account</a>
+  </nav>
+  <p class="fc-muted fc-privacy"><strong>Before you upload:</strong> answers come from Google Gemini (with free backup models). On the free service Google may use what you send to improve its products, so do not upload personal details.</p>
+</aside>
+
+<!-- ======================= all functions ("Unlock power") ======================= -->
+<section class="fc-sheet fc-functions" id="fc-functions" aria-labelledby="fc-functions-title" role="dialog" aria-modal="true" hidden>
+  <header class="fc-sheet-top">
+    <button class="fc-round fc-light" id="fc-functions-back" type="button" aria-label="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+    <h2 id="fc-functions-title">Unlock Fire Counsel Power</h2>
+    <button class="fc-round fc-light" id="fc-share" type="button" aria-label="Share Fire Counsel AI"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg></button>
+  </header>
+  <div class="fc-sheet-hero"><p>From case research to mnemonics, discover everything Fire Counsel can do for your law exams.</p><div class="fc-hero-gem" aria-hidden="true">🔥</div></div>
+  <div class="fc-sheet-body">
+    <div class="fc-tabs" role="tablist" aria-label="Function groups">
+      <button role="tab" id="fc-tab-must" aria-controls="fc-panel-must" aria-selected="true" type="button">Must-Try</button>
+      <button role="tab" id="fc-tab-new" aria-controls="fc-panel-new" aria-selected="false" type="button" tabindex="-1">What's New</button>
+      <button role="tab" id="fc-tab-advanced" aria-controls="fc-panel-advanced" aria-selected="false" type="button" tabindex="-1">Advanced</button>
+    </div>
+    <div class="fc-panel" role="tabpanel" id="fc-panel-must" aria-labelledby="fc-tab-must">
+      <button class="fc-row" type="button" data-ai-mode="chat"><span class="fc-tile fc-t1">💬</span><span class="fc-row-text"><strong>Chat with Fire Counsel</strong><small>Ask any legal question. Upload notes, photos or PDFs and get answers with checked links.</small></span><span class="fc-chev">›</span></button>
+      <button class="fc-row" type="button" data-ai-mode="case"><span class="fc-tile fc-t2">⚖️</span><span class="fc-row-text"><strong>Search &amp; analyse a case</strong><small>Master Case Research format: facts, issues, ratio, later treatment — with verification links.</small></span><span class="fc-chev">›</span></button>
+      <button class="fc-row" type="button" data-ai-mode="notes"><span class="fc-tile fc-t3">📒</span><span class="fc-row-text"><strong>Make exam-ready notes</strong><small>Turn lecture notes or textbook photos into clean revision notes. Download as Word or PDF.</small></span><span class="fc-chev">›</span></button>
+      <button class="fc-row" type="button" data-ai-mode="questions"><span class="fc-tile fc-t4">📝</span><span class="fc-row-text"><strong>Question setter</strong><small>Sets questions in your course's own past-question style: marks, time and format.</small></span><span class="fc-chev">›</span></button>
+      <button class="fc-row" type="button" data-ai-mode="chat" data-ai-task="mock"><span class="fc-tile fc-t3">⏱️</span><span class="fc-row-text"><strong>Timed mock exam</strong><small>The AI sets objective or essay questions, you sit them against a countdown, then see your score.</small></span><span class="fc-chev">›</span></button>
+      <button class="fc-row" type="button" data-ai-mode="chat" data-ai-task="marker" data-web-search="false"><span class="fc-tile fc-t4">✅</span><span class="fc-row-text"><strong>Mark my answer</strong><small>Paste or snap your exam answer. Get a score, what's missing, and a model answer outline.</small></span><span class="fc-chev">›</span></button>
+      <button class="fc-row" type="button" data-ai-mode="chat" data-ai-task="mnemonics"><span class="fc-tile fc-t5">🧠</span><span class="fc-row-text"><strong>Create mnemonics</strong><small>Memorable acronyms and stories for elements, lists and cases — with a quick self-test.</small></span><span class="fc-chev">›</span></button>
+      <button class="fc-row" type="button" data-open-research="true"><span class="fc-tile fc-t6">🔎</span><span class="fc-row-text"><strong>Search trusted sources</strong><small>Find approved materials, verified cases and exact past questions in the Fire Counsel library.</small></span><span class="fc-chev">›</span></button>
+    </div>
+    <div class="fc-panel" role="tabpanel" id="fc-panel-new" aria-labelledby="fc-tab-new" hidden>
+      <button class="fc-row" type="button" data-toggle-read="true"><span class="fc-tile fc-t1">🔊</span><span class="fc-row-text"><strong>Read answers aloud <span class="fc-switch" id="fc-read-state">Off</span></strong><small>Listen to every new answer — or tap 🔊 on any answer. Uses your phone's own voice, free.</small></span><span class="fc-chev">›</span></button>
+      <button class="fc-row" type="button" data-ai-mode="chat" data-ai-task="flashcards"><span class="fc-tile fc-t5">🃏</span><span class="fc-row-text"><strong>Flashcards from my notes</strong><small>10–20 question-and-answer cards from your notes or a topic.</small></span><span class="fc-chev">›</span></button>
+      <button class="fc-row" type="button" data-ai-mode="chat" data-ai-task="summary"><span class="fc-tile fc-t3">📄</span><span class="fc-row-text"><strong>Summarise a case or notes</strong><small>Facts, issues, holding and ratio in minutes — or short notes from long material.</small></span><span class="fc-chev">›</span></button>
+      <button class="fc-row" type="button" data-ai-mode="chat" data-ai-task="irac"><span class="fc-tile fc-t2">🧩</span><span class="fc-row-text"><strong>Solve a problem question (IRAC)</strong><small>Issue, Rule, Application, Conclusion — the way examiners want it.</small></span><span class="fc-chev">›</span></button>
+      <button class="fc-row" type="button" data-ai-mode="chat" data-ai-task="explain" data-open-files="true"><span class="fc-tile fc-t6">📷</span><span class="fc-row-text"><strong>Explain a photo of my notes</strong><small>Snap a page and get a simple step-by-step explanation.</small></span><span class="fc-chev">›</span></button>
+      <button class="fc-row" type="button" data-ai-mode="chat" data-ai-task="library" data-web-search="false"><span class="fc-tile fc-t1">📚</span><span class="fc-row-text"><strong>Ask my course library</strong><small>Answers from the books your administrator uploaded, cited by page.</small></span><span class="fc-chev">›</span></button>
+    </div>
+    <div class="fc-panel" role="tabpanel" id="fc-panel-advanced" aria-labelledby="fc-tab-advanced" hidden>
+      <button class="fc-row" type="button" data-ai-mode="chat" data-ai-task="compare"><span class="fc-tile fc-t2">⚔️</span><span class="fc-row-text"><strong>Compare &amp; distinguish cases</strong><small>Side-by-side table, then how the cases are reconciled or distinguished.</small></span><span class="fc-chev">›</span></button>
+      <button class="fc-row" type="button" data-ai-mode="chat" data-ai-task="statute"><span class="fc-tile fc-t4">📜</span><span class="fc-row-text"><strong>Explain a section or statute</strong><small>Plain-English meaning, elements, exceptions and leading cases.</small></span><span class="fc-chev">›</span></button>
+      <button class="fc-row" type="button" data-ai-mode="chat" data-ai-task="essay"><span class="fc-tile fc-t3">✍️</span><span class="fc-row-text"><strong>Plan an essay answer</strong><small>Thesis, headed sections with authorities, counter-arguments and conclusion.</small></span><span class="fc-chev">›</span></button>
+      <button class="fc-row" type="button" data-ai-mode="case" data-open-files="true"><span class="fc-tile fc-t5">📖</span><span class="fc-row-text"><strong>Every case on a textbook page</strong><small>Upload textbook pages; every case they cite is researched and checked.</small></span><span class="fc-chev">›</span></button>
+      <button class="fc-row" type="button" data-open-drawer="true"><span class="fc-tile fc-t6">◷</span><span class="fc-row-text"><strong>My AI allowance &amp; history</strong><small>See what you have left today and reopen saved conversations.</small></span><span class="fc-chev">›</span></button>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= timed mock exam ======================= -->
+<section class="fc-sheet fc-exam" id="fc-exam" aria-labelledby="fc-exam-title" role="dialog" aria-modal="true" hidden>
+  <header class="fc-sheet-top fc-exam-top">
+    <button class="fc-round fc-light" id="fc-exam-close" type="button" aria-label="Leave the exam"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+    <h2 id="fc-exam-title">Mock exam</h2>
+    <span class="fc-timer" id="fc-exam-timer" role="timer" aria-live="off">00:00</span>
+  </header>
+  <div class="fc-sheet-body fc-exam-body" id="fc-exam-body"></div>
+  <footer class="fc-exam-foot"><span id="fc-exam-progress" class="fc-muted"></span><button class="fc-btn" id="fc-exam-submit" type="button">Submit answers</button></footer>
+</section>
+
+<!-- ======================= trusted-source search ======================= -->
+<section class="fc-sheet fc-research" id="fc-research" aria-labelledby="research-title" role="dialog" aria-modal="true" hidden>
+  <header class="fc-sheet-top">
+    <button class="fc-round fc-light" id="fc-research-back" type="button" aria-label="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+    <h2 id="research-title">Search trusted sources</h2>
+    <span class="fc-round-spacer"></span>
+  </header>
+  <div class="fc-sheet-body integration-card research-panel">
+    <p class="fc-muted">Search approved materials, verified cases, statutes and exact archived questions. No AI is used here — results come straight from the Fire Counsel library.</p>
+    <form class="research-search-form" id="research-search-form"><label for="research-query">Topic, case citation or legal phrase<input id="research-query" type="search" minlength="3" maxlength="500" required placeholder="e.g. consideration in contract law"></label><button class="fc-btn" id="research-search-button" type="submit">Search sources</button></form>
+    <p class="integration-status" id="research-search-status" role="status" aria-live="polite">Checking sign-in setup…</p>
+    <div id="research-search-results" class="research-search-results"></div>
+  </div>
+</section>
+
+<script type="module" src="./ai-studio.mjs"></script>
+<script type="module" src="./research-search.mjs"></script>
+<script type="module" src="./presence.mjs"></script>
+</body>
+</html>

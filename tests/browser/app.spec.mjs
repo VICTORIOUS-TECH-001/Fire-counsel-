@@ -136,7 +136,7 @@ test("AI studio sends a question, polls the background job and renders safe answ
     if (path === "/api/v1/ai/conversations") return json(route, { data: polls ? [{ ...conversation, updated_at: "2026-11-16T10:00:00Z" }] : [] });
     if (path === `/api/v1/ai/conversations/${conversation.id}`) {
       polls += 1;
-      return json(route, { data: { conversation, messages: [user, polls > 1 ? answer : { id: "2", role: "assistant", status: "pending", content: "", sources: [], meta: {} }] } });
+      return json(route, { data: { conversation, messages: [user, polls > 1 ? answer : { id: "2", role: "assistant", status: "pending", content: "", sources: [], meta: { stage: "searching" } }] } });
     }
     if (path === "/api/v1/ai/messages" && request.method() === "POST") {
       const body = request.postDataJSON();
@@ -150,14 +150,18 @@ test("AI studio sends a question, polls the background job and renders safe answ
     if (path === "/api/v1/ai/messages/2/export") return route.fulfill({ status: 200, contentType: "application/pdf", headers: { "content-disposition": 'attachment; filename="consideration.pdf"' }, body: "%PDF-1.4 synthetic" });
     return json(route, { error: "Not part of this fixture" }, 404);
   });
-  await readyStudy(page, "ai-chat");
+  await page.goto("/ai.html");
+  await expect(page.locator(".fc-home h1")).toHaveText("Hi! I'm Fire Counsel");
   await expect(page.locator("#ai-status")).toContainText("Ready");
   await expect(page.locator("#ai-allowance-list")).toContainText("19 of 20 left");
+  await expect(page.locator(".fc-signin").first()).toBeHidden();
   await page.locator("#ai-input").fill("What is consideration?");
   await page.locator("#ai-file-input").setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("Synthetic note") });
   await expect(page.locator("#ai-files")).toContainText("notes.txt");
   await page.locator("#ai-send").click();
   await expect(page.locator(".ai-pending")).toBeVisible();
+  await expect(page.locator(".fc-wait-title")).toHaveText("🔥 Fire is coming…");
+  await expect(page.locator(".fc-wait-stage")).toHaveText("Searching the web for trusted sources…", { timeout: 10_000 });
   await expect(page.locator(".ai-answer h3")).toHaveText("Consideration", { timeout: 15_000 });
   expect(posts[0]).toMatchObject({ mode: "chat", text: "What is consideration?", options: { webSearch: true } });
   expect(posts[0].attachments).toEqual([{ name: "notes.txt", mimeType: "text/plain", data: Buffer.from("Synthetic note").toString("base64") }]);
@@ -174,7 +178,10 @@ test("AI studio sends a question, polls the background job and renders safe answ
   await page.locator("[data-download='2'][data-format=pdf]").click();
   expect((await download).suggestedFilename()).toBe("consideration.pdf");
 
-  await page.locator("[data-ai-mode=questions]").click();
+  await page.locator("#fc-open-functions-top").click();
+  await expect(page.locator("#fc-functions")).toBeVisible();
+  await page.locator("#fc-functions [data-ai-mode=questions]").click();
+  await expect(page.locator("#fc-functions")).toBeHidden();
   await expect(page.locator("#ai-workspace-title")).toHaveText("Set exam questions");
   await expect(page.locator("#ai-course-select option")).toHaveCount(2);
   await page.locator("#ai-input").fill("Offer and acceptance notes");
@@ -182,8 +189,114 @@ test("AI studio sends a question, polls the background job and renders safe answ
   await page.locator(`[data-pick-course="${courseId}"]`).click();
   await expect(page.locator("#ai-status")).toContainText("used all 5 question sets");
   expect(posts.at(-1).options.courseId).toBe(courseId);
+
+  // Functions list: tabs and a chat study tool (mnemonics).
+  await page.locator("#fc-mode-switch").click();
+  await page.locator("#fc-tab-new").click();
+  await expect(page.locator("#fc-panel-new")).toBeVisible();
+  await expect(page.locator("#fc-panel-must")).toBeHidden();
+  await page.locator("#fc-tab-must").click();
+  await page.locator("#fc-panel-must [data-ai-task=mnemonics]").click();
+  await expect(page.locator("#fc-mode-name")).toHaveText("Create mnemonics");
+  await expect(page.locator("#fc-task")).toBeVisible();
+  await page.locator("#ai-input").fill("Elements of a valid contract");
+  await page.locator("#ai-send").click();
+  await expect.poll(() => posts.at(-1).options.task).toBe("mnemonics");
+  expect(posts.at(-1).mode).toBe("chat");
   await page.setViewportSize({ width: 390, height: 844 });
   await expectNoHorizontalOverflow(page);
+});
+
+test("timed mock exam: start, answer, auto-save, submit, score, and send essays for AI marking; read-aloud toggles", async ({ page }) => {
+  await stubAuth(page, { user: student });
+  await page.addInitScript(() => {
+    window.__spoken = [];
+    Object.defineProperty(window, "speechSynthesis", { configurable: true, value: { getVoices: () => [{ lang: "en-GB", name: "Test" }], speak: (u) => { window.__spoken.push(u.text); setTimeout(() => u.onend?.(), 0); }, cancel: () => {} } });
+    window.SpeechSynthesisUtterance = function (text) { this.text = text; };
+  });
+  const posts = [];
+  const conversation = { id: "523e4567-e89b-42d3-a456-426614174000", mode: "chat", title: "Mock" };
+  const quiz = { title: "Torts mock", instructions: "Answer all questions.", minutes: 5, total_marks: 12, questions: [
+    { type: "mcq", question: "Which case set out the neighbour principle?", options: ["Donoghue v Stevenson", "Salomon v Salomon", "Carlill v Carbolic", "Hadley v Baxendale"], answer: 0, explanation: "Lord Atkin in Donoghue.", marks: 1 },
+    { type: "mcq", question: "Res ipsa loquitur means?", options: ["The thing speaks for itself", "Let the buyer beware", "No harm no foul", "Act of God"], answer: 0, explanation: "It shifts the evidential burden.", marks: 1 },
+    { type: "essay", question: "Discuss the duty of care.", marks: 10, guide: "Donoghue; Caparo three-stage test" } ] };
+  const mock = { id: "m2", role: "assistant", status: "done", content: "## Torts mock\n\n### Answer key\n\n1. A", sources: [], meta: { task: "mock", quiz } };
+  const answer = { id: "a2", role: "assistant", status: "done", content: "**Score: 7 / 10**. Good use of Donoghue.", sources: [], meta: {} };
+  let stage = "mock";
+  await page.route("**/api/**", route => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/v1/ai/me") return json(route, { data: { configured: true, web_search: true, email_verified: true, allowance: null } });
+    if (path === `/api/v1/ai/conversations/${conversation.id}`) return json(route, { data: { conversation, messages: stage === "mock" ? [{ id: "u1", role: "user", status: "done", content: "Negligence", meta: {} }, mock] : [{ id: "u1", role: "user", status: "done", content: "Negligence", meta: {} }, mock, { id: "u2", role: "user", status: "done", content: "mark", meta: {} }, answer] } });
+    if (path === "/api/v1/ai/messages" && request.method() === "POST") {
+      const body = request.postDataJSON();
+      posts.push(body);
+      if (body.options.task === "marker") stage = "marked";
+      return json(route, { data: { conversation, messages: [{ id: body.options.task === "marker" ? "u2" : "u1", role: "user", status: "done", content: body.text, meta: {} }, { id: "p", role: "assistant", status: "pending", content: "", meta: {} }] } }, 202);
+    }
+    if (path === "/api/v1/presence") return route.fulfill({ status: 204 });
+    return json(route, { data: [] });
+  });
+  await page.goto("/ai.html");
+  await page.locator("#fc-open-functions").click();
+  await page.locator("#fc-panel-must [data-ai-task=mock]").click();
+  await expect(page.locator("#ai-quiz-count")).toBeVisible();
+  await expect(page.locator("#ai-web-search")).toBeHidden();
+  await page.locator("#ai-quiz-count").fill("3");
+  await page.locator("#ai-quiz-type").selectOption("mixed");
+  await page.locator("#ai-input").fill("Negligence");
+  await page.locator("#ai-send").click();
+  await expect.poll(() => posts.length).toBe(1);
+  expect(posts[0].options).toMatchObject({ task: "mock", quiz: { count: 3, type: "mixed" } });
+  expect(posts[0].options.webSearch).toBeUndefined();
+  await expect(page.locator(".fc-mock-card > h3")).toHaveText("Torts mock", { timeout: 15_000 });
+  await page.locator("[data-start-exam=m2]").click();
+  await expect(page.locator("#fc-exam")).toBeVisible();
+  await expect(page.locator("#fc-exam-timer")).toHaveText(/0[45]:\d\d/);
+  await page.locator("input[name=fc-q-0][value='0']").check();
+  await page.locator("input[name=fc-q-1][value='2']").check();
+  await page.locator("#fc-essay-2").fill("Lord Atkin's neighbour principle and the Caparo test.");
+  await expect(page.locator("#fc-exam-progress")).toHaveText("3 of 3 answered");
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("fire-counsel-exam-m2")).answers)).toEqual([0, 2, "Lord Atkin's neighbour principle and the Caparo test."]);
+  await page.locator("#fc-exam-submit").click();
+  await expect(page.locator(".fc-result-head strong")).toHaveText("1 / 2");
+  await expect(page.locator(".fc-q[data-result=wrong] [data-correct=true]")).toContainText("The thing speaks for itself");
+  await page.locator("[data-mark-essays]").click();
+  await expect(page.locator("#fc-exam")).toBeHidden();
+  await expect.poll(() => posts.length).toBe(2);
+  expect(posts[1].options).toEqual({ webSearch: false, task: "marker" });
+  expect(posts[1].text).toContain("MY ANSWER:\nLord Atkin's neighbour principle");
+  expect(posts[1].text).toContain("Caparo three-stage test");
+
+  // Read aloud: toggle auto-read, then the next answer is spoken.
+  await page.locator("#fc-open-functions-top").click();
+  await page.locator("#fc-tab-new").click();
+  await page.locator("[data-toggle-read]").click();
+  await expect(page.locator("#fc-read-state")).toHaveText("On");
+  await page.locator("#fc-functions-back").click();
+  await expect(page.locator(".ai-answer .ai-markdown strong").last()).toHaveText("Score: 7 / 10", { timeout: 15_000 });
+  await page.locator("[data-speak=a2]").click();
+  await expect.poll(() => page.evaluate(() => window.__spoken.join(" "))).toContain("Score: 7 / 10");
+  await expect(page.locator(".fc-mock-score")).toContainText("1/2 objective marks");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectNoHorizontalOverflow(page);
+});
+
+test("the AI page shows a sign-in link when signed out and the study space links to it", async ({ page }) => {
+  await stubAuth(page, { user: null });
+  await page.goto("/ai.html");
+  await expect(page.locator("#ai-status")).toHaveText("Sign in to use Fire Counsel AI.");
+  await expect(page.locator(".fc-home .fc-signin")).toHaveAttribute("href", "./auth.html?next=ai.html");
+  await page.locator("#fc-menu").click();
+  await expect(page.locator("#fc-drawer")).toBeVisible();
+  await page.locator("#fc-open-research").click();
+  await expect(page.locator("#fc-research")).toBeVisible();
+  await expect(page.locator("#research-search-status")).toContainText("Sign in");
+  await page.locator("#fc-research-back").click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectNoHorizontalOverflow(page);
+  await readyStudy(page);
+  await expect(page.locator("#student-nav a[href='./ai.html']")).toBeVisible();
 });
 
 test("authenticated materials and verified source search render safe text from stubbed API replies", async ({ page }) => {

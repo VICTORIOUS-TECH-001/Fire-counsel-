@@ -460,3 +460,133 @@ test("documents: footnotes, links and verification table make it into the PDF an
   assert.equal(word.subarray(0, 2).toString(), "PK");
   assert.equal(documentFileName("Case analysis: Carlill v. Carbolic!", "pdf"), "Case-analysis-Carlill-v-Carbolic.pdf");
 });
+
+// ---------------- reliability: model health, time limits, progress, deadlines ----------------
+
+test("a missing or hanging model is skipped for the next request, but never refused outright", async () => {
+  const { resetProviderHealth, providerHealth } = await import("../src/services/ai/providers.js");
+  resetProviderHealth();
+  const seen = [];
+  const fetchImpl = async (url, init) => {
+    seen.push(url.match(/models\/([^:]+)/)[1]);
+    if (url.includes("/m1:")) return jsonResponse(404, { error: { message: "not found" } });
+    if (url.includes("/slow:")) return new Promise((_, reject) => init.signal.addEventListener("abort", () => reject(new DOMException("timeout", "TimeoutError"))));
+    return jsonResponse(200, { candidates: [{ finishReason: "STOP", content: { parts: [{ text: "ok" }] } }] });
+  };
+  const env = { GEMINI_API_KEY: "g", GEMINI_MODELS: "m1,slow,m3" };
+  const first = await generate({ messages: [{ role: "user", text: "Q" }], timeoutMs: 50 }, { env, fetchImpl });
+  assert.equal(first.text, "ok");
+  assert.deepEqual(seen, ["m1", "slow", "m3"]);
+  assert.deepEqual(providerHealth().map((item) => [item.model, item.code]).sort(), [["m1", "MODEL_UNAVAILABLE"], ["slow", "PROVIDER_TIMEOUT"]]);
+  seen.length = 0;
+  await generate({ messages: [{ role: "user", text: "Q" }], timeoutMs: 50 }, { env, fetchImpl });
+  assert.deepEqual(seen, ["m3"], "known-bad models are skipped");
+  // When every model is marked bad they are still all tried.
+  seen.length = 0;
+  await assert.rejects(generate({ messages: [{ role: "user", text: "Q" }], timeoutMs: 50 }, { env: { GEMINI_API_KEY: "g", GEMINI_MODELS: "m1,slow" }, fetchImpl }), { code: "PROVIDER_TIMEOUT" });
+  assert.deepEqual(seen, ["m1", "slow"]);
+  resetProviderHealth();
+});
+
+test("admin AI test reports every model separately", async t => {
+  const { resetProviderHealth } = await import("../src/services/ai/providers.js");
+  resetProviderHealth();
+  const fetchImpl = async (url) => {
+    if (url.includes("/bad:")) return jsonResponse(404, { error: { message: "model gone" } });
+    if (url.includes("openrouter")) return jsonResponse(200, { model: "free-model", choices: [{ message: { content: "FIRE COUNSEL AI is connected." } }] });
+    return jsonResponse(200, { candidates: [{ finishReason: "STOP", content: { parts: [{ text: "FIRE COUNSEL AI is connected." }] } }] });
+  };
+  const env = { GEMINI_API_KEY: "g", OPENROUTER_API_KEY: "o", GEMINI_MODELS: "bad,good" };
+  const request = await serve(t, app => app.use("/api/v1/admin/ai", createAdminAiRouter({ poolProvider: () => pool, verifyToken: stubVerify, env, fetchImpl, configured: () => true })));
+  const body = await (await request("/api/v1/admin/ai/test", { token: "admin", method: "POST", body: {} })).json();
+  assert.equal(body.data.ok, true);
+  assert.equal(body.data.model, "good");
+  assert.deepEqual(body.data.models.map((item) => [item.model, item.ok]), [["bad", false], ["good", true], ["free-model", true]]);
+  assert.match(body.data.models[0].error, /model not available/);
+  const status = await (await request("/api/v1/admin/ai/status", { token: "admin" })).json();
+  assert.deepEqual(status.data.skipped_models.map((item) => item.model), ["bad"]);
+  resetProviderHealth();
+});
+
+test("chat tasks shape the answer, and the studio reports progress stages", async () => {
+  const requests = [];
+  const stages = [];
+  const studio = createStudio({ db: pool, env: {}, generate: async (request) => { requests.push(request); return { text: "**FAT** mnemonic", sources: [], provider: "gemini", model: "m" }; }, verify: async () => [] });
+  const result = await studio.run("chat", { text: "Elements of a valid contract", options: { webSearch: false, task: "mnemonics" }, onProgress: (stage) => stages.push(stage) });
+  assert.match(requests.at(-1).system, /TASK — MNEMONICS/);
+  assert.equal(requests.at(-1).timeoutMs, 100_000, "chat uses a short writer time limit");
+  assert.equal(result.meta.task, "mnemonics");
+  assert.deepEqual(stages, ["library", "writing", "finishing"]);
+});
+
+test("AI jobs show live progress, stop at the deadline without counting, and ignore late answers", async t => {
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const seenOptions = [];
+  const studioFactory = () => ({ run: async (mode, input) => {
+    seenOptions.push(input.options);
+    input.onProgress("searching");
+    await gate;
+    return { content: "late answer", sources: [], provider: "gemini", model: "m", meta: {} };
+  } });
+  const request = await serve(t, app => app.use("/api/v1/ai", createAiRouter({ poolProvider: () => pool, verifyToken: stubVerify, env: { GEMINI_API_KEY: "k", AI_CHAT_DEADLINE_MS: "1200" }, studioFactory, configured: () => true })));
+  const sent = await (await request("/api/v1/ai/messages", { method: "POST", body: { mode: "chat", text: "Explain estoppel", options: { task: "explain", webSearch: false } } })).json();
+  const id = sent.data.conversation.id;
+  let stage = null;
+  for (let i = 0; i < 50 && !stage; i += 1) {
+    const body = await (await request(`/api/v1/ai/conversations/${id}`)).json();
+    stage = body.data.messages.at(-1).meta.stage || null;
+    if (!stage) await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  assert.equal(stage, "searching");
+  assert.equal(seenOptions[0].task, "explain");
+  let last;
+  for (let i = 0; i < 100; i += 1) {
+    last = (await (await request(`/api/v1/ai/conversations/${id}`)).json()).data.messages.at(-1);
+    if (last.status !== "pending") break;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.equal(last.status, "failed");
+  assert.match(last.content, /took too long.*not counted/);
+  release();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const after = (await (await request(`/api/v1/ai/conversations/${id}`)).json()).data.messages.at(-1);
+  assert.equal(after.status, "failed", "a late answer does not overwrite the failure");
+  assert.equal((await pool.query("SELECT status FROM ai_usage ORDER BY id DESC LIMIT 1")).rows[0].status, "failed");
+  // Unknown tasks are dropped.
+  await request("/api/v1/ai/messages", { method: "POST", body: { mode: "chat", text: "hi", options: { task: "hack" } } });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(seenOptions.at(-1).task, undefined);
+});
+
+test("mock exams are validated, timed and stored for the timed-exam screen", async () => {
+  const { normalizeQuiz } = await import("../src/services/ai/studio.js");
+  const quiz = normalizeQuiz({ title: "Contract", questions: [
+    { type: "mcq", question: "What is consideration?", options: ["Price for a promise", "A gift", "A deed", "An offer"], answer: 0, explanation: "Currie v Misa" },
+    { type: "mcq", question: "Bad answer index", options: ["a", "b"], answer: 5 },
+    { type: "essay", question: "Discuss offer and acceptance.", marks: 15, guide: "Carlill; Hyde v Wrench" },
+    { question: "" }
+  ] }, { type: "mixed", count: 10 });
+  assert.equal(quiz.questions.length, 3);
+  assert.deepEqual(quiz.questions.map((q) => q.type), ["mcq", "essay", "essay"]);
+  assert.equal(quiz.total_marks, 1 + 10 + 15);
+  assert.equal(normalizeQuiz({ questions: [] }), null);
+  assert.equal(normalizeQuiz({ questions: [{ question: "only mcq", options: ["a"], answer: 0 }] }, { type: "mcq" }), null);
+
+  const requests = [];
+  const studio = createStudio({ db: pool, env: {}, verify: async () => [], generate: async (request) => {
+    requests.push(request);
+    return { text: JSON.stringify({ title: "Torts mock", questions: [{ type: "mcq", question: "Duty of care case?", options: ["Donoghue v Stevenson", "Salomon", "Carlill", "Hadley"], answer: 0, explanation: "Neighbour principle" }] }), provider: "gemini", model: "m" };
+  } });
+  const result = await studio.run("chat", { text: "Negligence", options: { task: "mock", webSearch: false, quiz: { count: 5, type: "mcq", minutes: 7 } } });
+  assert.equal(requests[0].json, true);
+  assert.equal(result.meta.quiz.minutes, 7);
+  assert.equal(result.meta.quiz.questions[0].answer, 0);
+  assert.match(result.content, /Time allowed: \*\*7 minutes\*\*/);
+  assert.match(result.content, /Answer key/);
+  const broken = createStudio({ db: pool, env: {}, generate: async () => ({ text: "not json", provider: "gemini", model: "m" }) });
+  await assert.rejects(broken.run("chat", { text: "x", options: { task: "mock", quiz: {} } }), { code: "QUIZ_FAILED" });
+  // The marker task uses the lecturer-marking instruction.
+  await studio.run("chat", { text: "Q: ... A: ...", options: { task: "marker", webSearch: false } });
+  assert.match(requests.at(-1).system, /MARK MY ANSWER/);
+});

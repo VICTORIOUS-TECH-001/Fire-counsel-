@@ -5,9 +5,10 @@ import test from "node:test";
 
 const root = resolve(import.meta.dirname, "../..");
 const read = path => readFileSync(resolve(root, path), "utf8");
-const pages = ["index.html", "study.html", "admin.html", "auth.html"];
+const pages = ["index.html", "study.html", "admin.html", "auth.html", "ai.html"];
 const integrations = [
-  ["study.html", ["study-materials.mjs", "research-search.mjs", "student-profile.mjs", "ai-studio.mjs", "presence.mjs"]],
+  ["study.html", ["study-materials.mjs", "research-search.mjs", "student-profile.mjs", "presence.mjs"]],
+  ["ai.html", ["ai-studio.mjs", "research-search.mjs", "presence.mjs"]],
   ["admin.html", ["admin-auth.mjs", "admin-database.mjs", "admin-ai.mjs", "admin-site.mjs", "admin-uploads.mjs", "presence.mjs"]],
   ["auth.html", ["auth-page.mjs"]]
 ];
@@ -78,4 +79,22 @@ test("browser API helper enforces same-origin calls and does not embed a backend
   assert.match(source, /url\.origin !== window\.location\.origin/);
   assert.match(source, /url\.pathname\.startsWith\("\/api\/"\)/);
   assert.doesNotMatch(source, /https?:\/\/(?:localhost|127\.0\.0\.1)/);
+});
+
+test("the AI page lists every function and links back from the study space", () => {
+  const html = read("ai.html");
+  for (const task of ["mnemonics", "flashcards", "summary", "irac", "explain", "library", "compare", "statute", "essay", "mock", "marker"]) {
+    assert.match(html, new RegExp(`data-ai-task="${task}"`), `${task} is listed`);
+  }
+  for (const mode of ["chat", "case", "notes", "questions"]) assert.match(html, new RegExp(`data-ai-mode="${mode}"`));
+  for (const tab of ["Must-Try", "What's New", "Advanced"]) assert.ok(html.includes(tab), tab);
+  assert.match(html, /data-toggle-read="true"/, "read-aloud toggle is offered");
+  assert.match(html, /id="fc-exam-timer"/, "mock exams have a countdown");
+  assert.match(html, /auth\.html\?next=ai\.html/);
+  const study = read("study.html");
+  assert.match(study, /href="\.\/ai\.html"/);
+  assert.doesNotMatch(study, /ai-studio\.mjs/);
+  // Every chat task offered in the page is accepted by the server.
+  const studio = read("backend/src/services/ai/studio.js");
+  for (const match of html.matchAll(/data-ai-task="([a-z]+)"/g)) assert.match(studio, new RegExp(`\\b${match[1]}: \\{ label:`), `${match[1]} exists on the server`);
 });
