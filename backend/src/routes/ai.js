@@ -3,7 +3,7 @@ import { rateLimit } from "express-rate-limit";
 import { getPool } from "../config/database.js";
 import { verifyFirebaseToken } from "../middleware/verifyFirebaseToken.js";
 import { AiError, aiConfig } from "../services/ai/providers.js";
-import { createStudio } from "../services/ai/studio.js";
+import { CHAT_TASKS, createStudio } from "../services/ai/studio.js";
 import { FEATURES, finishUsage, getAllowance, reserveUsage } from "../services/ai/quota.js";
 import { attachmentSummary, validateAttachments } from "../services/ai/attachments.js";
 import { buildDocx, buildPdf, documentFileName } from "../services/ai/documents.js";
@@ -30,7 +30,10 @@ const messageRow = (row) => ({
 
 function cleanOptions(mode, raw = {}) {
   const options = {};
-  if (mode === "chat") options.webSearch = raw.webSearch !== false;
+  if (mode === "chat") {
+    options.webSearch = raw.webSearch !== false;
+    if (typeof raw.task === "string" && Object.hasOwn(CHAT_TASKS, raw.task)) options.task = raw.task;
+  }
   if (mode === "case" && typeof raw.caseQuery === "string") options.caseQuery = raw.caseQuery.trim().slice(0, 500);
   if (typeof raw.courseId === "string" && (raw.courseId === "auto" || UUID_RE.test(raw.courseId))) options.courseId = raw.courseId;
   if (mode === "notes") {
@@ -41,6 +44,15 @@ function cleanOptions(mode, raw = {}) {
   if (mode === "questions" && Number.isInteger(raw.count)) options.count = Math.min(Math.max(raw.count, 1), 20);
   return options;
 }
+
+// Hard limits per request. Past this the student gets a clear "try again"
+// message instead of a reply that spins forever (and the use is not counted).
+const DEADLINE_MS = { chat: 4 * 60_000, case: 14 * 60_000, notes: 12 * 60_000, questions: 10 * 60_000 };
+export function jobDeadline(mode, env = process.env) {
+  const custom = Number(env[`AI_${mode.toUpperCase()}_DEADLINE_MS`]);
+  return Number.isFinite(custom) && custom >= 1_000 ? Math.min(custom, 30 * 60_000) : DEADLINE_MS[mode] || 10 * 60_000;
+}
+const STAGES = new Set(["reading", "library", "searching", "checking", "researching_case", "detecting_course", "writing", "finishing"]);
 
 /** Runs a limited number of AI jobs at once on this (small) server. */
 function createJobQueue(max) {
@@ -199,20 +211,50 @@ export function createAiRouter({
       const jobUsage = usageId;
       usageId = null;
       queue.push(async () => {
+        let settled = false;
+        let timer;
+        let lastStage = "";
+        // Live progress for the "Fire is coming" screen; ignored once finished.
+        const onProgress = (stage, detail = "") => {
+          if (settled || !STAGES.has(stage)) return;
+          const key = `${stage}|${detail}`;
+          if (key === lastStage) return;
+          lastStage = key;
+          db.query("UPDATE ai_messages SET meta = COALESCE(meta, '{}'::jsonb) || $2::jsonb, updated_at = NOW() WHERE id = $1 AND status = 'pending'",
+            [pending.id, JSON.stringify({ stage, stage_detail: String(detail).slice(0, 160), stage_at: new Date().toISOString() })]).catch(() => {});
+        };
+        const fail = async (message, code) => {
+          if (settled) return;
+          settled = true;
+          await db.query("UPDATE ai_messages SET status = 'failed', content = $2, meta = $3::jsonb, updated_at = NOW() WHERE id = $1 AND status = 'pending'",
+            [pending.id, message, JSON.stringify({ code })]).catch(() => {});
+          await finishUsage(db, jobUsage, "failed").catch(() => {});
+        };
+        const deadline = new Promise((resolve) => { timer = setTimeout(resolve, jobDeadline(mode, env)); });
         try {
+          onProgress(attachments.length ? "reading" : "library");
           const studio = studioFactory({ db, env });
-          const result = await studio.run(mode, { history, text, attachments, options, isAdmin: req.user.admin });
+          const work = Promise.resolve().then(() => studio.run(mode, { history, text, attachments, options, isAdmin: req.user.admin, onProgress }));
+          const result = await Promise.race([work, deadline.then(() => null)]);
+          if (!result) {
+            work.catch(() => {});
+            await fail("Fire Counsel AI took too long to answer (the AI service is very busy). Please send it again in a minute — this was not counted.", "AI_DEADLINE");
+            return;
+          }
+          if (settled) return;
+          settled = true;
           await db.query(
-            "UPDATE ai_messages SET status = 'done', content = $2, sources = $3::jsonb, meta = $4::jsonb, provider = $5, model = $6, updated_at = NOW() WHERE id = $1",
+            "UPDATE ai_messages SET status = 'done', content = $2, sources = $3::jsonb, meta = $4::jsonb, provider = $5, model = $6, updated_at = NOW() WHERE id = $1 AND status = 'pending'",
             [pending.id, result.content, JSON.stringify(result.sources || []), JSON.stringify(result.meta || {}), result.provider, result.model]);
           // Asking the student to choose a course is not counted as a use.
           await finishUsage(db, jobUsage, result.needsCourse ? "failed" : "completed", { provider: result.provider, model: result.model });
         } catch (error) {
           const message = error instanceof AiError ? error.message : "Fire Counsel AI could not finish this request. Please try again — it was not counted.";
           if (!(error instanceof AiError)) console.error("AI job failed:", error?.name, error?.message);
-          await db.query("UPDATE ai_messages SET status = 'failed', content = $2, meta = $3::jsonb, updated_at = NOW() WHERE id = $1",
-            [pending.id, `${message}${error instanceof AiError ? " (This request was not counted.)" : ""}`, JSON.stringify({ code: error?.code || "AI_FAILED" })]).catch(() => {});
-          await finishUsage(db, jobUsage, "failed").catch(() => {});
+          else console.warn("AI job failed:", error.code, error.message);
+          await fail(`${message}${error instanceof AiError ? " (This request was not counted.)" : ""}`, error?.code || "AI_FAILED");
+        } finally {
+          clearTimeout(timer);
         }
       });
 
