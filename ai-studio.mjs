@@ -897,6 +897,14 @@ function initStudio() {
 
   const params = new URLSearchParams(location.search);
   setMode(MODES[params.get("mode")] ? params.get("mode") : "chat", { task: params.get("task") });
+  // A question typed in the student workspace's "Ask Fire Counsel AI" box
+  // arrives as ?q=… and is placed in the message box, ready to send.
+  const preset = params.get("q");
+  if (preset) {
+    input.value = preset.slice(0, 4000);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    try { input.focus({ preventScroll: true }); input.setSelectionRange(input.value.length, input.value.length); } catch { /* older browsers */ }
+  }
 
   // ------------------------------------------------------------ sign-in
   (async () => {

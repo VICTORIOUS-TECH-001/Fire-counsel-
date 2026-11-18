@@ -356,6 +356,11 @@ test("publishing updates the live homepage content immediately and can be undone
 
   assert.deepEqual(await live(), { bundled: true }, "bundled file until something is published");
   assert.throws(() => validateSiteContent({ brand: {} }), /brand\.name/);
+  // The student workspace part is optional but must have a sane shape.
+  assert.doesNotThrow(() => validateSiteContent({ ...SITE, workspace: { tiles: [{ title: "My Courses", link: "#subjects" }], deadlines: { items: [] } } }));
+  assert.throws(() => validateSiteContent({ ...SITE, workspace: [] }), /workspace must be an object/);
+  assert.throws(() => validateSiteContent({ ...SITE, workspace: { tiles: "x" } }), /workspace\.tiles/);
+  assert.throws(() => validateSiteContent({ ...SITE, workspace: { menu: [{ label: "x", link: "javascript:alert(1)" }] } }), /javascript/);
   assert.equal((await fetch(`${base}/api/v1/admin/site/publish`, json("POST", { content: { ...SITE, hero: { slides: [] } } }))).status, 400);
 
   const draft = structuredClone(SITE);
