@@ -122,13 +122,61 @@ export function librarySearchTerms(query, max = 12) {
   return out;
 }
 
-export function createStudio({ db, env = process.env, generate = defaultGenerate, verify = defaultVerify, fetchImpl } = {}) {
+/** Exact phrases worth searching on their own: case names, sections, quotes. */
+export function libraryPhrases(query, max = 4) {
+  const textValue = String(query || "");
+  const phrases = [];
+  const add = (value) => {
+    const phrase = value.replace(/[^A-Za-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+    if (phrase.split(" ").length >= 2 && phrase.length <= 120 && !phrases.includes(phrase)) phrases.push(phrase);
+  };
+  const name = "[A-Z][A-Za-z.&'’-]+(?:\\s+(?:[A-Z][A-Za-z.&'’-]+|of|and|&|for))*";
+  const filler = /^(explain|discuss|what|whats|analyse|analyze|examine|compare|describe|consider|summarise|summarize|in|the|see|under|per|case|cases|and|of|for|&)$/i;
+  for (const match of textValue.matchAll(new RegExp(`(${name})\\s+v\\.?\\s+(${name})`, "g"))) {
+    const left = match[1].split(/\s+/).filter((word) => !filler.test(word)).slice(-3);
+    const right = match[2].split(/\s+/).filter((word) => !filler.test(word)).slice(0, 3);
+    if (left.length && right.length) add(`${left.join(" ")} ${right.join(" ")}`);
+  }
+  for (const match of textValue.matchAll(/\b(?:section|sections|s\.|article|art\.)\s*(\d+[A-Za-z]?)(?:\s+of\s+the\s+([A-Za-z0-9 ]{3,60}?))?(?=[,.;:)]|$|\s{2})/gi)) add(`section ${match[1]}${match[2] ? ` ${match[2]}` : ""}`);
+  for (const match of textValue.matchAll(/["“]([^"”]{6,100})["”]/g)) add(match[1]);
+  return phrases.slice(0, max);
+}
+
+/** Runs fn over items with at most `limit` running at the same time. */
+async function mapLimit(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(Math.max(limit, 1), items.length) }, async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await fn(items[index], index);
+    }
+  }));
+  return results;
+}
+
+// Recent web research (6 hours by default). Popular cases and questions are
+// answered from here instantly and do not use Google Search quota again.
+const RESEARCH_CACHE = new Map();
+export function clearResearchCache() { RESEARCH_CACHE.clear(); }
+
+export function createStudio({ db, env = process.env, generate = defaultGenerate, verify = defaultVerify, fetchImpl, researchCache = generate === defaultGenerate } = {}) {
   const gen = (request) => generate(request, { env, fetchImpl });
+  const cacheMs = clampInt(env.AI_RESEARCH_CACHE_MINUTES, 0, 24 * 60, 360) * 60_000;
+  const researchParallel = clampInt(env.AI_RESEARCH_PARALLEL, 1, 6, 3);
 
   async function research(query, attachments = [], { timeoutMs } = {}) {
+    const key = researchCache && cacheMs && !attachments.length ? String(query).toLowerCase().replace(/\s+/g, " ").trim() : null;
+    const hit = key ? RESEARCH_CACHE.get(key) : null;
+    if (hit && hit.until > Date.now()) return { ...hit.value, cached: true };
     try {
       const result = await gen({ search: true, system: RESEARCHER, messages: [{ role: "user", text: query, attachments }], maxTokens: 6000, temperature: 0.2, timeoutMs });
-      return { ok: true, notes: result.text, sources: result.sources, queries: result.searchQueries, model: result.model };
+      const value = { ok: true, notes: result.text, sources: result.sources, queries: result.searchQueries, model: result.model };
+      if (key && value.sources.length) {
+        if (RESEARCH_CACHE.size >= 300) RESEARCH_CACHE.delete(RESEARCH_CACHE.keys().next().value);
+        RESEARCH_CACHE.set(key, { until: Date.now() + cacheMs, value });
+      }
+      return value;
     } catch (error) {
       return { ok: false, notes: "", sources: [], queries: [], error: error.message };
     }
@@ -209,33 +257,49 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
 
   const TYPE_LABEL = { lecture_note: "lecture note", textbook: "textbook", handout: "handout", case_material: "judgment / case material", statute: "statute", past_question: "past paper", marking_scheme: "marking scheme", course_outline: "course outline", model_answer: "model answer", other: "material" };
 
-  async function libraryExcerpts(query, { courseId = null, limit = 6, maxChars = 14_000 } = {}) {
-    const terms = librarySearchTerms(query);
-    if (!terms.length) return [];
+  async function librarySearch(fn, value, courseId, limit, boost) {
     try {
       const result = await db.query(
         `SELECT m.id AS material_id, m.title, m.material_type, chunk.page_number, chunk.content,
-                ts_rank_cd(to_tsvector('english', chunk.content), q.query) + CASE WHEN $2::uuid IS NOT NULL AND m.course_id = $2::uuid THEN 0.5 ELSE 0 END AS score
+                ts_rank_cd(to_tsvector('english', chunk.content), q.query) + CASE WHEN $2::uuid IS NOT NULL AND m.course_id = $2::uuid THEN 0.5 ELSE 0 END + $4::float AS score
            FROM material_chunks chunk
            JOIN materials m ON m.id = chunk.material_id
-           CROSS JOIN (SELECT to_tsquery('english', $1) AS query) q
+           CROSS JOIN (SELECT ${fn === "plainto_tsquery" ? "plainto_tsquery" : "to_tsquery"}('english', $1) AS query) q
           WHERE m.approval_status = 'approved' AND m.publication_status = 'published' AND m.access_scope IN ('platform', 'institution')
             AND to_tsvector('english', chunk.content) @@ q.query
             AND chunk.version_id = (SELECT v.id FROM material_versions v WHERE v.material_id = m.id ORDER BY v.version_number DESC LIMIT 1)
           ORDER BY score DESC LIMIT $3`,
-        [terms.join(" | "), courseId, limit]);
-      const picked = [];
-      let used = 0;
-      for (const row of result.rows) {
-        const text = truncate(row.content, Math.max(0, Math.min(3_600, maxChars - used)));
-        if (!text) break;
-        used += text.length;
-        picked.push({ ...row, content: text });
-      }
-      return picked;
+        [value, courseId, limit, boost]);
+      return result.rows;
     } catch {
       return [];
     }
+  }
+
+  // The library is searched several ways at once: all keywords (broad) plus
+  // each exact case name / section / quoted phrase (precise, ranked higher).
+  async function libraryExcerpts(query, { courseId = null, limit = 6, maxChars = 14_000 } = {}) {
+    const terms = librarySearchTerms(query);
+    const phrases = libraryPhrases(query);
+    if (!terms.length && !phrases.length) return [];
+    const runs = [];
+    if (terms.length) runs.push(librarySearch("to_tsquery", terms.join(" | "), courseId, limit, 0));
+    for (const phrase of phrases) runs.push(librarySearch("plainto_tsquery", phrase, courseId, Math.min(limit, 4), 1));
+    const merged = new Map();
+    for (const row of (await Promise.all(runs)).flat()) {
+      const key = `${row.material_id}|${row.page_number}|${String(row.content).slice(0, 120)}`;
+      const previous = merged.get(key);
+      if (!previous || Number(row.score) > Number(previous.score)) merged.set(key, row);
+    }
+    const picked = [];
+    let used = 0;
+    for (const row of [...merged.values()].sort((a, b) => Number(b.score) - Number(a.score)).slice(0, limit)) {
+      const text = truncate(row.content, Math.max(0, Math.min(3_600, maxChars - used)));
+      if (!text) break;
+      used += text.length;
+      picked.push({ ...row, content: text });
+    }
+    return picked;
   }
 
   async function materialText(materialId, maxChars = 12_000) {
@@ -309,18 +373,21 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     };
   }
 
-  async function chat({ history = [], text, attachments = [], options = {}, onProgress = () => {} }) {
+  async function chat({ history = [], text, attachments = [], options = {}, onProgress = () => {}, onPartial }) {
     if (options.task === "mock") return mockExam({ text, attachments, options, onProgress });
     const custom = await loadPrompt(db, "chat");
     const task = CHAT_TASKS[options.task] || null;
     let researchResult = null;
     let checked = [];
     const terms = termsFrom(text);
-    onProgress("library");
-    const library = await libraryExcerpts(text || attachments.map((a) => a.name).join(" "), { courseId: options.courseId || null });
-    if (options.webSearch !== false) {
-      onProgress("searching");
-      researchResult = await research(`Student question${task ? ` (${task.label})` : ""}: ${text}`, attachments, { timeoutMs: CHAT_RESEARCH_MS });
+    // Library and web search run at the same time.
+    onProgress(options.webSearch !== false ? "searching" : "library");
+    const [library, webResult] = await Promise.all([
+      libraryExcerpts(text || attachments.map((a) => a.name).join(" "), { courseId: options.courseId || null }),
+      options.webSearch !== false ? research(`Student question${task ? ` (${task.label})` : ""}: ${text}`, attachments, { timeoutMs: CHAT_RESEARCH_MS }) : null
+    ]);
+    if (webResult) {
+      researchResult = webResult;
       if (researchResult.ok && researchResult.sources.length) {
         onProgress("checking", `${researchResult.sources.length} sources`);
         checked = await verify(researchResult.sources, { terms, limit: 12 });
@@ -333,7 +400,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     const messages = [...history.slice(-12), { role: "user", text: `${text || "(see the attached files)"}${libraryContext}${context}`, attachments }];
     onProgress("writing");
     const system = composeSystem("chat", custom) + (task ? `\n\n${task.instruction}` : "");
-    const answer = await gen({ system, messages, maxTokens: 8192, timeoutMs: CHAT_WRITER_MS });
+    const answer = await gen({ system, messages, maxTokens: 8192, timeoutMs: CHAT_WRITER_MS, onText: onPartial });
     onProgress("finishing");
     return {
       content: answer.text + lengthNote(answer),
@@ -343,7 +410,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     };
   }
 
-  async function caseAnalysis({ history = [], text, attachments = [], options = {}, onProgress = () => {} }) {
+  async function caseAnalysis({ history = [], text, attachments = [], options = {}, onProgress = () => {}, onPartial }) {
     const query = String(options.caseQuery || text || "").trim();
     let register = [];
     let subject = "";
@@ -360,26 +427,31 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     const limit = MAX_CASES(env);
     const selected = register.slice(0, limit);
     const remaining = register.slice(limit);
+    // Several cases are researched at the same time (database, web, library).
+    let finished = 0;
+    onProgress("researching_case", selected.length > 1 ? `${Math.min(selected.length, researchParallel)} at the same time` : truncate(selected[0].name, 80));
+    const perCase = await mapLimit(selected, researchParallel, async (item) => {
+      const [found, r, passages] = await Promise.all([
+        findCases(item.name),
+        research(`Research this case/authority for a Nigerian law student${subject ? ` (subject: ${subject})` : ""}: ${item.name}${item.citation ? ` — citation as printed: ${item.citation}` : ""}${item.proposition ? `. The textbook cites it for: ${item.proposition}` : ""}.`),
+        libraryExcerpts(item.name, { limit: 3, maxChars: 6_000 })
+      ]);
+      finished += 1;
+      if (selected.length > 1) onProgress("researching_case", `${finished} of ${selected.length} done`);
+      return { item, found, research: r, passages };
+    });
     const records = [];
     const researched = [];
-    for (const [index, item] of selected.entries()) {
-      onProgress("researching_case", `${index + 1} of ${selected.length}: ${truncate(item.name, 80)}`);
-      const found = await findCases(item.name);
-      records.push(...found.filter((row) => !records.some((r) => r.id === row.id)));
-      const r = await research(`Research this case/authority for a Nigerian law student${subject ? ` (subject: ${subject})` : ""}: ${item.name}${item.citation ? ` — citation as printed: ${item.citation}` : ""}${item.proposition ? `. The textbook cites it for: ${item.proposition}` : ""}.`);
-      researched.push({ item, research: r });
-    }
     const library = [];
-    for (const item of selected) {
-      for (const row of await libraryExcerpts(item.name, { limit: 3, maxChars: 6_000 })) {
-        if (!library.some((r) => r.material_id === row.material_id && r.page_number === row.page_number && r.content === row.content)) library.push(row);
+    for (const { item, found, research: r, passages } of perCase) {
+      records.push(...found.filter((row) => !records.some((existing) => existing.id === row.id)));
+      researched.push({ item, research: r });
+      for (const row of passages) {
+        if (!library.some((existing) => existing.material_id === row.material_id && existing.page_number === row.page_number && existing.content === row.content)) library.push(row);
       }
     }
-    const judgments = [];
-    for (const row of records.filter((r) => r.source_material_id).slice(0, 3)) {
-      const judgment = await materialText(row.source_material_id, 12_000);
-      if (judgment) judgments.push({ name: row.case_name, text: judgment });
-    }
+    const judgments = (await Promise.all(records.filter((r) => r.source_material_id).slice(0, 3)
+      .map(async (row) => ({ name: row.case_name, text: await materialText(row.source_material_id, 12_000) })))).filter((j) => j.text);
     const terms = termsFrom(...selected.map((item) => item.name));
     const allSources = researched.flatMap(({ research: r }) => r.sources);
     onProgress("checking", `${allSources.length} sources`);
@@ -398,7 +470,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     ].filter(Boolean).join("\n\n");
     const messages = [...history.slice(-4), { role: "user", text: brief, attachments }];
     onProgress("writing");
-    const answer = await gen({ system: composeSystem("case_research", custom), messages, maxTokens: 32768, temperature: 0.2 });
+    const answer = await gen({ system: composeSystem("case_research", custom), messages, maxTokens: 32768, temperature: 0.2, onText: onPartial });
     return {
       content: answer.text + lengthNote(answer),
       sources: await finalSources(answer.text, checked, terms),
@@ -407,7 +479,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     };
   }
 
-  async function notes({ history = [], text, attachments = [], options = {}, onProgress = () => {} }) {
+  async function notes({ history = [], text, attachments = [], options = {}, onProgress = () => {}, onPartial }) {
     if (!attachments.length && String(text || "").trim().length < 200) {
       throw new AiError(400, "Upload your notes, textbook pages or photos, or paste at least a full paragraph of notes.", "VALIDATION_ERROR");
     }
@@ -417,12 +489,15 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     let researchResult = null;
     let checked = [];
     const terms = termsFrom(options.topic || text);
+    let library = [];
     if (options.allowResearch) {
       onProgress("searching");
-      researchResult = await research(`Find authoritative sources for these study notes${options.topic ? ` on ${options.topic}` : ""}: ${truncate(text, 3000)}`, attachments);
+      [researchResult, library] = await Promise.all([
+        research(`Find authoritative sources for these study notes${options.topic ? ` on ${options.topic}` : ""}: ${truncate(text, 3000)}`, attachments),
+        libraryExcerpts(options.topic || text, { courseId: course?.id || null, limit: 6, maxChars: 12_000 })
+      ]);
       if (researchResult.ok) checked = await verify(researchResult.sources, { terms, limit: 15 });
     }
-    const library = options.allowResearch ? await libraryExcerpts(options.topic || text, { courseId: course?.id || null, limit: 6, maxChars: 12_000 }) : [];
     const custom = await loadPrompt(db, "exam_note");
     const brief = [
       `STUDENT REQUEST: Build exam-ready notes${options.topic ? ` on: ${options.topic}` : ""} from the supplied material.`,
@@ -435,7 +510,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       researchResult?.ok ? `RESEARCH NOTES:\n${truncate(researchResult.notes, 15000)}\n\nCHECKED SOURCES:\n${sourceBlock(checked)}` : ""
     ].filter(Boolean).join("\n\n");
     onProgress("writing");
-    const answer = await gen({ system: composeSystem("exam_note", custom), messages: [...history.slice(-4), { role: "user", text: brief, attachments }], maxTokens: 32768, temperature: 0.2 });
+    const answer = await gen({ system: composeSystem("exam_note", custom), messages: [...history.slice(-4), { role: "user", text: brief, attachments }], maxTokens: 32768, temperature: 0.2, onText: onPartial });
     return {
       content: answer.text + lengthNote(answer),
       sources: checked.length || extractUrls(answer.text).length ? await finalSources(answer.text, checked, terms) : [],
@@ -444,7 +519,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     };
   }
 
-  async function questionSet({ history = [], text, attachments = [], options = {}, onProgress = () => {} }) {
+  async function questionSet({ history = [], text, attachments = [], options = {}, onProgress = () => {}, onPartial }) {
     if (!attachments.length && String(text || "").trim().length < 20) {
       throw new AiError(400, "Paste your notes or a sample question, or upload your notes, so the AI knows what to set questions on.", "VALIDATION_ERROR");
     }
@@ -468,10 +543,12 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
         };
       }
     }
-    const questions = course ? await pastQuestions(course.id, 30) : [];
+    const [questions, library] = await Promise.all([
+      course ? pastQuestions(course.id, 30) : [],
+      course ? libraryExcerpts(text, { courseId: course.id, limit: 4, maxChars: 8_000 }) : []
+    ]);
     const profile = formatProfile(questions);
     const count = Math.min(Math.max(Number(options.count) || 0, 0), 20);
-    const library = course ? await libraryExcerpts(text, { courseId: course.id, limit: 4, maxChars: 8_000 }) : [];
     const custom = await loadPrompt(db, "question_setter");
     const brief = [
       course ? `COURSE: ${courseLabel(course)}${detection ? ` (auto-detected, confidence ${Math.round(detection.confidence * 100)}%: ${detection.reason})` : " (chosen by the student)"}` : "COURSE: none in the database yet.",
@@ -483,7 +560,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       library.length ? `${libraryBlock(library)}\n(Use these course passages only to keep the questions within this course's syllabus.)` : ""
     ].filter(Boolean).join("\n\n");
     onProgress("writing");
-    const answer = await gen({ system: composeSystem("question_setter", custom), messages: [...history.slice(-4), { role: "user", text: brief, attachments }], maxTokens: 24576, temperature: 0.5 });
+    const answer = await gen({ system: composeSystem("question_setter", custom), messages: [...history.slice(-4), { role: "user", text: brief, attachments }], maxTokens: 24576, temperature: 0.5, onText: onPartial });
     return {
       content: answer.text + lengthNote(answer),
       sources: [],

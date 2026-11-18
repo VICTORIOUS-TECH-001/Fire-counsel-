@@ -131,7 +131,13 @@ export async function checkLink(raw, { terms = [], fetchImpl = fetch, lookup = d
 }
 
 /** Check up to `limit` links in parallel batches. */
-export async function verifySources(sources, { terms = [], limit = 20, fetchImpl = fetch, lookup = dnsLookup, concurrency = 6 } = {}) {
+// Recently checked links (1 hour). Popular cases share the same sources, so a
+// second student asking about the same case does not wait for the checks again.
+const LINK_CACHE = new Map();
+const LINK_CACHE_MS = 60 * 60_000;
+export function clearLinkCache() { LINK_CACHE.clear(); }
+
+export async function verifySources(sources, { terms = [], limit = 20, fetchImpl = fetch, lookup = dnsLookup, concurrency = 8, cache = fetchImpl === fetch } = {}) {
   const unique = [];
   const seen = new Set();
   for (const source of sources) {
@@ -140,20 +146,34 @@ export async function verifySources(sources, { terms = [], limit = 20, fetchImpl
     unique.push(source);
     if (unique.length >= limit) break;
   }
-  const checked = [];
-  for (let index = 0; index < unique.length; index += concurrency) {
-    const batch = unique.slice(index, index + concurrency);
-    const results = await Promise.all(batch.map((source) => checkLink(source.url, { terms, fetchImpl, lookup })));
-    results.forEach((result, offset) => {
-      const source = batch[offset];
-      checked.push({
+  const termsKey = terms.map((term) => String(term).toLowerCase()).sort().join(",");
+  const checked = new Array(unique.length);
+  let next = 0;
+  // A small worker pool: a slow site no longer holds up a whole batch.
+  async function worker() {
+    while (next < unique.length) {
+      const index = next++;
+      const source = unique[index];
+      const key = `${source.url}|${termsKey}`;
+      const hit = cache ? LINK_CACHE.get(key) : null;
+      let result;
+      if (hit && hit.until > Date.now()) result = hit.result;
+      else {
+        result = await checkLink(source.url, { terms, fetchImpl, lookup });
+        if (cache && result.status !== "broken") {
+          if (LINK_CACHE.size > 2000) LINK_CACHE.delete(LINK_CACHE.keys().next().value);
+          LINK_CACHE.set(key, { until: Date.now() + LINK_CACHE_MS, result });
+        }
+      }
+      checked[index] = {
         url: result.final_url || source.url,
         title: (source.title || result.page_title || "").slice(0, 300),
         origin: source.origin || "answer",
         status: result.status,
         http_status: result.http_status
-      });
-    });
+      };
+    }
   }
+  await Promise.all(Array.from({ length: Math.min(concurrency, unique.length) }, worker));
   return checked;
 }

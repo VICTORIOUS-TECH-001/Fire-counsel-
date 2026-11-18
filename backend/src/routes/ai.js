@@ -22,6 +22,8 @@ export function publicAiError(res, error) {
   return res.status(503).json({ error: "The AI service is temporarily unavailable. Please try again.", code: "AI_UNAVAILABLE" });
 }
 
+const PARTIAL_SAVE_MS = 1_200;
+
 const messageRow = (row) => ({
   id: String(row.id), role: row.role, status: row.status, content: row.content,
   sources: row.sources || [], attachments: row.attachments || [], meta: row.meta || {},
@@ -232,6 +234,26 @@ export function createAiRouter({
           db.query("UPDATE ai_messages SET meta = COALESCE(meta, '{}'::jsonb) || $2::jsonb, updated_at = NOW() WHERE id = $1 AND status = 'pending'",
             [pending.id, JSON.stringify({ stage, stage_detail: String(detail).slice(0, 160), stage_at: new Date().toISOString() })]).catch(() => {});
         };
+        // Word-by-word answers: the text written so far is saved every ~1.2 s
+        // while the job is pending, so the page can show it growing.
+        let partialText = "";
+        let partialSaved = "";
+        let partialTimer = null;
+        let partialAt = 0;
+        const savePartial = () => {
+          partialTimer = null;
+          if (settled || partialText === partialSaved) return;
+          partialSaved = partialText;
+          partialAt = Date.now();
+          db.query("UPDATE ai_messages SET content = $2, meta = COALESCE(meta, '{}'::jsonb) || $3::jsonb, updated_at = NOW() WHERE id = $1 AND status = 'pending'",
+            [pending.id, partialText, JSON.stringify({ stage: "writing", streaming: Boolean(partialText) })]).catch(() => {});
+        };
+        const onPartial = (textSoFar) => {
+          if (settled) return;
+          partialText = String(textSoFar || "").slice(0, 200_000);
+          if (partialTimer) return;
+          partialTimer = setTimeout(savePartial, Math.max(0, PARTIAL_SAVE_MS - (Date.now() - partialAt)));
+        };
         const fail = async (message, code) => {
           if (settled) return;
           settled = true;
@@ -243,7 +265,7 @@ export function createAiRouter({
         try {
           onProgress(attachments.length ? "reading" : "library");
           const studio = studioFactory({ db, env });
-          const work = Promise.resolve().then(() => studio.run(mode, { history, text, attachments, options, isAdmin: req.user.admin, onProgress }));
+          const work = Promise.resolve().then(() => studio.run(mode, { history, text, attachments, options, isAdmin: req.user.admin, onProgress, onPartial }));
           const result = await Promise.race([work, deadline.then(() => null)]);
           if (!result) {
             work.catch(() => {});
@@ -264,6 +286,7 @@ export function createAiRouter({
           await fail(`${message}${error instanceof AiError ? " (This request was not counted.)" : ""}`, error?.code || "AI_FAILED");
         } finally {
           clearTimeout(timer);
+          clearTimeout(partialTimer);
         }
       });
 
