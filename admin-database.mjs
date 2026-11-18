@@ -121,17 +121,31 @@ function friendlyError(body, response) {
   if (body?.error) return body.error;
   if (response.status === 401) return "Sign in again to continue.";
   if (response.status === 403) return "The server did not verify administrator permission.";
-  if (response.status === 503) return "The API or Neon database is not ready.";
+  if (response.status === 502 || response.status === 504 || response.status === 503) return "The server is waking up or restarting (Render free plan sleeps after 15 minutes). Wait about a minute, then tap Check connection.";
   return `Request failed (${response.status}).`;
 }
+
+// Render's proxy answers 502/503/504 with a non-JSON page while the free
+// server wakes up. Reads are retried automatically; writes are never repeated.
+const isWaking = (response, body) => [502, 503, 504].includes(response.status) && !body?.code && !body?.error;
+const pause = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function apiRequest(path, options = {}) {
   const sameSession = sessionScope.capture();
   const sameView = viewScope.capture();
   if (!authClient) throw new Error("Firebase Auth is not configured.");
-  const response = await authClient.apiRequest(path, options);
-  const body = await safeJson(response);
-  if (!sameSession() || !sameView()) throw new DOMException("Stale content request.", "AbortError");
+  const method = String(options.method || "GET").toUpperCase();
+  let response;
+  let body;
+  for (let attempt = 0; ; attempt++) {
+    response = await authClient.apiRequest(path, options);
+    body = await safeJson(response);
+    if (!sameSession() || !sameView()) throw new DOMException("Stale content request.", "AbortError");
+    if (method !== "GET" || attempt >= 2 || !isWaking(response, body)) break;
+    setStatus(`The server is waking up… retrying (${attempt + 1} of 2)`, "");
+    await pause(4000 * (attempt + 1));
+    if (!sameSession() || !sameView()) throw new DOMException("Stale content request.", "AbortError");
+  }
   if (!response.ok) throw new Error(friendlyError(body, response));
   return body;
 }

@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#10121b"><meta name="robots" content="noindex,nofollow">
-  <meta name="description" content="FIRE COUNSEL content studio and administration preview. Local content previews with server-verified administrator access for Neon content.">
-  <title>FIRE COUNSEL · Admin Studio Preview</title>
+  <meta name="description" content="FIRE COUNSEL admin studio: website publishing, document uploads, Neon content and AI settings with server-verified administrator access.">
+  <title>FIRE COUNSEL · Admin Studio</title>
   <link rel="icon" href="./assets/fire-counsel-192.png" type="image/png">
   <link rel="stylesheet" href="./admin.css">
   <link rel="stylesheet" href="./integrations.css">
@@ -13,13 +13,14 @@
 <body>
   <header class="admin-topbar">
     <a class="admin-brand" href="./index.html"><img src="./assets/images/fire-counsel-brand.jpg" alt="" width="46" height="46"><span><strong>FIRE COUNSEL</strong><small>ADMIN STUDIO</small></span></a>
-    <div class="admin-top-actions"><span class="preview-chip"><i></i> LOCAL PREVIEW</span><a class="preview-site" href="./index.html?draft=1" target="_blank" rel="noopener">Preview public website ↗</a></div>
+    <div class="admin-top-actions"><span class="preview-chip"><i></i> ADMIN STUDIO</span><a class="preview-site" id="preview-site-top" href="./index.html?preview=1" target="fire-counsel-preview">Preview website changes ↗</a></div>
   </header>
   <main class="admin-layout">
     <aside class="admin-sidebar" aria-label="Admin studio sections">
       <div class="sidebar-label">ADMINISTRATION</div>
       <button class="admin-tab is-active" type="button" data-panel="overview"><span>⌂</span>Overview</button>
       <button class="admin-tab" type="button" data-panel="database"><span>▦</span>Database data</button>
+      <button class="admin-tab" type="button" data-panel="uploads"><span>⇪</span>Upload documents</button>
       <button class="admin-tab" type="button" data-panel="content"><span>▤</span>Pages & JSON</button>
       <button class="admin-tab" type="button" data-panel="media"><span>▧</span>Slides & images</button>
       <button class="admin-tab" type="button" data-panel="ai"><span>✦</span>AI studio &amp; prompts</button>
@@ -27,17 +28,17 @@
       <div class="sidebar-bottom"><span class="lock-icon">⌑</span><p>Neon editing requires Firebase sign-in and a server-verified admin claim.</p><a href="./index.html">← Back to FIRE COUNSEL</a></div>
     </aside>
     <section class="admin-main">
-      <div class="security-warning"><span class="warning-icon">!</span><div><strong>Staging admin studio.</strong><p>Database data, AI settings, prompts and user limits are saved on the server only after it verifies your administrator account. Site content and slideshow drafts still stay in this browser. Never paste API keys here: they belong in Render&rsquo;s Environment settings.</p></div></div>
+      <div class="security-warning"><span class="warning-icon">!</span><div><strong>Staging admin studio.</strong><p>Database data, uploaded documents, website changes, AI settings, prompts and user limits are saved in Neon by the server only after it verifies your administrator account. Never paste API keys here: they belong in Render&rsquo;s Environment settings.</p></div></div>
 
       <section class="integration-card admin-auth-card" id="admin-auth-status" data-state="checking" aria-labelledby="admin-auth-title">
-        <div><span class="eyebrow">FIREBASE · SERVER AUTHORIZATION</span><h2 id="admin-auth-title">Checking administrator setup…</h2><p id="admin-auth-message" role="status" aria-live="polite">Local drafts do not grant database access.</p></div>
+        <div><span class="eyebrow">FIREBASE · SERVER AUTHORIZATION</span><h2 id="admin-auth-title">Checking administrator setup…</h2><p id="admin-auth-message" role="status" aria-live="polite">Sign in with the administrator account to make changes.</p></div>
         <div class="integration-actions"><a class="button button-light" id="admin-auth-link" href="./auth.html?next=admin.html">Sign in as administrator</a><button class="button button-primary" id="admin-claim" type="button" hidden>Make this account the administrator</button><button class="button button-light" id="admin-signout" type="button" hidden>Sign out</button></div>
       </section>
 
       <section class="admin-panel is-visible" id="panel-overview" aria-labelledby="admin-title">
-        <div class="admin-heading"><div><span class="eyebrow">FIRE COUNSEL · ADMIN STUDIO</span><h1 id="admin-title">Your study platform, in one place.</h1><p>Preview the controls for site content, slideshow images, AI settings, plan limits and individual student access.</p></div><a class="button button-primary" href="./index.html?draft=1" target="_blank" rel="noopener">Open website preview ↗</a></div>
-        <div class="admin-stat-grid"><article class="admin-stat"><span>01</span><strong>Website content</strong><small>JSON draft & local preview</small></article><article class="admin-stat"><span>02</span><strong>Slideshow images</strong><small>Add/remove preview controls</small></article><article class="admin-stat"><span>03</span><strong>AI studio</strong><small>Key status · private prompts</small></article><article class="admin-stat"><span>04</span><strong>Users &amp; limits</strong><small>Active badges · daily allowances</small></article></div>
-        <div class="admin-card next-card"><div><span class="eyebrow">ADMIN WORKSPACE</span><h2>Set the rules. Give each student the right access.</h2><p>Set the default daily AI limits, see who is active right now, and give any account more or less. Changes apply to students immediately.</p><button class="button button-primary" type="button" data-switch="plans">Open users &amp; AI limits →</button></div><div class="step-stack"><span><b>1</b> Add courses, cases and past questions in Database data</span><span><b>2</b> Upload your private prompts in AI studio</span><span><b>3</b> Adjust any account&rsquo;s daily limits</span></div></div>
+        <div class="admin-heading"><div><span class="eyebrow">FIRE COUNSEL · ADMIN STUDIO</span><h1 id="admin-title">Your study platform, in one place.</h1><p>Upload course materials, cases and past questions, edit and publish the website, and manage AI settings and student limits.</p></div><button class="button button-primary" type="button" data-switch="uploads">Upload documents →</button></div>
+        <div class="admin-stat-grid"><article class="admin-stat"><span>01</span><strong>Website content</strong><small>Draft · preview · publish</small></article><article class="admin-stat"><span>02</span><strong>Documents</strong><small>PDF, Word & photos into Neon</small></article><article class="admin-stat"><span>03</span><strong>AI studio</strong><small>Key status · private prompts</small></article><article class="admin-stat"><span>04</span><strong>Users &amp; limits</strong><small>Active badges · daily allowances</small></article></div>
+        <div class="admin-card next-card"><div><span class="eyebrow">ADMIN WORKSPACE</span><h2>Set the rules. Give each student the right access.</h2><p>Set the default daily AI limits, see who is active right now, and give any account more or less. Changes apply to students immediately.</p><button class="button button-primary" type="button" data-switch="plans">Open users &amp; AI limits →</button></div><div class="step-stack"><span><b>1</b> Add courses in Database data, then upload materials, cases and past papers in Upload documents</span><span><b>2</b> Upload your private prompts in AI studio</span><span><b>3</b> Adjust any account&rsquo;s daily limits</span></div></div>
       </section>
 
       <section class="admin-panel" id="panel-database" aria-labelledby="database-title" hidden>
@@ -56,32 +57,68 @@
           <div class="integration-actions"><button class="button button-light" id="database-delete" type="button" disabled hidden>Delete record</button><button class="button button-light" id="database-form-cancel" type="button">Cancel</button><button class="button button-primary" id="database-save" type="submit" disabled>Save to Neon</button></div>
         </form>
         <section class="integration-card" id="database-version-panel" aria-labelledby="database-version-title" hidden>
-          <h2 id="database-version-title">Material text versions</h2><p>Paste text to create a version and searchable chunks. File uploads, embeddings and AI generation are not implemented.</p>
+          <h2 id="database-version-title">Material text versions</h2><p>Paste text to create a new version and searchable parts. To add a PDF, Word file or photo instead, use <b>Upload documents → New version of a material</b>.</p>
           <div class="database-version-list" id="database-version-list"></div>
           <form id="database-version-form"><label class="database-field" for="database-version-text">New material text<textarea id="database-version-text" rows="10" maxlength="700000" placeholder="Paste reviewed staging material text" disabled></textarea></label><p class="integration-status" id="database-version-status" role="status" aria-live="polite"></p><button class="button button-primary" type="submit" disabled>Save new text version</button></form>
         </section>
         <div class="info-card"><span class="info-mark">i</span><p>No account tables, passwords, personal study files, embeddings or raw SQL are exposed here. Deletions require confirmation; applicable records are deactivated or unpublished instead.</p></div>
       </section>
 
+      <section class="admin-panel" id="panel-uploads" aria-labelledby="uploads-title" hidden>
+        <div class="admin-heading"><div><span class="eyebrow">PDF · WORD · PHOTOS → NEON LIBRARY</span><h1 id="uploads-title">Upload documents.</h1><p>Upload course materials, case judgments and past-question papers. The server reads every page (scans and photos too), saves the text in Neon, and the AI then uses it in chat, case analysis, notes and question setting.</p></div><span class="panel-status" id="uploads-panel-status">SIGN IN AS ADMIN</span></div>
+        <form class="integration-card fc-upload-form" id="upload-form">
+          <div class="database-fields">
+            <label class="database-field">What are you uploading?<select id="upload-purpose"><option value="material">Course material (notes, textbook, handout, statute)</option><option value="case">Case judgment / law report</option><option value="past_questions">Past-question paper</option><option value="material_version">New version of an existing material</option></select></label>
+            <label class="database-field" id="upload-course-field">Course<select id="upload-course"><option value="">No specific course (all students)</option></select></label>
+            <label class="database-field" id="upload-material-field" hidden>Material to update<select id="upload-material"><option value="">Choose the material…</option></select></label>
+            <label class="database-field" id="upload-case-field" hidden>Attach to a case<select id="upload-case"><option value="">Create a new case record</option></select></label>
+            <label class="database-field" id="upload-type-field">Type<select id="upload-type"><option value="lecture_note">Lecture note</option><option value="textbook">Textbook</option><option value="handout">Handout</option><option value="statute">Statute</option><option value="course_outline">Course outline</option><option value="marking_scheme">Marking scheme</option><option value="model_answer">Model answer</option><option value="case_material">Case material</option><option value="other">Other</option></select></label>
+            <label class="database-field" id="upload-title-field">Title (optional — the file name is used otherwise)<input id="upload-title" type="text" maxlength="250"></label>
+            <div class="database-field" id="upload-paper-fields" hidden><label>Exam year<input id="upload-year" type="number" min="1950" max="2100" step="1" placeholder="e.g. 2023"></label><label>Semester<input id="upload-semester" type="text" maxlength="50" placeholder="e.g. First"></label></div>
+          </div>
+          <p class="fc-status" id="upload-help"></p>
+          <div class="fc-row"><label><input id="upload-publish" type="checkbox" checked> Students&rsquo; AI can use it straight away</label><label><input id="upload-review" type="checkbox"> Let me check the text before saving</label></div>
+          <div class="fc-row"><label class="sr-only" for="upload-files">Files</label><input id="upload-files" type="file" multiple accept="application/pdf,.pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/webp,image/heic,.txt,text/plain" disabled><button class="button button-primary" id="upload-submit" type="submit" disabled>Upload</button></div>
+          <p class="fc-status" id="upload-status" role="status" aria-live="polite"></p>
+          <p class="fc-status" id="upload-usage"></p>
+        </form>
+        <section class="integration-card" aria-labelledby="upload-list-title" style="margin-top:16px">
+          <div class="fc-row"><h2 id="upload-list-title" style="margin:0;flex:1">Recent uploads</h2><button class="button button-light" id="upload-refresh" type="button" disabled>Refresh</button></div>
+          <div class="fc-users-wrap"><table class="fc-users fc-uploads"><thead><tr><th scope="col">File</th><th scope="col">Status</th><th scope="col">Result</th><th scope="col">Actions</th></tr></thead><tbody id="upload-rows"><tr><td colspan="4">Sign in as the administrator to see uploads.</td></tr></tbody></table></div>
+        </section>
+        <section class="integration-card" id="upload-viewer" aria-labelledby="upload-viewer-title" hidden style="margin-top:16px">
+          <div class="fc-row"><h2 id="upload-viewer-title" style="margin:0;flex:1">Text</h2><button class="button button-light" id="upload-copy-text" type="button">Copy</button><button class="button button-light" id="upload-viewer-close" type="button">Close</button></div>
+          <label class="sr-only" for="upload-text">Text read from the file</label>
+          <textarea id="upload-text" class="json-editor" spellcheck="false" readonly></textarea>
+          <div class="fc-row"><button class="button button-primary" id="upload-save-text" type="button" hidden>Save to library</button><span class="fc-status" id="upload-viewer-status" role="status" aria-live="polite"></span></div>
+        </section>
+        <div class="info-card"><span class="info-mark">i</span><p><strong>How files are read:</strong> normal (digital) PDFs and Word files are read directly — free, no AI. Scanned pages and photos are read by your Gemini key a few pages at a time; long scans can take a few minutes, and you can leave this page meanwhile. Cases are saved as “unverified” and past questions as “pending” until you check them in Database data.</p></div>
+      </section>
+
       <section class="admin-panel" id="panel-content" aria-labelledby="content-title" hidden>
-        <div class="admin-heading"><div><span class="eyebrow">PAGES · SECTIONS · FOOTER</span><h1 id="content-title">Edit site content.</h1><p>The public homepage reads <code>data/site-content.json</code>. Save a private local draft here or export JSON for a reviewed deployment.</p></div><span class="panel-status">LOCAL DRAFT ONLY</span></div>
-        <div class="editor-card"><div class="editor-toolbar"><div><strong>Website content JSON</strong><small>Homepage · navigation · slides · articles · case notes · legal links · footer</small></div><div class="editor-actions"><label class="button button-light file-button" for="json-import">Import JSON</label><input id="json-import" type="file" accept="application/json,.json" hidden><button class="button button-light" id="export-json" type="button">Export JSON</button></div></div>
+        <div class="admin-heading"><div><span class="eyebrow">PAGES · SECTIONS · FOOTER</span><h1 id="content-title">Edit site content.</h1><p>Edit the homepage text below. <b>Save draft</b> keeps your work (only admins see it), <b>Preview</b> opens the site with your changes, and <b>Publish</b> makes them live for everyone.</p></div><span class="panel-status" id="site-publish-state">SIGN IN AS ADMIN TO PUBLISH</span></div>
+        <div class="editor-card"><div class="editor-toolbar"><div><strong>Website content JSON</strong><small>Homepage · navigation · slides · articles · case notes · legal links · footer</small></div><div class="editor-actions"><label class="button button-light file-button" for="json-import">Import JSON</label><input id="json-import" type="file" accept="application/json,.json" hidden><button class="button button-light" id="export-json" type="button">Download backup</button></div></div>
           <label class="sr-only" for="json-editor">Edit the FIRE COUNSEL website content JSON</label><textarea class="json-editor" id="json-editor" spellcheck="false" aria-describedby="json-hint" placeholder="Loading site content…"></textarea>
           <div class="editor-footer"><span id="json-hint">Text is escaped before display. Do not paste passwords, provider API keys or student content.</span><span class="editor-status" id="editor-status" role="status" aria-live="polite">Loading…</span></div>
-          <div class="editor-actions bottom-actions"><button class="button button-primary" id="save-draft" type="button">Save local website draft</button><button class="button button-light" id="clear-draft" type="button">Discard website draft</button><button class="button button-disabled" id="publish-site" type="button" disabled aria-disabled="true">Publish to all students · not connected</button></div>
+          <div class="editor-actions bottom-actions"><button class="button button-light button-disabled" id="save-draft" type="button" disabled aria-disabled="true">1 · Save draft</button><button class="button button-light" id="preview-site" type="button">2 · Preview ↗</button><label class="sr-only" for="publish-note">What changed (optional)</label><input id="publish-note" type="text" maxlength="200" placeholder="What changed? (optional)" disabled><button class="button button-primary button-disabled" id="publish-site" type="button" disabled aria-disabled="true">3 · Publish to live site</button><button class="button button-light button-disabled" id="clear-draft" type="button" disabled aria-disabled="true">Discard changes</button></div>
         </div>
-        <div class="info-card"><span class="info-mark">i</span><p><strong>Local means this browser only.</strong> The draft does not update Firebase, the public JSON file, another device or other students. Export and deploy only after an authorized editor reviews it.</p></div>
+        <section class="integration-card" aria-labelledby="site-versions-title" style="margin-top:16px">
+          <span class="eyebrow">PUBLISH HISTORY</span><h2 id="site-versions-title">Published versions</h2>
+          <p>Made a mistake? Restore an earlier version and it goes live again immediately.</p>
+          <div id="site-versions"><p>Sign in as the administrator to see the history.</p></div>
+        </section>
+        <div class="info-card"><span class="info-mark">i</span><p><strong>Nothing is live until you press Publish.</strong> Preview opens a new tab showing your unsaved changes to you only. Website content and photos are stored in Neon (Firebase Storage would need the paid Blaze plan).</p></div>
       </section>
 
       <section class="admin-panel" id="panel-media" aria-labelledby="media-title" hidden>
-        <div class="admin-heading"><div><span class="eyebrow">HOMEPAGE · SLIDESHOW · PHOTOGRAPHS</span><h1 id="media-title">Shape the slideshow.</h1><p>Remove a slide from the local website draft or add multiple photos for a temporary preview. Firebase uploads are not connected.</p></div><span class="panel-status">LOCAL PREVIEW</span></div>
+        <div class="admin-heading"><div><span class="eyebrow">HOMEPAGE · SLIDESHOW · PHOTOGRAPHS</span><h1 id="media-title">Shape the slideshow.</h1><p>Upload photos to add new slides, or remove slides. Then Preview and Publish in <b>Pages &amp; JSON</b>.</p></div><span class="panel-status">PHOTOS STORED IN NEON</span></div>
         <div class="media-layout admin-media-layout">
-          <div class="media-card media-add-card"><label class="upload-box" for="slide-files"><span class="upload-icon">＋</span><strong>Choose one or more photos</strong><small>JPG, PNG or WebP · up to 10 MB each · no SVG</small><input class="sr-only" id="slide-files" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><div class="media-toolbar"><span id="slide-selection-count">No photos selected</span><button class="button button-primary" id="add-slide-files" type="button">Add to local preview</button></div><span id="slide-status" class="slide-status" role="status" aria-live="polite">Changes here are local previews only.</span><p class="media-small-note">No photo-count limit is set in the proposed Storage rule. These selected files are temporary browser previews only; they are not copied into the website or uploaded.</p></div>
-          <aside class="media-note"><span class="info-mark">!</span><div><strong>The project is already on Blaze, as you confirmed.</strong><p>I prepared proposed Firebase rules in <code>firebase/storage.rules</code> and <code>firebase/firestore.rules</code>. They are files in this project only; nothing was deployed. Slide reads are public, while create/update/delete require a Firebase Auth admin claim.</p><p>The Storage rule permits any number of slide files and limits each to 10 MB. A count limit is not a billing cap. Actual upload/delete remains off until authenticated admin access, App Check and cost monitoring are reviewed.</p></div></aside>
+          <div class="media-card media-add-card"><label class="upload-box" for="slide-files"><span class="upload-icon">＋</span><strong>Choose one or more photos</strong><small>JPG, PNG or WebP · large phone photos are shrunk automatically · no SVG</small><input class="sr-only" id="slide-files" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><div class="media-toolbar"><span id="slide-selection-count">No photos selected</span><button class="button button-primary button-disabled" id="add-slide-files" type="button" disabled aria-disabled="true">Upload &amp; add as slides</button></div><span id="slide-status" class="slide-status" role="status" aria-live="polite">Sign in as the administrator to upload photos.</span><p class="media-small-note">Each photo becomes a new slide copying the last slide&rsquo;s text: change its words in Pages &amp; JSON (look for &ldquo;New slide&rdquo;).</p></div>
+          <aside class="media-note"><span class="info-mark">i</span><div><strong>How slides go live</strong><p>1. Upload photos here. 2. Edit the new slide text in <b>Pages &amp; JSON</b>. 3. Tap <b>Preview</b> to check, then <b>Publish</b>.</p><p>Photos are kept in the Neon database and served from this website, so no Firebase Storage (paid Blaze plan) is needed.</p></div></aside>
         </div>
         <div class="slide-library-heading"><div><span class="eyebrow">HOMEPAGE SLIDES</span><h2>Current website draft</h2></div><span class="panel-status" id="slide-count-label">Loading slides…</span></div>
         <div class="slide-library" id="slide-library" aria-live="polite"><div class="slide-empty">Loading the current site slides…</div></div>
-        <div class="info-card"><span class="info-mark">i</span><p>Removing a saved slide updates the JSON editor only. Use <strong>Save local website draft</strong> to keep that preview on this device. At least one homepage slide is required; temporary image previews disappear when this page closes.</p></div>
+        <div class="info-card"><span class="info-mark">i</span><p>Removing a slide changes the editor only. It disappears from the live website after you press <strong>Publish</strong>. At least one homepage slide is required.</p></div>
       </section>
 
       <section class="admin-panel" id="panel-ai" aria-labelledby="ai-title" hidden>
@@ -159,6 +196,8 @@
   <script type="module" src="./admin-auth.mjs"></script>
   <script type="module" src="./admin-database.mjs"></script>
   <script type="module" src="./admin-ai.mjs"></script>
+  <script type="module" src="./admin-site.mjs"></script>
+  <script type="module" src="./admin-uploads.mjs"></script>
   <script type="module" src="./presence.mjs"></script>
 </body>
 </html>

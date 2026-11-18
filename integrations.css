@@ -106,3 +106,17 @@ body[data-theme="dark"] .student-profile-grid .integration-status[data-kind="err
 body[data-theme="dark"] .student-profile-grid .integration-status[data-kind="ok"]{color:#7edaba}
 @media(max-width:760px){.student-profile-grid,.profile-security-forms{grid-template-columns:1fr}.profile-security-forms{gap:15px}.student-security-card{grid-column:auto}.student-profile-heading{gap:12px}}
 @media(max-width:760px){.admin-auth-card{flex-direction:column}.integration-state-grid,.database-fields{grid-template-columns:1fr}.integration-card{padding:17px}.integration-heading{flex-wrap:wrap}.research-search-form{align-items:stretch;flex-direction:column}.research-result-card header{flex-wrap:wrap}.database-pagination{align-items:flex-start;flex-direction:column}}
+/* Upload documents and website publishing (admin studio) */
+.fc-upload-form [hidden]{display:none!important}
+#upload-paper-fields{grid-template-columns:1fr 1fr;gap:10px}#upload-paper-fields label{display:grid;gap:6px}
+#upload-paper-fields input{width:100%;padding:10px 12px;border:1px solid #dcd4e5;border-radius:8px;background:#fbfafc;font:inherit}
+#upload-files{max-width:100%;font:inherit}
+.fc-uploads td{min-width:120px}.fc-upload-actions{display:flex;flex-wrap:wrap;gap:6px}.fc-upload-actions .button{padding:7px 11px;font-size:12px}
+.fc-upload-error{color:#a13748}.fc-upload-warning{color:#8a5a00!important}
+.fc-state[data-upload-state="saved"]{background:#dcf3e8;color:#11694e}.fc-state[data-upload-state="failed"]{background:#fde1e5;color:#9b1c31}
+.fc-state[data-upload-state="processing"],.fc-state[data-upload-state="uploaded"]{background:#fff1d6;color:#7a4b00}.fc-state[data-upload-state="ready"]{background:#deeaf6;color:#1f3864}
+#upload-text{min-height:320px;width:100%}
+#publish-note{flex:1 1 200px;min-width:0;padding:10px 12px;border:1px solid #dcd4e5;border-radius:8px;font:inherit}
+.fc-version-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+.fc-version-list li{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid #eceef3;border-radius:10px}
+.fc-version-list small{display:block;color:#6b7080;font-size:12px;overflow-wrap:anywhere}
