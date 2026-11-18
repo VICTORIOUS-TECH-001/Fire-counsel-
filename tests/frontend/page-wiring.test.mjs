@@ -7,8 +7,8 @@ const root = resolve(import.meta.dirname, "../..");
 const read = path => readFileSync(resolve(root, path), "utf8");
 const pages = ["index.html", "study.html", "admin.html", "auth.html", "ai.html", "student.html"];
 const integrations = [
-  ["study.html", ["study-materials.mjs", "research-search.mjs", "student-profile.mjs", "student-page.mjs", "presence.mjs", "workspace.mjs", "workspace-gate.mjs"]],
-  ["ai.html", ["ai-studio.mjs", "research-search.mjs", "presence.mjs"]],
+  ["study.html", ["study-materials.mjs", "research-search.mjs", "student-profile.mjs", "student-page.mjs", "presence.mjs", "workspace.mjs", "auth-gate.mjs"]],
+  ["ai.html", ["ai-studio.mjs", "research-search.mjs", "presence.mjs", "auth-gate.mjs"]],
   ["admin.html", ["admin-auth.mjs", "admin-database.mjs", "admin-ai.mjs", "admin-courses.mjs", "admin-workspace.mjs", "admin-site.mjs", "admin-uploads.mjs", "presence.mjs"]],
   ["auth.html", ["auth-page.mjs"]],
   ["student.html", ["student-page-view.mjs"]]

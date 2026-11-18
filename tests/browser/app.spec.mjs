@@ -102,7 +102,7 @@ test("existing legacy study records and session counter remain readable and unch
 test("missing Firebase config degrades safely while the real proxy and authorization gates work", async ({ page }) => {
   // A returning (previously signed-in) browser keeps its local tools when
   // Firebase cannot load; the integration modules then degrade as before.
-  await page.addInitScript(key => { try { localStorage.setItem(key, "returning-student"); } catch { /* ignore */ } }, "fire-counsel-workspace-session-v1");
+  await page.addInitScript(key => { try { localStorage.setItem(key, "returning-student"); } catch { /* ignore */ } }, "fire-counsel-auth-gate-v1");
   await readyStudy(page, "library");
   await expect(page.locator("#server-materials-status")).toContainText("configuration is not available");
   await page.locator("[data-page=ai-chat]").click();
@@ -331,23 +331,19 @@ test("the answer appears word by word while the AI is still writing", async ({ p
   await expect(page.locator("[data-speak='2']")).toBeVisible();
 });
 
-test("the AI page shows a sign-in link when signed out and the workspace shows its sign-in gate", async ({ page }) => {
+test("signed out, the AI studio and the workspace both show only the sign-in gate", async ({ page }) => {
   await stubAuth(page, { user: null });
   await page.goto("/ai.html");
-  await expect(page.locator("#ai-status")).toHaveText("Sign in to use Fire Counsel AI.");
-  await expect(page.locator(".fc-home .fc-signin")).toHaveAttribute("href", "./auth.html?next=ai.html");
-  await page.locator("#fc-menu").click();
-  await expect(page.locator("#fc-drawer")).toBeVisible();
-  await page.locator("#fc-open-research").click();
-  await expect(page.locator("#fc-research")).toBeVisible();
-  await expect(page.locator("#research-search-status")).toContainText("Sign in");
-  await page.locator("#fc-research-back").click();
+  // No AI preview: the gate covers the page and links back to sign-in.
+  await expect(page.locator("#auth-gate")).toBeVisible();
+  await expect(page.locator("#auth-gate-signin")).toHaveAttribute("href", "./auth.html?next=ai.html");
+  await expect(page.locator("#ai-workspace")).toBeHidden();
   await page.setViewportSize({ width: 390, height: 844 });
   await expectNoHorizontalOverflow(page);
   // Signed out, the workspace shows only its lock screen with a sign-in route.
   await page.goto("/study.html");
-  await expect(page.locator("#ws-gate")).toBeVisible();
-  await expect(page.locator("#ws-gate-signin")).toHaveAttribute("href", "./auth.html?next=study.html");
+  await expect(page.locator("#auth-gate")).toBeVisible();
+  await expect(page.locator("#auth-gate-signin")).toHaveAttribute("href", "./auth.html?next=study.html");
   await expect(page.locator("#student-nav")).toBeHidden();
   await expectNoHorizontalOverflow(page);
 });
@@ -581,25 +577,21 @@ test("verified admin CRUD uses the API and clears records on sign-out (all repli
   await expect(page.locator("#database-table-body")).toBeEmpty();
 });
 
-test("sign-in and password-reset UI works with local stubs, without sending email", async ({ page }) => {
+test("sign-in is Google-only: no email form, and the Google button signs in with a branded logo", async ({ page }) => {
   await stubAuth(page);
   await page.route("**/api/v1/profile", route => json(route, { data: { full_name: student.displayName, email: student.email, installation: { registered: true } } }));
   await page.goto("/auth.html");
-  await expect(page.locator("#email-signin-form")).toBeVisible();
-  await page.locator("#forgot-password-button").click();
-  await expect(page.locator("#auth-message")).toContainText("Enter your email");
-  await page.locator("#auth-email").fill("student@example.invalid");
-  await page.locator("#forgot-password-button").click();
-  await expect(page.locator("#auth-message")).toContainText("If a Firebase account exists");
-  expect(await page.evaluate(() => window.__auth.resets)).toEqual(["student@example.invalid"]);
-  await page.locator("#auth-password").fill("synthetic-password");
-  await page.locator("#email-signin-button").click();
-  await expect(page.locator("#continue-button")).toBeVisible();
-  await page.locator("#sign-out-button").click();
-  await expect(page.locator("#email-signin-form")).toBeVisible();
+  // No email/password path exists: nothing to phish or brute-force.
+  await expect(page.locator("#google-signin-button")).toBeVisible();
+  await expect(page.locator("#google-signin-button .google-logo")).toBeVisible();
+  await expect(page.locator("#email-signin-form")).toHaveCount(0);
+  await expect(page.locator(".auth-card input[type=password]")).toHaveCount(0);
   await page.locator("#google-signin-button").click();
   await expect(page.locator("#signed-in-email")).toHaveText("google@example.invalid");
+  await expect(page.locator("#continue-button")).toBeVisible();
   expect(await page.evaluate(() => window.__auth.googleCalls)).toBe(1);
+  await page.locator("#sign-out-button").click();
+  await expect(page.locator("#google-signin-button")).toBeVisible();
 });
 
 test("admin sign-in cannot continue after a server denial or redirect to another origin", async ({ page }) => {
@@ -654,7 +646,7 @@ test("a delayed admin permission reply cannot restore a signed-out session", asy
   await page.goto("/auth.html?next=admin.html");
   await requestStarted;
   await page.locator("#sign-out-button").click();
-  await expect(page.locator("#email-signin-form")).toBeVisible();
+  await expect(page.locator("#google-signin-button")).toBeVisible();
   const returned = page.waitForResponse("**/api/v1/admin/me");
   release(); await finishReply(page, await returned);
   await expect(page.locator("#signed-in-panel")).toBeHidden();

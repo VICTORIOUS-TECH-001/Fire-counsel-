@@ -3,8 +3,8 @@
 **Latest update:** 18 November 2026 (UTC), branch `arena/d4df7fc6-fire-counsel`
 
 **Access and paywall changes this round:**
-- The Google sign-in button now carries the official four-colour Google logo (inline SVG, offline-safe).
-- The student workspace (`study.html`) no longer renders for signed-out visitors: a lock screen (`workspace-gate.mjs`) hides the shell until Firebase Auth confirms an account, and sign-out locks it again instantly. A browser that has signed in before keeps its local study tools offline; a fresh browser must sign in online once. Server data was never exposed either way — every API route requires a verified Firebase token.
+- Sign-in is **Google-only** (`auth.html` has no email/password form — nothing to phish or brute-force) and the button carries the official four-colour Google logo (inline SVG, offline-safe).
+- Locked pages (`study.html` workspace **and** `ai.html` AI studio) no longer render for signed-out visitors: a shared lock screen (`auth-gate.mjs`) hides the page until Firebase Auth confirms an account, and sign-out locks again instantly. A browser that has signed in before keeps its local study tools offline; a fresh browser must sign in online once. Server data was never exposed either way — every API route requires a verified Firebase token. The public homepage, the auth page and published student pages stay public; the admin page keeps its own server-verified admin gate.
 - AI features are now a premium plan, enforced server-side: `ai_user_limits.premium` (migration `005_premium.sql`, admin-granted in Admin → Users & AI limits) is checked inside `reserveUsage`, so free accounts get `403 PREMIUM_REQUIRED` before any AI spend and cannot enable it from a browser. `/api/v1/ai/me` exposes the flag; the AI studio shows a free-plan notice and locks its composer.
 - **Deploy step required:** run the Neon migration workflow (Actions → "Neon database migration") so the `premium` column exists before using the admin premium toggle; without it, reads simply report every account as free.
 

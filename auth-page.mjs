@@ -1,22 +1,20 @@
 import { createRequestScope } from "./request-scope.mjs";
 import { authErrorText } from "./firebase/auth-errors.mjs";
 
+// Google-only sign-in: FIRE COUNSEL accounts are Google accounts, so there is
+// no email/password form here to phish or brute-force. The Google button is
+// the single way in; the TOTP step still appears when Firebase demands a
+// second factor for an enrolled account.
 const $ = selector => document.querySelector(selector);
 const message = $("#auth-message");
-const emailForm = $("#email-signin-form");
 const googleButton = $("#google-signin-button");
 const mfaForm = $("#mfa-form");
-const divider = $("#auth-divider");
 const signedInPanel = $("#signed-in-panel");
 const continueButton = $("#continue-button");
 const signOutButton = $("#sign-out-button");
-const emailButton = $("#email-signin-button");
-const forgotPasswordButton = $("#forgot-password-button");
-const modeToggle = $("#auth-mode-toggle");
 const requestedNext = new URLSearchParams(location.search).get("next") || "study.html#dashboard";
 const allowedNextFiles = new Set(["study.html", "admin.html", "index.html", "ai.html"]);
 let authClient;
-let creatingAccount = false;
 const sessionScope = createRequestScope();
 
 function safeNextUrl(value) {
@@ -31,9 +29,8 @@ function safeNextUrl(value) {
 const nextUrl = safeNextUrl(requestedNext);
 const wantsAdmin = nextUrl.pathname.endsWith("/admin.html");
 let continueUrl = nextUrl;
-modeToggle.hidden = wantsAdmin;
 $("#manage-profile-link").hidden = wantsAdmin;
-if (wantsAdmin) $("#auth-intro").textContent = "Sign in to an existing administrator account. The server must verify the Firebase admin claim; registration, Google sign-in and profile creation never grant administrator permission.";
+if (wantsAdmin) $("#auth-intro").textContent = "Sign in to an existing administrator account with Google. The server must verify the Firebase admin claim; Google sign-in and profile creation never grant administrator permission.";
 
 function setMessage(text, kind = "") {
   message.textContent = text;
@@ -41,8 +38,6 @@ function setMessage(text, kind = "") {
 }
 
 function showMfa(info) {
-  emailForm.hidden = true;
-  divider.hidden = true;
   googleButton.hidden = true;
   signedInPanel.hidden = true;
   mfaForm.hidden = false;
@@ -134,8 +129,6 @@ async function verifyServerAccess(user) {
 
 function showSignedIn(user) {
   const isCurrent = sessionScope.capture();
-  emailForm.hidden = true;
-  divider.hidden = true;
   googleButton.hidden = true;
   hideMfa();
   signedInPanel.hidden = false;
@@ -151,26 +144,9 @@ function showSignedIn(user) {
   }).catch(() => {});
 }
 
-function setAccountMode(create) {
-  creatingAccount = create && !wantsAdmin;
-  for (const id of ["signup-name-row", "signup-confirm-row", "signup-hint"]) $(`#${id}`).hidden = !creatingAccount;
-  $("#auth-name").disabled = !creatingAccount;
-  $("#auth-password-confirm").disabled = !creatingAccount;
-  $("#auth-password").value = "";
-  $("#auth-password-confirm").value = "";
-  $("#auth-password").autocomplete = creatingAccount ? "new-password" : "current-password";
-  $("#auth-password").minLength = creatingAccount ? 8 : 6;
-  $("#auth-title").textContent = creatingAccount ? "Your account starts here." : "Welcome back.";
-  emailButton.textContent = creatingAccount ? "Create my Firebase account" : "Sign in with email";
-  modeToggle.textContent = creatingAccount ? "Already have an account? Sign in" : "New here? Create a student account";
-  forgotPasswordButton.hidden = creatingAccount;
-}
-
 try {
   authClient = await import("./firebase/auth-client.mjs");
 } catch (error) {
-  emailForm.hidden = true;
-  divider.hidden = true;
   googleButton.hidden = true;
   mfaForm.hidden = true;
   setMessage(error?.message || "Firebase client configuration could not load. Put the Web API key in firebase/firebase-config.mjs, then reload.", "error");
@@ -187,68 +163,15 @@ if (authClient) {
     googleButton.disabled = false;
     continueButton.hidden = true;
     continueButton.disabled = true;
-    $("#auth-password").value = "";
-    $("#auth-password-confirm").value = "";
     if (user) showSignedIn(user);
     else if (mfaForm.hidden) {
-      emailForm.hidden = false;
-      divider.hidden = false;
       googleButton.hidden = false;
       signedInPanel.hidden = true;
       $("#signed-in-email").textContent = "";
-      $("#auth-name").value = "";
-      setMessage("Sign in with Google or email, or create a student account.");
+      setMessage("Sign in with your Google account to open FIRE COUNSEL.");
     }
   }, error => handleAuthError(error));
 }
-
-modeToggle.addEventListener("click", () => setAccountMode(!creatingAccount));
-emailForm.addEventListener("submit", async event => {
-  event.preventDefault();
-  if (!authClient || emailButton.disabled) return;
-  const email = $("#auth-email").value;
-  const password = $("#auth-password").value;
-  if (creatingAccount && password !== $("#auth-password-confirm").value) {
-    setMessage("Your passwords do not match.", "error");
-    return;
-  }
-  emailButton.disabled = true;
-  modeToggle.disabled = true;
-  googleButton.disabled = true;
-  setMessage(creatingAccount ? "Creating your account securely with Firebase…" : "Signing in…");
-  try {
-    if (creatingAccount) await authClient.registerWithEmail(email, password, $("#auth-name").value);
-    else await authClient.signInWithEmail(email, password);
-  } catch (error) { handleAuthError(error); }
-  finally {
-    $("#auth-password").value = "";
-    $("#auth-password-confirm").value = "";
-    emailButton.disabled = false;
-    modeToggle.disabled = false;
-    googleButton.disabled = false;
-  }
-});
-
-forgotPasswordButton.addEventListener("click", async () => {
-  if (!authClient) return;
-  const email = $("#auth-email").value.trim();
-  if (!email) {
-    setMessage("Enter your email address first, then request a reset link.", "error");
-    $("#auth-email").focus();
-    return;
-  }
-  const isCurrent = sessionScope.capture();
-  forgotPasswordButton.disabled = true;
-  setMessage("Requesting a password reset email…");
-  try {
-    await authClient.requestPasswordReset(email);
-    if (isCurrent()) setMessage("If a Firebase account exists for that email, Firebase will send a password-reset link.", "ok");
-  } catch (error) {
-    if (!isCurrent()) return;
-    if (error?.code === "auth/user-not-found") setMessage("If a Firebase account exists for that email, Firebase will send a password-reset link.", "ok");
-    else setMessage("The password-reset request could not be completed. Check Firebase Auth setup and try again.", "error");
-  } finally { forgotPasswordButton.disabled = false; }
-});
 
 googleButton.addEventListener("click", async () => {
   if (!authClient || googleButton.disabled) return;

@@ -13,7 +13,7 @@
 <link href="./integrations.css" rel="stylesheet"/>
 <link href="./workspace.css" rel="stylesheet"/>
 </head>
-<body class="ws" data-theme="dark" data-ws-auth="pending">
+<body class="ws" data-theme="dark" data-auth-gate="pending">
 <div class="fc-preloader" id="fc-preloader" role="status" aria-label="FIRE COUNSEL is loading">
 <div class="fc-pre-core" aria-hidden="true"><div class="fc-pre-ring"></div><div class="fc-pre-hex"><div class="fc-pre-fire"><i class="fl fl1"></i><i class="fl fl2"></i><i class="fl fl3"></i><i class="fl fl4"></i><i class="em em1"></i><i class="em em2"></i><i class="em em3"></i><i class="em em4"></i><i class="em em5"></i></div></div></div>
 <div class="fc-pre-name">FIRE <span>COUNSEL</span></div>
@@ -22,16 +22,16 @@
 <div class="fc-pre-status">Loading your workspace…</div>
 </div>
 <script src="./preloader.js"></script>
-<script type="module" src="./workspace-gate.mjs"></script>
-<div class="ws-gate" id="ws-gate" role="dialog" aria-modal="true" aria-labelledby="ws-gate-title">
-  <div class="ws-gate-card">
-    <img class="ws-gate-brand" src="./assets/images/fire-counsel-brand.jpg" alt="" width="56" height="56">
-    <span class="ws-gate-lock" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
-    <h1 id="ws-gate-title">Workspace locked</h1>
-    <p id="ws-gate-message">Your study workspace is private. Sign in to open it.</p>
-    <a class="button primary ws-gate-signin" id="ws-gate-signin" href="./auth.html?next=study.html">Sign in / create account</a>
-    <a class="ws-gate-home" href="./index.html">&larr; Back to the homepage</a>
-    <p class="ws-gate-status" id="ws-gate-status" role="status" aria-live="polite">Checking your sign-in&hellip;</p>
+<script type="module" src="./auth-gate.mjs"></script>
+<div class="auth-gate" id="auth-gate" role="dialog" aria-modal="true" aria-labelledby="auth-gate-title">
+  <div class="auth-gate-card">
+    <img class="auth-gate-brand" src="./assets/images/fire-counsel-brand.jpg" alt="" width="56" height="56">
+    <span class="auth-gate-lock" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+    <h1 id="auth-gate-title">Workspace locked</h1>
+    <p id="auth-gate-message">Your study workspace is private. Sign in to open it.</p>
+    <a class="button primary auth-gate-signin" id="auth-gate-signin" href="./auth.html?next=study.html">Sign in with Google</a>
+    <a class="auth-gate-home" href="./index.html">&larr; Back to the homepage</a>
+    <p class="auth-gate-status" id="auth-gate-status" role="status" aria-live="polite">Checking your sign-in&hellip;</p>
   </div>
 </div>
 <div class="app">
