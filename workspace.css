@@ -335,7 +335,7 @@ body.ws .site-footer .brand-copy small{color:var(--ws-sky)}
 /* Workspace sign-in gate (workspace-gate.mjs). The shell stays hidden until
    Firebase Auth confirms a student; a signed-in-before browser keeps local
    tools offline. */
-body.ws[data-ws-auth="pending"] .app,body.ws[data-ws-auth="locked"] .app{display:none}
+body.ws[data-ws-auth="pending"] .app,body.ws[data-ws-auth="locked"] .app,body.ws[data-ws-auth="pending"] .app~.site-footer,body.ws[data-ws-auth="locked"] .app~.site-footer{display:none}
 body.ws .ws-gate{display:none}
 body.ws[data-ws-auth="pending"] .ws-gate,body.ws[data-ws-auth="locked"] .ws-gate{display:grid;place-items:center;position:fixed;inset:0;z-index:90;padding:22px;background:radial-gradient(circle at 50% 18%,rgba(37,99,235,.22),transparent 30rem),var(--ws-bg)}
 body.ws .ws-gate-card{display:grid;justify-items:center;gap:13px;width:min(100%,420px);padding:36px 30px 28px;border:1px solid var(--ws-border);border-radius:22px;background:var(--ws-card);box-shadow:var(--ws-glow);text-align:center}

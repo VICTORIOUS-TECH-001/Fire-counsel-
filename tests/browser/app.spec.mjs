@@ -33,6 +33,7 @@ test("public homepage renders JSON, carousel, articles and mobile navigation", a
 test("local files, flashcards and personal subjects persist across a reload without uploading", async ({ page }) => {
   const mutations = [];
   page.on("request", request => { if (request.method() !== "GET") mutations.push(request.url()); });
+  await stubAuth(page, { user: student });
   await readyStudy(page, "memory");
   await page.locator("#card-front").fill("Synthetic case recall question");
   await page.locator("#card-back").fill("Synthetic local answer");
@@ -78,6 +79,7 @@ test("existing legacy study records and session counter remain readable and unch
       };
     });
   });
+  await stubAuth(page, { user: student });
   await readyStudy(page, "library");
   await expect(page.locator("#document-list")).toContainText("legacy.txt");
   await expect(page.locator("#stat-sessions")).toHaveText("7");
@@ -95,6 +97,9 @@ test("existing legacy study records and session counter remain readable and unch
 });
 
 test("missing Firebase config degrades safely while the real proxy and authorization gates work", async ({ page }) => {
+  // A returning (previously signed-in) browser keeps its local tools when
+  // Firebase cannot load; the integration modules then degrade as before.
+  await page.addInitScript(key => { try { localStorage.setItem(key, "returning-student"); } catch { /* ignore */ } }, "fire-counsel-workspace-session-v1");
   await readyStudy(page, "library");
   await expect(page.locator("#server-materials-status")).toContainText("configuration is not available");
   await page.locator("[data-page=ai-chat]").click();
@@ -323,7 +328,7 @@ test("the answer appears word by word while the AI is still writing", async ({ p
   await expect(page.locator("[data-speak='2']")).toBeVisible();
 });
 
-test("the AI page shows a sign-in link when signed out and the study space links to it", async ({ page }) => {
+test("the AI page shows a sign-in link when signed out and the workspace shows its sign-in gate", async ({ page }) => {
   await stubAuth(page, { user: null });
   await page.goto("/ai.html");
   await expect(page.locator("#ai-status")).toHaveText("Sign in to use Fire Counsel AI.");
@@ -336,8 +341,12 @@ test("the AI page shows a sign-in link when signed out and the study space links
   await page.locator("#fc-research-back").click();
   await page.setViewportSize({ width: 390, height: 844 });
   await expectNoHorizontalOverflow(page);
-  await readyStudy(page);
-  await expect(page.locator("#student-nav a[href='./ai.html']")).toBeVisible();
+  // Signed out, the workspace shows only its lock screen with a sign-in route.
+  await page.goto("/study.html");
+  await expect(page.locator("#ws-gate")).toBeVisible();
+  await expect(page.locator("#ws-gate-signin")).toHaveAttribute("href", "./auth.html?next=study.html");
+  await expect(page.locator("#student-nav")).toBeHidden();
+  await expectNoHorizontalOverflow(page);
 });
 
 test("authenticated materials and verified source search render safe text from stubbed API replies", async ({ page }) => {
@@ -729,6 +738,7 @@ trailer << /Root 1 0 R /Size 6 >>
 }
 
 test("students can read a saved PDF in the built-in reader and close it with Back", async ({ page }) => {
+  await stubAuth(page, { user: student });
   await readyStudy(page, "library");
   await page.locator("#file-input").setInputFiles({ name: "synthetic-judgment.pdf", mimeType: "application/pdf", buffer: syntheticPdf("Reader works offline") });
   await expect(page.locator("#library-count")).toHaveText("1 file");
