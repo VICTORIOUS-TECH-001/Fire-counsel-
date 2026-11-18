@@ -48,17 +48,18 @@ function renderStatus(data) {
   const p = data.providers;
   const state = (ok, yes, no) => `<span class="fc-state" data-ok="${ok}">${ok ? yes : no}</span>`;
   $("#ai-provider-status").innerHTML = `<dl class="fc-kv">
-    <dt>Google Gemini (main)</dt><dd>${state(p.gemini.configured, "KEY ADDED", "NO KEY")}</dd>
+    <dt>Google Gemini (main)</dt><dd>${state(p.gemini.configured, "KEY ADDED", "NO KEY")}${p.gemini.warning ? `<br><small class="fc-warn">⚠ ${escapeHTML(p.gemini.warning)}</small>` : ""}</dd>
     <dt>Writing models</dt><dd>${escapeHTML(p.gemini.models.join(", "))}</dd>
     <dt>Web-search model</dt><dd>${escapeHTML(p.gemini.search_models.join(", "))}</dd>
     <dt>Groq (fast backup)</dt><dd>${state(Boolean(p.groq?.configured), "KEY ADDED", "NO KEY")} ${escapeHTML((p.groq?.models || []).join(", "))}${p.groq?.key_name ? ` <small>(${escapeHTML(p.groq.key_name)})</small>` : ""}${p.groq?.warning ? `<br><small class="fc-warn">⚠ ${escapeHTML(p.groq.warning)}</small>` : ""}</dd>
-    <dt>OpenRouter (backup)</dt><dd>${state(p.openrouter.configured, "KEY ADDED", "NO KEY")} ${escapeHTML(p.openrouter.models.join(", "))}</dd>
+    <dt>OpenRouter (backup)</dt><dd>${state(p.openrouter.configured, "KEY ADDED", "NO KEY")} ${escapeHTML(p.openrouter.models.join(", "))}${p.openrouter.warning ? `<br><small class="fc-warn">⚠ ${escapeHTML(p.openrouter.warning)}</small>` : ""}</dd>
     <dt>Tavily (backup web search)</dt><dd>${state(Boolean(p.tavily?.configured), "KEY ADDED", "NO KEY")}${p.tavily?.key_name ? ` <small>(${escapeHTML(p.tavily.key_name)})</small>` : ""}${p.tavily?.warning ? `<br><small class="fc-warn">⚠ ${escapeHTML(p.tavily.warning)}</small>` : ""}</dd>
     <dt>Database tables</dt><dd>${state(data.schema_ready, "READY", "NOT INSTALLED")}</dd>
   </dl>${data.schema_ready ? "" : `<p class="fc-status" data-kind="error">The AI tables are not in Neon yet. On GitHub open <b>Actions → “Neon database migration (AI, website, uploads)” → Run workflow</b>.</p>`}`;
   if (data.render_service && $("#ai-render-service")) $("#ai-render-service").textContent = data.render_service;
   const missing = ["groq", "tavily"].filter((name) => p[name] && !p[name].configured && !p[name].warning);
   if (missing.length) {
+    if (missing.includes("tavily")) $("#ai-provider-status").insertAdjacentHTML("beforeend", `<p class="fc-status" data-kind="error"><b>Web search needs Tavily.</b> Google does not allow web search with Gemini 3 models on the free Gemini plan, so without a Tavily key the AI answers without live web sources. Tavily is free (1,000 searches a month): <a href="https://app.tavily.com" target="_blank" rel="noopener">app.tavily.com</a>.</p>`);
     $("#ai-provider-status").insertAdjacentHTML("beforeend", `<p class="fc-status" data-kind="error">The server cannot see the ${missing.map((name) => name === "groq" ? "Groq" : "Tavily").join(" and ")} key${missing.length > 1 ? "s" : ""}. In Render, open the service <b>${escapeHTML(data.render_service || "fire-counsel-2")}</b> (the one this website runs on) → <b>Environment</b> → add ${missing.map((name) => `<code>${name === "groq" ? "GROQ_API_KEY" : "TAVILY_API_KEY"}</code>`).join(" and ")} → <b>Save, rebuild, and deploy</b>.</p>`);
   }
   const today = data.today || {};

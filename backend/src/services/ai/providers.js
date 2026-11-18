@@ -19,7 +19,11 @@ export const DEFAULT_GEMINI_MODELS = ["gemini-3.8-flash", "gemini-4-hydrogen", "
 // before (Gemini API release notes), so newer keys get "model not available".
 // Gemini 3+ models share 5,000 free Google Search prompts a month; each one is
 // tried in turn and a model that refuses search on this key is skipped.
-export const DEFAULT_GEMINI_SEARCH_MODELS = ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.6-flash", "gemini-2.5-flash-lite"];
+// Gemini 2.5 models are closed to new projects (and 2.5 Flash/Pro retire on
+// 1 Dec 2026), so only Gemini 3 models search by default. Note: Google Search
+// on Gemini 3 needs a paid (billing-enabled) Gemini project; on the free plan
+// Tavily does the web search.
+export const DEFAULT_GEMINI_SEARCH_MODELS = ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.6-flash"];
 export const DEFAULT_OPENROUTER_MODELS = ["openrouter/free"];
 // Groq free plan (console.groq.com, 2026): 30 requests/min, 1,000/day and
 // about 8,000 tokens per minute on gpt-oss-120b. Text only (no images/PDFs).
@@ -29,7 +33,22 @@ export const DEFAULT_GROQ_MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"]
 const GROQ_KEY_NAMES = ["GROQ_API_KEY", "GROQ_KEY", "GROK_API_KEY", "GROCK_API_KEY"];
 const TAVILY_KEY_NAMES = ["TAVILY_API_KEY", "TAVILY_KEY", "TRIVILY_API_KEY", "TAVILLY_API_KEY"];
 
-const cleanValue = (value) => String(value || "").trim().replace(/^["']|["']$/g, "").trim();
+// Removes quotes, "Bearer ", spaces, line breaks and invisible characters that
+// creep in when a key is copied on a phone.
+const cleanValue = (value) => String(value || "").replace(/[\u200B-\u200D\u2060\uFEFF]/g, "").trim()
+  .replace(/^["'`]+|["'`;,]+$/g, "").trim().replace(/^Bearer\s+/i, "").trim();
+
+// If a whole code example was pasted instead of the key, the key is picked out
+// of it by its known shape.
+const KEY_SHAPES = { gemini: /AIza[\w-]{30,}/, openrouter: /sk-or-[\w-]{20,}/, groq: /gsk_[A-Za-z0-9]{20,}/, tavily: /tvly-[\w-]{10,}/ };
+function extractKey(kind, raw) {
+  const value = cleanValue(raw);
+  if (!value) return { value: "", extracted: false };
+  const shape = KEY_SHAPES[kind];
+  const match = shape && value.match(shape);
+  if (match && match[0] !== value) return { value: match[0], extracted: true };
+  return { value: value.replace(/\s+/g, ""), extracted: false };
+}
 
 /**
  * Finds a key under the usual names first, then under any setting whose name
@@ -57,8 +76,12 @@ function findKey(env, names, { pattern, prefix } = {}) {
   return { name: null, value: "" };
 }
 
+const EXTRACTED_NOTE = "The saved value had extra text around the key (for example a code example or the word Bearer); the server is using only the key part. To be safe, replace it with just the key.";
+
 function keyWarning(kind, key) {
   if (!key) return null;
+  if (kind === "openrouter" && !key.startsWith("sk-or-")) return "OpenRouter keys start with sk-or-v1-. What is saved does not look like a key: paste ONLY the key from openrouter.ai/keys (not the TypeScript or REST code).";
+  if (kind === "gemini" && !/^AIza|^AQ\./.test(key)) return "Gemini keys from aistudio.google.com/apikey normally start with AIza. Check that only the key was pasted.";
   if (kind === "groq") {
     if (key.startsWith("xai-")) return "This is an xAI Grok key (paid), not a Groq key. Create a free key at console.groq.com/keys — it starts with gsk_.";
     if (!key.startsWith("gsk_")) return "Groq keys normally start with gsk_. Check that the whole key was pasted.";
@@ -83,21 +106,31 @@ const list = (value, fallback) => {
 };
 
 export function aiConfig(env = process.env) {
-  const geminiKey = (env.GEMINI_API_KEY || "").trim();
-  const openrouterKey = (env.OPENROUTER_API_KEY || "").trim();
-  const groq = findKey(env, GROQ_KEY_NAMES, { pattern: /GRO[QK]|GROCK/i, prefix: "gsk_" });
+  const gemini = extractKey("gemini", env.GEMINI_API_KEY);
+  const openrouter = extractKey("openrouter", env.OPENROUTER_API_KEY);
+  const geminiKey = gemini.value;
+  const openrouterKey = openrouter.value;
+  const groqFound = findKey(env, GROQ_KEY_NAMES, { pattern: /GRO[QK]|GROCK/i, prefix: "gsk_" });
+  const groqKey = extractKey("groq", groqFound.value);
+  const groq = { name: groqFound.name, value: groqKey.value };
   // An xAI key under GROK_API_KEY would only ever fail at Groq, so it is not used.
   const groqUsable = Boolean(groq.value) && !groq.value.startsWith("xai-");
-  const tavily = findKey(env, TAVILY_KEY_NAMES, { pattern: /TAV+IL|TRIV+IL/i, prefix: "tvly-" });
+  const tavilyFound = findKey(env, TAVILY_KEY_NAMES, { pattern: /TAV+IL|TRIV+IL/i, prefix: "tvly-" });
+  const tavilyKey = extractKey("tavily", tavilyFound.value);
+  const tavily = { name: tavilyFound.name, value: tavilyKey.value };
+  const note = (found, kind, key) => (found.extracted ? EXTRACTED_NOTE : keyWarning(kind, key));
   return {
-    gemini: { configured: Boolean(geminiKey), key: geminiKey, models: list(env.GEMINI_MODELS, DEFAULT_GEMINI_MODELS), searchModels: list(env.GEMINI_SEARCH_MODELS, DEFAULT_GEMINI_SEARCH_MODELS) },
-    openrouter: { configured: Boolean(openrouterKey), key: openrouterKey, models: list(env.OPENROUTER_MODELS, DEFAULT_OPENROUTER_MODELS), referer: env.RENDER_EXTERNAL_URL || (env.PUBLIC_HOST ? `https://${env.PUBLIC_HOST}` : "https://fire-counsel.onrender.com") },
-    groq: { configured: groqUsable, key: groqUsable ? groq.value : "", keyName: groq.name, warning: keyWarning("groq", groq.value), models: list(env.GROQ_MODELS, DEFAULT_GROQ_MODELS),
+    gemini: { configured: Boolean(geminiKey), key: geminiKey, warning: note(gemini, "gemini", geminiKey), models: list(env.GEMINI_MODELS, DEFAULT_GEMINI_MODELS), searchModels: list(env.GEMINI_SEARCH_MODELS, DEFAULT_GEMINI_SEARCH_MODELS) },
+    openrouter: { configured: Boolean(openrouterKey), key: openrouterKey, warning: note(openrouter, "openrouter", openrouterKey), models: list(env.OPENROUTER_MODELS, DEFAULT_OPENROUTER_MODELS), referer: env.RENDER_EXTERNAL_URL || (env.PUBLIC_HOST ? `https://${env.PUBLIC_HOST}` : "https://fire-counsel.onrender.com") },
+    groq: { configured: groqUsable, key: groqUsable ? groq.value : "", keyName: groq.name, warning: note(groqKey, "groq", groq.value), models: list(env.GROQ_MODELS, DEFAULT_GROQ_MODELS),
       tokensPerMinute: Math.min(Math.max(Number(env.GROQ_TOKENS_PER_MINUTE) || 8_000, 2_000), 1_000_000) },
-    tavily: { configured: Boolean(tavily.value), key: tavily.value, keyName: tavily.name, warning: keyWarning("tavily", tavily.value),
+    tavily: { configured: Boolean(tavily.value), key: tavily.value, keyName: tavily.name, warning: note(tavilyKey, "tavily", tavily.value),
       depth: env.TAVILY_SEARCH_DEPTH === "advanced" ? "advanced" : "basic", maxResults: Math.min(Math.max(Number(env.TAVILY_MAX_RESULTS) || 8, 3), 20) },
     timeoutMs: Math.min(Math.max(Number(env.AI_TIMEOUT_MS) || 240_000, 10_000), 600_000),
     streamIdleMs: Math.min(Math.max(Number(env.AI_STREAM_IDLE_MS) || 60_000, 5_000), 300_000),
+    // A busy model that has not started answering within this time is left
+    // for the next one (only when another model or provider is still available).
+    firstTokenMs: Math.min(Math.max(Number(env.AI_FIRST_TOKEN_MS) || 45_000, 1_000), 600_000),
     configured: Boolean(geminiKey || openrouterKey || groqUsable)
   };
 }
@@ -107,8 +140,8 @@ export function describeProviders(env = process.env) {
   const config = aiConfig(env);
   return {
     configured: config.configured,
-    gemini: { configured: config.gemini.configured, models: config.gemini.models, search_models: config.gemini.searchModels },
-    openrouter: { configured: config.openrouter.configured, models: config.openrouter.models },
+    gemini: { configured: config.gemini.configured, warning: config.gemini.warning, models: config.gemini.models, search_models: config.gemini.searchModels },
+    openrouter: { configured: config.openrouter.configured, warning: config.openrouter.warning, models: config.openrouter.models },
     groq: { configured: config.groq.configured, key_name: config.groq.keyName, warning: config.groq.warning, models: config.groq.models },
     tavily: { configured: config.tavily.configured, key_name: config.tavily.keyName, warning: config.tavily.warning, depth: config.tavily.depth }
   };
@@ -137,8 +170,8 @@ function geminiBody({ system, messages, search, json, maxTokens, temperature }) 
 }
 
 function classifyHttp(status, detail, provider) {
-  if (status === 429) return new AiError(429, `${provider} rate limit or free quota reached.`, "PROVIDER_QUOTA", { retryable: true });
   const why = detail ? ` (${provider} said: ${detail})` : "";
+  if (status === 429) return new AiError(429, `${provider} rate limit or free quota reached.${why}`, "PROVIDER_QUOTA", { retryable: true });
   if (status === 401 || status === 403) return new AiError(502, `${provider} rejected the API key. Create a new key and paste it in Render.${why}`, "PROVIDER_AUTH", { retryable: true });
   if (status === 402) return new AiError(502, `${provider} says this account has no credit left for this model.${why}`, "PROVIDER_QUOTA", { retryable: true });
   if (status === 404) return new AiError(502, `${provider} model not available for this key.${why}`, "MODEL_UNAVAILABLE", { retryable: true });
@@ -178,9 +211,9 @@ function geminiResult(model, data, text, candidate) {
  * model must start within timeoutMs and then never go silent for idleMs —
  * a slow but steady long answer is not cut off, a stuck one fails fast.
  */
-async function streamGemini(model, request, { key, fetchImpl, timeoutMs, idleMs }) {
+async function streamGemini(model, request, { key, fetchImpl, timeoutMs, idleMs, firstTokenMs }) {
   const controller = new AbortController();
-  let timer = setTimeout(() => controller.abort(new DOMException("first token timeout", "TimeoutError")), timeoutMs);
+  let timer = setTimeout(() => controller.abort(new DOMException("first token timeout", "TimeoutError")), Math.min(timeoutMs, firstTokenMs || timeoutMs));
   const keepAlive = () => { clearTimeout(timer); timer = setTimeout(() => controller.abort(new DOMException("stream idle", "TimeoutError")), idleMs); };
   let text = "";
   let last = null;
@@ -253,8 +286,8 @@ async function streamGemini(model, request, { key, fetchImpl, timeoutMs, idleMs 
   return geminiResult(model, last, text, lastCandidate);
 }
 
-export async function callGemini(model, request, { key, fetchImpl = fetch, timeoutMs = 240_000, idleMs = 60_000 }) {
-  if (typeof request.onText === "function" && !request.json) return streamGemini(model, request, { key, fetchImpl, timeoutMs, idleMs });
+export async function callGemini(model, request, { key, fetchImpl = fetch, timeoutMs = 240_000, idleMs = 60_000, firstTokenMs }) {
+  if (typeof request.onText === "function" && !request.json) return streamGemini(model, request, { key, fetchImpl, timeoutMs, idleMs, firstTokenMs });
   let response;
   try {
     response = await fetchImpl(`${GEMINI_BASE}/${encodeURIComponent(model)}:generateContent`, {
@@ -407,12 +440,28 @@ function searchPhrase(request) {
 // A model that is missing (404), rate-limited or hanging is skipped for a
 // while, so the next student does not wait for it again. When every model is
 // marked unhealthy they are all tried anyway (never refuse outright).
-const SKIP_MS = { SEARCH_UNSUPPORTED: 6 * 60 * 60_000, MODEL_UNAVAILABLE: 30 * 60_000, PROVIDER_TIMEOUT: 5 * 60_000, PROVIDER_QUOTA: 2 * 60_000, PROVIDER_UNAVAILABLE: 60_000, PROVIDER_AUTH: 10 * 60_000, PROVIDER_MONTHLY_QUOTA: 6 * 60 * 60_000 };
+const SKIP_MS = { SEARCH_UNSUPPORTED: 6 * 60 * 60_000, SEARCH_QUOTA: 60 * 60_000, MODEL_UNAVAILABLE: 30 * 60_000, MODEL_RETIRED: 24 * 60 * 60_000, PROVIDER_TIMEOUT: 10 * 60_000, PROVIDER_QUOTA: 2 * 60_000, PROVIDER_UNAVAILABLE: 60_000, PROVIDER_AUTH: 10 * 60_000, PROVIDER_MONTHLY_QUOTA: 6 * 60 * 60_000 };
 const unhealthy = new Map();
 
 function markModel(model, error, now = Date.now()) {
-  const ms = SKIP_MS[error?.code];
-  if (ms) unhealthy.set(model, { until: now + ms, code: error.code, message: error.message });
+  // "No longer available to new users" / deprecated: it will not come back soon.
+  const code = error?.code === "MODEL_UNAVAILABLE" && /no longer available|deprecated|shut ?down|retired/i.test(error.message) ? "MODEL_RETIRED" : error?.code;
+  const ms = SKIP_MS[code];
+  if (ms) unhealthy.set(model, { until: now + ms, code, message: error.message });
+}
+
+// Google Search on Gemini 3+ shares ONE quota across those models, and the
+// free plan's quota is 0. One "quota" reply therefore means all of them are
+// out: skip them all for search for an hour and go straight to Tavily.
+const geminiGeneration = (model) => Number(/gemini-(\d+)/.exec(model)?.[1] || 0);
+export const SEARCH_QUOTA_MESSAGE = "Google Search is not available on this Gemini key right now. On the FREE Gemini plan, Google Search does not work with Gemini 3 models (its quota is 0) — add the free Tavily key (app.tavily.com) for web search, or turn on billing in Google AI Studio.";
+function searchQuotaError(error) {
+  return new AiError(429, `${SEARCH_QUOTA_MESSAGE}${error?.message?.includes("said:") ? ` ${error.message.slice(error.message.indexOf("("))}` : ""}`, "SEARCH_QUOTA", { retryable: true });
+}
+function markSearchQuota(models, error, now = Date.now()) {
+  const marked = searchQuotaError(error);
+  for (const model of models) if (geminiGeneration(model) >= 3) markModel(healthKey(model, true), marked, now);
+  return marked;
 }
 
 const unhealthyNow = (name, now = Date.now()) => unhealthy.get(name)?.until > now;
@@ -450,14 +499,25 @@ export async function generate(request, { env = process.env, fetchImpl = fetch }
   if (!config.configured) throw new AiError(503, "No AI provider key is configured on the server.", "AI_NOT_CONFIGURED");
   const errors = [];
   if (config.gemini.configured) {
-    const models = orderModels(request.search ? config.gemini.searchModels : config.gemini.models, Date.now(), Boolean(request.search));
-    for (const model of models) {
+    let models = orderModels(request.search ? config.gemini.searchModels : config.gemini.models, Date.now(), Boolean(request.search));
+    // Every Gemini search model is known to be failing and Tavily works: use
+    // Tavily straight away instead of waiting for Gemini to refuse again.
+    if (request.search && config.tavily.configured && !unhealthyNow("tavily") && models.every((model) => unhealthyNow(healthKey(model, true)))) models = [];
+    const laterProviders = request.search ? config.tavily.configured : (config.groq.configured || config.openrouter.configured);
+    for (const [index, model] of models.entries()) {
       try {
         if (typeof request.onText === "function") { try { request.onText(""); } catch { /* display only */ } }
-        const result = await callGemini(model, request, { key: config.gemini.key, fetchImpl, timeoutMs: request.timeoutMs || config.timeoutMs, idleMs: config.streamIdleMs });
+        const hasNext = index < models.length - 1 || laterProviders;
+        const result = await callGemini(model, request, { key: config.gemini.key, fetchImpl, timeoutMs: request.timeoutMs || config.timeoutMs, idleMs: config.streamIdleMs, firstTokenMs: hasNext ? config.firstTokenMs : undefined });
         unhealthy.delete(healthKey(model, request.search));
         return result;
       } catch (error) {
+        if (request.search && error?.code === "PROVIDER_QUOTA" && geminiGeneration(model) >= 3) {
+          errors.push(markSearchQuota(config.gemini.searchModels, error));
+          // Every other Gemini 3+ model shares this quota: do not try them.
+          if (models.slice(index + 1).every((next) => geminiGeneration(next) >= 3)) break;
+          continue;
+        }
         errors.push(error);
         markModel(healthKey(model, request.search), request.search ? searchRefusal(error) : error);
         if (!(error instanceof AiError) || !error.retryable) {
@@ -534,7 +594,10 @@ export async function testModels({ env = process.env, fetchImpl = fetch, search 
         add("gemini", model, "web search", async () => {
           try {
             return await callGemini(model, { search: true, messages: [{ role: "user", text: "Find the official website of the Supreme Court of Nigeria. Reply in one sentence." }], maxTokens: 256 }, { key: config.gemini.key, fetchImpl, timeoutMs: searchTimeoutMs });
-          } catch (error) { throw searchRefusal(error); }
+          } catch (error) {
+            if (error?.code === "PROVIDER_QUOTA" && geminiGeneration(model) >= 3) throw searchQuotaError(error);
+            throw searchRefusal(error);
+          }
         }, { markAs: healthKey(model, true) });
       }
     }
@@ -565,7 +628,7 @@ export async function testModels({ env = process.env, fetchImpl = fetch, search 
         return { provider, model: reply.model || model, role, ok: true, ms: Date.now() - started, reply: String(reply.text || "").slice(0, 120), sources: reply.sources?.length || 0 };
       } catch (error) {
         markModel(markAs, error);
-        return { provider, model, role, ok: false, ms: Date.now() - started, code: error?.code || "ERROR", error: String(error?.message || error).slice(0, 240) };
+        return { provider, model, role, ok: false, ms: Date.now() - started, code: error?.code || "ERROR", error: String(error?.message || error).slice(0, 480) };
       }
     })();
     const late = deadline.then(() => ({ provider, model, role, ok: false, ms: Date.now() - started, code: "TEST_TIMEOUT",
@@ -573,6 +636,9 @@ export async function testModels({ env = process.env, fetchImpl = fetch, search 
     return Promise.race([attempt, late]);
   }));
   clearTimeout(stopTimer);
+  if (config.openrouter.configured && config.openrouter.warning) {
+    for (const row of results) if (row.provider === "openrouter" && !row.ok) row.error = `${row.error} — ${config.openrouter.warning}`.slice(0, 480);
+  }
   if (!config.groq.configured && config.groq.warning) {
     results.push({ provider: "groq", model: "—", role: "fast backup", ok: false, ms: 0, code: "BAD_KEY", error: config.groq.warning });
   }
