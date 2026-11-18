@@ -16,7 +16,10 @@ changes. It supplies Firebase ID-token headers and a persisted installation
 marker for protected student same-origin `/api/...` calls. `auth.html` is
 the shared sign-in page; the admin page requests `/api/v1/admin/me` and treats
 the backend response—not a browser claim—as authoritative. It does not grant
-admin claims or enable live edits.
+admin claims. Publishing homepage content (incl. slides) and student-page
+editing write directly to Firestore; the deployed security rules re-verify the
+admin claim or the document ownership on every request, so a manipulated UI
+cannot widen access.
 
 The provided config confirms the project ID, Auth domain, Storage bucket, app
 ID and measurement ID. It does **not** verify the live project's Firestore
@@ -145,11 +148,16 @@ file.
 ## Local tests and deployment gate
 
 Use Node.js 22.17+ for the complete repository toolchain. From this directory, `npm run test:local` checks that the legacy IndexedDB name,
-version, stores and session counter remain unchanged and that service-worker
-cleanup does not clear browser study data. `npm run test:rules` runs the Firestore
+version, stores and session counter remain unchanged, that service-worker
+cleanup does not clear browser study data, and that the shared Firestore
+content validators (`content-schema.mjs`) accept the bundled homepage content
+while rejecting malformed slides, links, images and student pages. `npm run test:rules` runs the Firestore
 and Storage suite against local emulators using a `demo-` project ID; it covers
-anonymous/student/admin reads and writes, slide upload type/size, public reads,
-and admin-only deletion. It never targets the live Firebase project.
+anonymous/student/admin reads and writes, the validated admin `siteContent`
+publish path (including forged metadata and unsafe slide images/links),
+`studentPages` owner-write/publish-gating/immutable-createdAt rules, slide
+upload type/size, public reads, and admin-only deletion. It never targets the
+live Firebase project.
 
 The root `npm test` and `npm run test:browser` additionally cover page wiring,
 service-worker behavior, preserved legacy study records, API proxy restrictions,

@@ -8,8 +8,13 @@ import {
   initializeTestEnvironment
 } from "@firebase/rules-unit-testing";
 import {
+  Timestamp,
+  collection,
+  deleteDoc,
   doc,
   getDoc,
+  getDocs,
+  serverTimestamp,
   setDoc
 } from "firebase/firestore";
 import {
@@ -24,6 +29,41 @@ const MAX_SLIDE_BYTES = 10 * 1024 * 1024;
 const firestoreRules = readFileSync(new URL("../firestore.rules", import.meta.url), "utf8");
 const storageRules = readFileSync(new URL("../storage.rules", import.meta.url), "utf8");
 let testEnv;
+
+// A minimal document that satisfies every siteContent rule. Mirrors the
+// bundled data/site-content.json shape checked by firebase/content-schema.mjs.
+function validSiteContent(uid) {
+  return {
+    brand: { name: "FIRE COUNSEL", tagline: "Ignite your legal intelligence", markImage: "./assets/images/fire-counsel-brand.jpg", markAlt: "Brand" },
+    navigation: [{ label: "Home", href: "#home" }],
+    hero: {
+      autoplayMs: 6500,
+      slides: [{
+        eyebrow: "A FRESH WAY TO STUDY LAW", title: "Build legal clarity.", accent: "Move with confidence.",
+        body: "A focused home for your law courses.", image: "./assets/images/pexels-law-judge.jpg",
+        imageAlt: "A judge writing", imageCredit: "Photo · Pexels",
+        primaryLabel: "Open student workspace", primaryHref: "./study.html#dashboard",
+        secondaryLabel: "See the study tools", secondaryHref: "#learning"
+      }]
+    },
+    quickFacts: [], learning: {}, caseNotes: {}, articles: {}, resources: {}, footer: {},
+    updatedAt: serverTimestamp(),
+    updatedBy: uid
+  };
+}
+
+function validStudentPage() {
+  return {
+    displayName: "Ada Student",
+    headline: "300-level law student",
+    bio: "Working through tort and contract.",
+    links: ["https://example.org/ada"],
+    focusAreas: ["Tort", "Contract"],
+    published: false,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  };
+}
 
 before(async () => {
   testEnv = await initializeTestEnvironment({
@@ -58,13 +98,81 @@ beforeEach(async () => {
   });
 });
 
-test("Firestore allows public site-content reads but no client publishing", async () => {
+test("Firestore allows public site-content reads and verified admin publishing only", async () => {
   const anonymousDb = testEnv.unauthenticatedContext().firestore();
+  const studentDb = testEnv.authenticatedContext("test-student").firestore();
   const adminDb = testEnv.authenticatedContext("test-admin", { admin: true }).firestore();
 
   const publicContent = await assertSucceeds(getDoc(doc(anonymousDb, "siteContent", "public")));
   assert.equal(publicContent.exists(), true);
-  await assertFails(setDoc(doc(adminDb, "siteContent", "public"), { title: "Client write" }));
+
+  // The admin studio publishes directly from the browser, with the full shape
+  // and server-owned metadata enforced by the rules.
+  await assertSucceeds(setDoc(doc(adminDb, "siteContent", "public"), validSiteContent("test-admin")));
+
+  // Students and visitors can never publish, even with a valid document.
+  await assertFails(setDoc(doc(studentDb, "siteContent", "public"), validSiteContent("test-student")));
+  await assertFails(setDoc(doc(anonymousDb, "siteContent", "public"), validSiteContent("anon")));
+
+  // An admin write with a broken shape, a forged author, or a forged
+  // timestamp is refused.
+  const noSlides = { ...validSiteContent("test-admin"), hero: { slides: [] } };
+  await assertFails(setDoc(doc(adminDb, "siteContent", "public"), noSlides));
+  const badImage = validSiteContent("test-admin");
+  badImage.hero.slides[0].image = "https://evil.example/photo.png";
+  await assertFails(setDoc(doc(adminDb, "siteContent", "public"), badImage));
+  const badLink = validSiteContent("test-admin");
+  badLink.hero.slides[0].primaryHref = "javascript:alert(1)";
+  await assertFails(setDoc(doc(adminDb, "siteContent", "public"), badLink));
+  const forgedMeta = { ...validSiteContent("test-admin"), updatedBy: "someone-else", updatedAt: Timestamp.fromMillis(1000) };
+  await assertFails(setDoc(doc(adminDb, "siteContent", "public"), forgedMeta));
+  const extraSection = { ...validSiteContent("test-admin"), secrets: {} };
+  await assertFails(setDoc(doc(adminDb, "siteContent", "public"), extraSection));
+
+  // Deletion stays server-only so the homepage cannot be removed by a client.
+  await assertFails(deleteDoc(doc(adminDb, "siteContent", "public")));
+});
+
+test("Firestore student pages are owned, validated and publish-gated", async () => {
+  const ownerDb = testEnv.authenticatedContext("test-student").firestore();
+  const otherDb = testEnv.authenticatedContext("other-student").firestore();
+  const adminDb = testEnv.authenticatedContext("test-admin", { admin: true }).firestore();
+  const anonymousDb = testEnv.unauthenticatedContext().firestore();
+  const pageRef = db => doc(db, "studentPages", "test-student");
+
+  // The owner creates their page; nobody else can create or edit it.
+  await assertSucceeds(setDoc(pageRef(ownerDb), validStudentPage()));
+  await assertFails(setDoc(pageRef(otherDb), validStudentPage()));
+  await assertFails(setDoc(pageRef(anonymousDb), validStudentPage()));
+
+  // Field shape is enforced: no extra keys, bounded text, https links only.
+  await assertFails(setDoc(pageRef(ownerDb), { ...validStudentPage(), role: "admin" }));
+  await assertFails(setDoc(pageRef(ownerDb), { ...validStudentPage(), bio: "x".repeat(2001) }));
+  await assertFails(setDoc(pageRef(ownerDb), { ...validStudentPage(), links: ["http://insecure.example"] }));
+  await assertFails(setDoc(pageRef(ownerDb), { ...validStudentPage(), links: ["https://a.example", "https://b.example", "https://c.example", "https://d.example", "https://e.example", "https://f.example"] }));
+  await assertFails(setDoc(pageRef(ownerDb), { ...validStudentPage(), displayName: "" }));
+
+  // Unpublished pages are visible only to the owner and admins.
+  await assertSucceeds(getDoc(pageRef(ownerDb)));
+  await assertSucceeds(getDoc(pageRef(adminDb)));
+  await assertFails(getDoc(pageRef(otherDb)));
+  await assertFails(getDoc(pageRef(anonymousDb)));
+
+  // Publishing flips public readability on; making it private flips it off.
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "studentPages", "test-student"), { ...validStudentPage(), published: true, createdAt: Timestamp.fromMillis(5000), updatedAt: Timestamp.fromMillis(5000) });
+  });
+  await assertSucceeds(getDoc(pageRef(anonymousDb)));
+
+  // The creation timestamp is immutable for owners and admins alike.
+  await assertFails(setDoc(pageRef(ownerDb), { ...validStudentPage(), published: true, createdAt: Timestamp.fromMillis(9999), updatedAt: serverTimestamp() }));
+  const preserved = await testEnv.withSecurityRulesDisabled(async (context) => (await getDoc(doc(context.firestore(), "studentPages", "test-student"))).data());
+  await assertSucceeds(setDoc(pageRef(ownerDb), { ...validStudentPage(), published: true, createdAt: preserved.createdAt, updatedAt: serverTimestamp() }));
+
+  // The collection cannot be listed by students or visitors.
+  await assertFails(getDocs(collection(anonymousDb, "studentPages")));
+  await assertFails(getDocs(collection(ownerDb, "studentPages")));
+  await assertSucceeds(getDocs(collection(adminDb, "studentPages")));
 });
 
 test("Firestore restricts account and quota reads to the admin claim and denies client writes", async () => {

@@ -68,6 +68,19 @@
       if (draft) { showPreviewBanner("PREVIEW — only you can see this. Go back to the admin tab and press Publish to make it live."); return draft; }
       showPreviewBanner("Preview not received — this shows the live site. Open the preview from the admin page (Pages & JSON → Preview).");
     }
+    // The admin studio publishes siteContent/public straight to Firestore, so
+    // live slide/content edits come from there first. The bundled JSON remains
+    // the fallback for first deploy, offline, or an unconfigured Firebase
+    // project. The Firestore attempt is time-boxed so a slow network can
+    // never hold the homepage hostage.
+    try {
+      const { loadPublicSiteContent } = await import("./firebase/firestore-client.mjs");
+      const live = await Promise.race([
+        loadPublicSiteContent(),
+        new Promise(resolve => setTimeout(() => resolve(null), 2500))
+      ]);
+      if (live) return live;
+    } catch { /* Firebase not configured or unreachable — bundled content below */ }
     const response = await fetch("./data/site-content.json", {cache:"no-cache"});
     if (!response.ok) throw new Error(`Content request failed: ${response.status}`);
     return response.json();

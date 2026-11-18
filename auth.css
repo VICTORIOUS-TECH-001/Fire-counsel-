@@ -2,3 +2,11 @@
 [hidden]{display:none!important}
 .auth-text-button{display:block;width:100%;margin:7px 0 0;padding:8px;border:0;background:transparent;color:#7558ba;font-size:10px;font-weight:750;text-align:center;cursor:pointer}.auth-text-button:hover{text-decoration:underline}.auth-text-button:disabled{opacity:.55;cursor:wait}
 .auth-hint{margin:0;color:#817789;font-size:11px;line-height:1.7}.auth-signed-in a.auth-button{text-decoration:none}
+/* Public student page (student.html) */
+#sp-bio{margin:0 0 18px;color:#4d4756;font-size:13px;line-height:1.75;white-space:pre-line}
+.sp-chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px;padding:0;list-style:none}
+.sp-chips li{padding:6px 11px;border-radius:999px;background:#f4effc;color:#5d3fa8;font-size:11px;font-weight:700}
+.sp-links{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.sp-links a{display:block;padding:11px 13px;border:1px solid #ece7f1;border-radius:10px;color:#37323e;font-size:12px;font-weight:700;text-decoration:none;overflow-wrap:anywhere}
+.sp-links a:hover{border-color:#c9b8ec;background:#faf8fd}
+.sp-updated{margin:18px 0 0;color:#a49dab;font-size:10px}

@@ -7,6 +7,7 @@ const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({
 const editor = $("#json-editor");
 
 let authClient = null;
+let firestoreClient = null;
 let verified = false;
 let session = 0;
 let publishedContent = null;
@@ -74,7 +75,7 @@ function setEnabled(on) {
   }
   const note = $("#publish-note");
   if (note) note.disabled = !on;
-  setText("#site-publish-state", on ? "SAVED IN NEON · LIVE ON PUBLISH" : "SIGN IN AS ADMIN TO PUBLISH");
+  setText("#site-publish-state", on ? "PUBLISH GOES LIVE VIA FIREBASE" : "SIGN IN AS ADMIN TO PUBLISH");
   if (!on) setText("#slide-status", "Sign in as the administrator to upload photos.");
 }
 
@@ -149,14 +150,31 @@ $("#publish-site")?.addEventListener("click", async () => {
   const button = $("#publish-site");
   button.disabled = true;
   try {
-    editorStatus("Publishing…");
-    const note = $("#publish-note")?.value.trim() || "";
-    await api("/api/v1/admin/site/publish", { method: "POST", body: JSON.stringify({ content, note }) });
-    if ($("#publish-note")) $("#publish-note").value = "";
-    editorStatus("Published! The live website now shows these changes.", "ok");
+    // 1. The live channel: write siteContent/public directly to Firestore.
+    //    The deployed security rules re-verify this browser's admin claim and
+    //    the full document shape before anything is stored.
+    if (firestoreClient) {
+      editorStatus("Publishing the live content to Firebase…");
+      await firestoreClient.publishSiteContent(content);
+    }
+    // 2. Keep the Neon draft/version-history archive in step. A history
+    //    failure must not roll back the live Firebase publish.
+    try {
+      editorStatus(firestoreClient ? "Live on Firebase. Saving the version history in Neon…" : "Publishing…");
+      const note = $("#publish-note")?.value.trim() || "";
+      await api("/api/v1/admin/site/publish", { method: "POST", body: JSON.stringify({ content, note }) });
+      if ($("#publish-note")) $("#publish-note").value = "";
+      editorStatus(firestoreClient
+        ? "Published! The homepage reads this content live from Firebase, and the version is archived in Neon."
+        : "Published! The live website now shows these changes.", "ok");
+    } catch (historyError) {
+      editorStatus(firestoreClient
+        ? `Live on Firebase now — but the Neon version history could not be saved: ${historyError.message}`
+        : historyError.message, "error");
+    }
     await loadSite(session, "publish");
   } catch (error) {
-    editorStatus(error.message, "error");
+    editorStatus(`Firebase publish failed, nothing went live: ${error.message}`, "error");
   } finally {
     button.disabled = !verified;
   }
@@ -253,5 +271,8 @@ document.addEventListener("fire-counsel:admin-state", (event) => onAdminState(ev
 setEnabled(false);
 try {
   authClient = await import("./firebase/auth-client.mjs");
+  // Direct Firestore publish rides on the same Firebase session; without the
+  // Web configuration there is no admin sign-in, so publishing stays disabled.
+  firestoreClient = await import("./firebase/firestore-client.mjs");
   onAdminState($("#admin-auth-status")?.dataset.state);
 } catch { /* sign-in not configured: publishing stays disabled */ }

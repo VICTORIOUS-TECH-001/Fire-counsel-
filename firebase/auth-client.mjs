@@ -165,6 +165,17 @@ export async function getDisplayRole() {
   return token.claims.admin === true ? "admin" : "student";
 }
 
+// True when the current token carries the server-issued admin: true claim.
+// Firestore/Storage rules re-check this claim on every direct client write;
+// this helper only decides what the UI offers. A freshly granted claim needs
+// getIdToken(true) first — the admin page does that after /api/v1/admin/claim.
+export async function hasAdminClaim(user = firebaseAuth.currentUser) {
+  if (!user) return false;
+  const token = await user.getIdTokenResult();
+  assertSameAccount(user);
+  return token.claims.admin === true;
+}
+
 // Same-origin only: deployment must proxy/serve /api on this origin. Neither
 // Firebase credentials nor the installation marker can be sent to another host.
 export async function apiRequest(path, options = {}) {

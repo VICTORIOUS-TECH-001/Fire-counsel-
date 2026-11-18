@@ -15,17 +15,18 @@ ROOT = Path(__file__).resolve().parents[1]
 # AI uploads (photos/PDFs as base64) can be up to about 26 MB.
 MAX_PROXY_BODY = 26 * 1024 * 1024
 PUBLIC_FILES = {
-    "index.html", "study.html", "admin.html", "auth.html", "ai.html",
+    "index.html", "study.html", "admin.html", "auth.html", "ai.html", "student.html",
     "site.css", "styles.css", "admin.css", "auth.css", "integrations.css",
     "site.js", "app.js", "admin.js", "sw.js", "manifest.webmanifest",
     "auth-page.mjs", "admin-auth.mjs", "admin-database.mjs",
     "study-materials.mjs", "research-search.mjs", "request-scope.mjs",
-    "student-profile.mjs", "installation.mjs",
+    "student-profile.mjs", "student-page.mjs", "student-page-view.mjs", "installation.mjs",
     "ai-studio.css", "ai-page.css", "ai-studio.mjs", "ai-markdown.mjs", "admin-ai.mjs", "admin-courses.mjs", "presence.mjs",
     "admin-site.mjs", "admin-uploads.mjs", "pdf-reader.mjs",
     "preloader.css", "preloader.js", "workspace.css", "workspace.mjs", "workspace-config.mjs", "admin-workspace.mjs",
     "data/site-content.json",
-    "firebase/client.mjs", "firebase/auth-client.mjs",
+    "firebase/client.mjs", "firebase/auth-client.mjs", "firebase/auth-errors.mjs",
+    "firebase/firestore-client.mjs", "firebase/content-schema.mjs",
     "firebase/firebase-config.mjs", "firebase/firebase-config.example.mjs",
 }
 

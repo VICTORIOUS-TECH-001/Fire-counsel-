@@ -60,7 +60,7 @@ function client({ provider = "password" } = {}) {
     .replace(/import\s*\{[\s\S]*?\}\s*from\s*"[^"]+";\s*/g, "")
     .replace(/export\s*\{[^}]*\};/g, "")
     .replace(/\bexport /g, "");
-  const exports = ["registerWithEmail", "signInWithEmail", "signInWithGoogle", "beginMfaChallenge", "completeMfaChallenge", "hasPasswordProvider", "requestAccountEmailChange", "changeAccountPassword", "requestAccountVerification", "requestPasswordReset", "refreshAccount", "getApiAuthorizationHeader", "apiRequest"];
+  const exports = ["registerWithEmail", "signInWithEmail", "signInWithGoogle", "beginMfaChallenge", "completeMfaChallenge", "hasPasswordProvider", "requestAccountEmailChange", "changeAccountPassword", "requestAccountVerification", "requestPasswordReset", "refreshAccount", "getApiAuthorizationHeader", "apiRequest", "hasAdminClaim"];
   vm.runInNewContext(`${executable}\nglobalThis.exports = { ${exports.join(",")} };`, context);
   return { ...context.exports, auth, user, sdk, context, calls, requests };
 }
@@ -189,4 +189,14 @@ test("Google Authenticator completes only a pending TOTP challenge", async () =>
     ["resolve-mfa", "123456"]
   ]);
   await assert.rejects(api.completeMfaChallenge("123456"), /Start sign-in again/);
+});
+
+test("hasAdminClaim reads the token claim and never trusts a signed-out session", async () => {
+  const api = client();
+  assert.equal(await api.hasAdminClaim(), false);
+  api.user.getIdTokenResult = async () => ({ claims: { admin: true } });
+  assert.equal(await api.hasAdminClaim(), true);
+  api.auth.currentUser = null;
+  assert.equal(await api.hasAdminClaim(null), false);
+  assert.equal(await api.hasAdminClaim(), false);
 });
