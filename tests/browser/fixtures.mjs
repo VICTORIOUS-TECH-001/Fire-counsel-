@@ -20,6 +20,8 @@ export async function expectNoHorizontalOverflow(page) {
   // Wait on that actual browser condition instead of issuing timed CDP samples
   // through expect.poll (which could time out without completing a measurement).
   // No fixed sleep, clipping CSS, relaxed width threshold or whole-test retry.
+  // Headless Chromium may otherwise throttle render frames on an occluded tab.
+  await page.bringToFront();
   try {
     const fits = await page.waitForFunction(() => document.documentElement.scrollWidth <= window.innerWidth,
       null, { polling: "raf", timeout: 7_000 });
@@ -30,6 +32,8 @@ export async function expectNoHorizontalOverflow(page) {
     const layout = await page.evaluate(() => ({
       viewport: window.innerWidth,
       width: document.documentElement.scrollWidth,
+      visibility: document.visibilityState,
+      readyState: document.readyState,
       overflowing: [...document.querySelectorAll("body *")].flatMap(element => {
         const rect = element.getBoundingClientRect();
         return rect.width > 0 && rect.right > window.innerWidth + 0.5

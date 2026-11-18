@@ -262,7 +262,11 @@ test("profile editing and sign-out preserve local recall records, session count 
   await expect(page.locator("#stat-sessions")).toHaveText("7");
   expect(await page.evaluate(key => localStorage.getItem(key), installationKey)).toBe(id);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/study.html#profile");
+  // Use the mobile navigation, not a second native fragment navigation while
+  // Chromium is resizing/restoring the preceding page's scroll position.
+  await page.locator("#menu-toggle").click();
+  await page.locator("#student-nav [data-page=profile]").click();
+  await expect(page.locator("#sidebar")).not.toHaveClass(/\bopen\b/);
   await expect(page.locator("#profile-page")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
