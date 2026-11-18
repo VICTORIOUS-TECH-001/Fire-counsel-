@@ -15,7 +15,7 @@ export const PUBLIC_FILES = new Set([
   "study-materials.mjs", "research-search.mjs", "request-scope.mjs",
   "student-profile.mjs", "installation.mjs",
   "ai-studio.css", "ai-studio.mjs", "ai-markdown.mjs", "admin-ai.mjs", "presence.mjs",
-  "admin-site.mjs", "admin-uploads.mjs",
+  "admin-site.mjs", "admin-uploads.mjs", "pdf-reader.mjs",
   "data/site-content.json",
   "firebase/client.mjs", "firebase/auth-client.mjs",
   "firebase/firebase-config.mjs", "firebase/firebase-config.example.mjs"
@@ -23,6 +23,24 @@ export const PUBLIC_FILES = new Set([
 // Friendly sign-in addresses (mirrors the Netlify _redirects file).
 export const REDIRECTS = new Map(["/login", "/login/", "/signin", "/sign-in", "/sign-in/"].map((from) => [from, "/auth.html"]));
 const ASSET_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico"]);
+
+// pdf.js (the PDF reader) is served from the backend's own pdfjs-dist package
+// at /vendor/pdfjs/… — only these folders and file types.
+const PDFJS_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "node_modules", "pdfjs-dist");
+const PDFJS_FILES = new Map([
+  ["build", /^pdf(?:\.worker)?\.min\.mjs$/],
+  ["standard_fonts", /^[A-Za-z0-9_-]+\.(?:pfb|ttf)$/],
+  ["cmaps", /^[A-Za-z0-9_-]+\.bcmap$/],
+  ["iccs", /^[A-Za-z0-9_-]+\.icc$/],
+  ["wasm", /^[A-Za-z0-9_-]+\.(?:wasm|js)$/]
+]);
+
+/** Returns the path inside pdfjs-dist for /vendor/pdfjs/<folder>/<file>, or null. */
+export function resolvePdfjsFile(urlPath) {
+  const match = /^\/vendor\/pdfjs\/([a-z_]+)\/([^/]+)$/.exec(urlPath);
+  if (!match || !PDFJS_FILES.get(match[1])?.test(match[2])) return null;
+  return match[1] === "build" ? `legacy/build/${match[2]}` : `${match[1]}/${match[2]}`;
+}
 
 export function resolvePublicFile(urlPath) {
   let decoded;
@@ -58,6 +76,15 @@ export function createWebsiteHandler({ root = DEFAULT_WEBSITE_ROOT } = {}) {
     if (req.path === "/api" || req.path.startsWith("/api/") || req.path === "/healthz") return next();
     const redirect = REDIRECTS.get(req.path);
     if (redirect) return res.redirect(301, redirect);
+    const pdfjs = resolvePdfjsFile(req.path);
+    if (pdfjs) {
+      return websiteHeaders(req, res, () => {
+        res.set("Cache-Control", "public, max-age=604800");
+        res.sendFile(pdfjs, { root: PDFJS_ROOT, dotfiles: "deny" }, (error) => {
+          if (error && !res.headersSent) next();
+        });
+      });
+    }
     const file = resolvePublicFile(req.path);
     if (!file) return next();
     websiteHeaders(req, res, () => {

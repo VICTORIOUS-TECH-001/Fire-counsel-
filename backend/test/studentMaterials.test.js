@@ -42,7 +42,44 @@ test("student material reads require approved/published scope and course eligibi
   assert.match(queries[0].text, /institution_memberships/);
   assert.match(queries[0].text, /course_enrollments/);
   assert.match(queries[0].text, /student_upload/);
-  assert.doesNotMatch(queries[0].text, /file_storage_path|embedding/);
+  // The storage path is only turned into a yes/no flag; it is never returned.
+  assert.match(queries[0].text, /LIKE 'neon:uploaded_files\/%'\) AS has_original/);
+  assert.doesNotMatch(queries[0].text.replace(/\(COALESCE\(latest\.file_storage_path, m\.file_storage_path\) LIKE[^)]*\) AS has_original/, ""), /m\.file_storage_path|latest\.file_storage_path|embedding/);
+});
+
+test("students can open the original uploaded PDF only through the same access check", async (t) => {
+  const FILE_ID = "423e4567-e89b-42d3-a456-426614174000";
+  const pdf = Buffer.from("%PDF-1.4 synthetic");
+  const queries = [];
+  const pool = {
+    async query(text, values) {
+      queries.push({ text, values });
+      if (/FROM materials m/.test(text)) return { rows: values[1] === MATERIAL_ID ? [{ ref: `neon:uploaded_files/${FILE_ID}`, original_file_name: "Contract \"notes\".pdf" }] : [] };
+      if (/FROM uploaded_files/.test(text)) return { rows: values[0] === FILE_ID ? [{ file_name: "x.pdf", mime_type: "application/pdf", data: new Uint8Array(pdf) }] : [] };
+      return { rows: [] };
+    }
+  };
+  const base = await serveRouter(t, makeRouter(pool));
+  const ok = await fetch(`${base}/${MATERIAL_ID}/file`);
+  assert.equal(ok.status, 200);
+  assert.equal(ok.headers.get("content-type"), "application/pdf");
+  assert.match(ok.headers.get("content-disposition"), /^inline; filename="Contract _notes_.pdf"$/);
+  assert.equal(ok.headers.get("cache-control"), "private, no-store");
+  assert.deepEqual(Buffer.from(await ok.arrayBuffer()), pdf);
+  assert.match(queries[0].text, /approval_status = 'approved'/);
+  assert.equal(queries[0].values[0], "student-firebase-uid");
+
+  const other = await fetch(`${base}/523e4567-e89b-42d3-a456-426614174000/file`);
+  assert.equal(other.status, 404);
+  assert.equal((await fetch(`${base}/not-a-uuid/file`)).status, 400);
+});
+
+test("original-file reads report a friendly 404 when the file was deleted or never uploaded", async (t) => {
+  const pool = { async query(text) { return /FROM materials m/.test(text) ? { rows: [{ ref: "firebase://legacy/path", original_file_name: "a.pdf" }] } : { rows: [] }; } };
+  const base = await serveRouter(t, makeRouter(pool));
+  const response = await fetch(`${base}/${MATERIAL_ID}/file`);
+  assert.equal(response.status, 404);
+  assert.match((await response.json()).error, /text version/);
 });
 
 test("student cannot retrieve a material outside their allowed scopes", async (t) => {
