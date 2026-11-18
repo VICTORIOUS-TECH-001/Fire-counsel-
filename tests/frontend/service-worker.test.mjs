@@ -48,7 +48,8 @@ test("the complete offline shell exists and includes the mounted student integra
   const sw = worker();
   await sw.lifecycle("install");
   for (const file of sw.shell) assert.ok(existsSync(resolve(import.meta.dirname, "../..", file)), `${file} exists`);
-  for (const module of ["./study-materials.mjs", "./research-search.mjs", "./student-profile.mjs", "./installation.mjs", "./request-scope.mjs", "./integrations.css", "./ai-studio.css", "./ai-studio.mjs", "./ai-markdown.mjs", "./presence.mjs"]) {
+  assert.ok(sw.shell.includes("./ai.html"));
+  for (const module of ["./study-materials.mjs", "./research-search.mjs", "./student-profile.mjs", "./installation.mjs", "./request-scope.mjs", "./integrations.css", "./ai-studio.css", "./ai-page.css", "./ai-studio.mjs", "./ai-markdown.mjs", "./presence.mjs"]) {
     assert.ok(sw.shell.includes(module));
   }
   assert.ok(!sw.shell.some(path => path.includes("config.local") || path.includes("admin.html")));

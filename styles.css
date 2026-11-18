@@ -141,3 +141,9 @@ html.reader-open,html.reader-open body{overflow:hidden}
 .reader-image{display:block;max-width:100%;margin:0 auto;background:#fff}
 .reader-plain{max-width:820px;margin:0 auto;padding:18px;background:#fff;color:#222;border-radius:10px;white-space:pre-wrap;font:15px/1.7 system-ui,sans-serif;user-select:text}
 @media (max-width:560px){.reader-title{font-size:12px}.reader-btn{min-width:36px;padding:0 9px;font-size:13px}}
+/* Launcher for the full-screen Fire Counsel AI page (ai.html). */
+.ai-launch-card{display:flex;align-items:center;gap:16px;padding:22px 24px;border-radius:24px;background:linear-gradient(115deg,#17151f,#2c2131 60%,#3b2216);color:#fff;text-decoration:none;box-shadow:0 18px 40px rgba(40,20,10,.18)}
+.ai-launch-flame{display:grid;place-items:center;flex:none;width:58px;height:58px;border-radius:18px;background:radial-gradient(circle at 50% 70%,rgba(255,122,26,.45),rgba(255,255,255,.06));font-size:30px}
+.ai-launch-copy{display:grid;gap:4px;min-width:0;flex:1}.ai-launch-copy strong{font-size:18px}.ai-launch-copy small{color:rgba(255,255,255,.75);font-size:12px;line-height:1.5}
+.ai-launch-arrow{flex:none;font-size:24px;color:#ffb366}
+.ai-launch-card:hover{transform:translateY(-1px)}

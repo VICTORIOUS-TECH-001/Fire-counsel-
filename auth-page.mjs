@@ -13,7 +13,7 @@ const emailButton = $("#email-signin-button");
 const forgotPasswordButton = $("#forgot-password-button");
 const modeToggle = $("#auth-mode-toggle");
 const requestedNext = new URLSearchParams(location.search).get("next") || "study.html#dashboard";
-const allowedNextFiles = new Set(["study.html", "admin.html", "index.html"]);
+const allowedNextFiles = new Set(["study.html", "admin.html", "index.html", "ai.html"]);
 let authClient;
 let creatingAccount = false;
 const sessionScope = createRequestScope();

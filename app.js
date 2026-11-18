@@ -85,7 +85,7 @@
     $$("#student-nav .nav-link").forEach(link => link.classList.toggle("active", link.dataset.page === valid));
     $("#workspace-label").textContent = "Student workspace";
     $("#breadcrumb-workspace").textContent = "Student";
-    $("#page-breadcrumb").textContent = ({dashboard:"Overview","ai-chat":"Fire Counsel AI",subjects:"My courses",library:"Study library",memory:"Case flashcards",exams:"Past questions",profile:"My profile"})[valid];
+    $("#page-breadcrumb").textContent = ({dashboard:"Overview","ai-chat":"Trusted sources",subjects:"My courses",library:"Study library",memory:"Case flashcards",exams:"Past questions",profile:"My profile"})[valid];
     $("#mode-label").textContent = "LOCAL STUDY";
     closeSidebar();
     if (updateHash && location.hash !== `#${valid}`) history.replaceState(null, "", `#${valid}`);
@@ -308,11 +308,12 @@
   });
   $("#active-course-select").addEventListener("change", async event => {
     activeCourse = event.target.value;
-    $("#chat-course-select").value = activeCourse;
+    const chatCourseSelect = $("#chat-course-select");
+    if (chatCourseSelect) chatCourseSelect.value = activeCourse;
     if (db) await put("settings", {key:"active-course", value:activeCourse});
     toast("Course choice saved locally on this device.");
   });
-  $("#chat-course-select").addEventListener("change", async event => {
+  $("#chat-course-select")?.addEventListener("change", async event => {
     activeCourse = event.target.value;
     $("#active-course-select").value = activeCourse;
     if (db) await put("settings", {key:"active-course", value:activeCourse});
