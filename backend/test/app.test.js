@@ -159,8 +159,9 @@ test("SERVE_WEBSITE accepts true however it was typed, and nothing else", async 
 });
 
 test("health page shows whether the Groq and Tavily keys are set, under any common name, without showing them", async t => {
-  const base = await serve(t, { env: { DATABASE_URL: "x", GROK_API_KEY: "gsk_secret-groq", TRIVILY_API_KEY: "secret-tavily" }, databaseCheck: async () => true });
+  const base = await serve(t, { env: { DATABASE_URL: "x", GROK_API_KEY: "gsk_secret-groq", TRIVILY_API_KEY: "secret-tavily", RENDER_SERVICE_NAME: "fire-counsel-2" }, databaseCheck: async () => true });
   const body = await (await fetch(`${base}/api/health`)).json();
+  assert.equal(body.render_service, "fire-counsel-2");
   assert.equal(body.setup.groq_key, true);
   assert.equal(body.setup.tavily_key, true);
   assert.deepEqual(body.ai_key_notes.map((n) => [n.provider, n.setting_name, Boolean(n.problem)]), [["groq", "GROK_API_KEY", false], ["tavily", "TRIVILY_API_KEY", true]]);

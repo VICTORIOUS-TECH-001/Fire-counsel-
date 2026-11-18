@@ -15,7 +15,11 @@ const TAVILY_URL = "https://api.tavily.com/search";
 // - gemini-2.5-flash-lite still includes Google Search grounding on the free
 //   tier (shared daily limit), so it is the default "researcher".
 export const DEFAULT_GEMINI_MODELS = ["gemini-3.8-flash", "gemini-4-hydrogen", "gemini-3.6-flash", "gemini-3.5-flash-lite"];
-export const DEFAULT_GEMINI_SEARCH_MODELS = ["gemini-2.5-flash-lite"];
+// Since 18 Sept 2026 the 2.5 models only work for projects that used them
+// before (Gemini API release notes), so newer keys get "model not available".
+// Gemini 3+ models share 5,000 free Google Search prompts a month; each one is
+// tried in turn and a model that refuses search on this key is skipped.
+export const DEFAULT_GEMINI_SEARCH_MODELS = ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.6-flash", "gemini-2.5-flash-lite"];
 export const DEFAULT_OPENROUTER_MODELS = ["openrouter/free"];
 // Groq free plan (console.groq.com, 2026): 30 requests/min, 1,000/day and
 // about 8,000 tokens per minute on gpt-oss-120b. Text only (no images/PDFs).
@@ -25,10 +29,30 @@ export const DEFAULT_GROQ_MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"]
 const GROQ_KEY_NAMES = ["GROQ_API_KEY", "GROQ_KEY", "GROK_API_KEY", "GROCK_API_KEY"];
 const TAVILY_KEY_NAMES = ["TAVILY_API_KEY", "TAVILY_KEY", "TRIVILY_API_KEY", "TAVILLY_API_KEY"];
 
-function findKey(env, names) {
+const cleanValue = (value) => String(value || "").trim().replace(/^["']|["']$/g, "").trim();
+
+/**
+ * Finds a key under the usual names first, then under any setting whose name
+ * mentions the service (e.g. "Groq key", "TAVILY"), then by the key's own
+ * prefix (gsk_ / tvly-) whatever the setting is called.
+ */
+function findKey(env, names, { pattern, prefix } = {}) {
   for (const name of names) {
-    const value = String(env[name] || "").trim().replace(/^["']|["']$/g, "");
+    const value = cleanValue(env[name]);
     if (value) return { name, value };
+  }
+  const entries = Object.entries(env || {});
+  if (pattern) {
+    for (const [name, raw] of entries) {
+      const value = cleanValue(raw);
+      if (value && pattern.test(name) && !/MODELS?$|DEPTH|RESULTS|TOKENS/i.test(name)) return { name, value };
+    }
+  }
+  if (prefix) {
+    for (const [name, raw] of entries) {
+      const value = cleanValue(raw);
+      if (value.startsWith(prefix) && value.length > prefix.length + 10) return { name, value };
+    }
   }
   return { name: null, value: "" };
 }
@@ -61,10 +85,10 @@ const list = (value, fallback) => {
 export function aiConfig(env = process.env) {
   const geminiKey = (env.GEMINI_API_KEY || "").trim();
   const openrouterKey = (env.OPENROUTER_API_KEY || "").trim();
-  const groq = findKey(env, GROQ_KEY_NAMES);
+  const groq = findKey(env, GROQ_KEY_NAMES, { pattern: /GRO[QK]|GROCK/i, prefix: "gsk_" });
   // An xAI key under GROK_API_KEY would only ever fail at Groq, so it is not used.
   const groqUsable = Boolean(groq.value) && !groq.value.startsWith("xai-");
-  const tavily = findKey(env, TAVILY_KEY_NAMES);
+  const tavily = findKey(env, TAVILY_KEY_NAMES, { pattern: /TAV+IL|TRIV+IL/i, prefix: "tvly-" });
   return {
     gemini: { configured: Boolean(geminiKey), key: geminiKey, models: list(env.GEMINI_MODELS, DEFAULT_GEMINI_MODELS), searchModels: list(env.GEMINI_SEARCH_MODELS, DEFAULT_GEMINI_SEARCH_MODELS) },
     openrouter: { configured: Boolean(openrouterKey), key: openrouterKey, models: list(env.OPENROUTER_MODELS, DEFAULT_OPENROUTER_MODELS), referer: env.RENDER_EXTERNAL_URL || (env.PUBLIC_HOST ? `https://${env.PUBLIC_HOST}` : "https://fire-counsel.onrender.com") },
@@ -114,9 +138,11 @@ function geminiBody({ system, messages, search, json, maxTokens, temperature }) 
 
 function classifyHttp(status, detail, provider) {
   if (status === 429) return new AiError(429, `${provider} rate limit or free quota reached.`, "PROVIDER_QUOTA", { retryable: true });
-  if (status === 401 || status === 403) return new AiError(502, `${provider} rejected the API key. Check the key in Render.`, "PROVIDER_AUTH", { retryable: true });
-  if (status === 404) return new AiError(502, `${provider} model not available.`, "MODEL_UNAVAILABLE", { retryable: true });
-  if (status >= 500) return new AiError(502, `${provider} is temporarily unavailable.`, "PROVIDER_UNAVAILABLE", { retryable: true });
+  const why = detail ? ` (${provider} said: ${detail})` : "";
+  if (status === 401 || status === 403) return new AiError(502, `${provider} rejected the API key. Create a new key and paste it in Render.${why}`, "PROVIDER_AUTH", { retryable: true });
+  if (status === 402) return new AiError(502, `${provider} says this account has no credit left for this model.${why}`, "PROVIDER_QUOTA", { retryable: true });
+  if (status === 404) return new AiError(502, `${provider} model not available for this key.${why}`, "MODEL_UNAVAILABLE", { retryable: true });
+  if (status >= 500) return new AiError(502, `${provider} is temporarily unavailable (busy or overloaded).${why}`, "PROVIDER_UNAVAILABLE", { retryable: true });
   return new AiError(502, `${provider} could not process the request${detail ? `: ${detail}` : "."}`, "PROVIDER_REJECTED", { retryable: status === 400 });
 }
 
@@ -381,7 +407,7 @@ function searchPhrase(request) {
 // A model that is missing (404), rate-limited or hanging is skipped for a
 // while, so the next student does not wait for it again. When every model is
 // marked unhealthy they are all tried anyway (never refuse outright).
-const SKIP_MS = { MODEL_UNAVAILABLE: 30 * 60_000, PROVIDER_TIMEOUT: 5 * 60_000, PROVIDER_QUOTA: 2 * 60_000, PROVIDER_UNAVAILABLE: 60_000, PROVIDER_AUTH: 10 * 60_000, PROVIDER_MONTHLY_QUOTA: 6 * 60 * 60_000 };
+const SKIP_MS = { SEARCH_UNSUPPORTED: 6 * 60 * 60_000, MODEL_UNAVAILABLE: 30 * 60_000, PROVIDER_TIMEOUT: 5 * 60_000, PROVIDER_QUOTA: 2 * 60_000, PROVIDER_UNAVAILABLE: 60_000, PROVIDER_AUTH: 10 * 60_000, PROVIDER_MONTHLY_QUOTA: 6 * 60 * 60_000 };
 const unhealthy = new Map();
 
 function markModel(model, error, now = Date.now()) {
@@ -391,8 +417,19 @@ function markModel(model, error, now = Date.now()) {
 
 const unhealthyNow = (name, now = Date.now()) => unhealthy.get(name)?.until > now;
 
-function orderModels(models, now = Date.now()) {
-  const healthy = models.filter((model) => !(unhealthy.get(model)?.until > now));
+// A model may write fine but refuse Google Search on this key, so search use
+// is tracked separately ("search:<model>").
+const healthKey = (model, search) => (search ? `search:${model}` : model);
+
+// A 400 that mentions search/grounding/tools means "this model cannot search
+// on this key" — skip it for search for a few hours instead of every time.
+function searchRefusal(error) {
+  return error?.code === "PROVIDER_REJECTED" && /search|ground|tool/i.test(error.message)
+    ? new AiError(error.status, error.message, "SEARCH_UNSUPPORTED", { retryable: true }) : error;
+}
+
+function orderModels(models, now = Date.now(), search = false) {
+  const healthy = models.filter((model) => !(unhealthy.get(healthKey(model, search))?.until > now));
   return healthy.length ? healthy : models;
 }
 
@@ -413,16 +450,16 @@ export async function generate(request, { env = process.env, fetchImpl = fetch }
   if (!config.configured) throw new AiError(503, "No AI provider key is configured on the server.", "AI_NOT_CONFIGURED");
   const errors = [];
   if (config.gemini.configured) {
-    const models = orderModels(request.search ? config.gemini.searchModels : config.gemini.models);
+    const models = orderModels(request.search ? config.gemini.searchModels : config.gemini.models, Date.now(), Boolean(request.search));
     for (const model of models) {
       try {
         if (typeof request.onText === "function") { try { request.onText(""); } catch { /* display only */ } }
         const result = await callGemini(model, request, { key: config.gemini.key, fetchImpl, timeoutMs: request.timeoutMs || config.timeoutMs, idleMs: config.streamIdleMs });
-        unhealthy.delete(model);
+        unhealthy.delete(healthKey(model, request.search));
         return result;
       } catch (error) {
         errors.push(error);
-        markModel(model, error);
+        markModel(healthKey(model, request.search), request.search ? searchRefusal(error) : error);
         if (!(error instanceof AiError) || !error.retryable) {
           if (request.search && config.tavily.configured) break;
           throw error;
@@ -494,7 +531,11 @@ export async function testModels({ env = process.env, fetchImpl = fetch, search 
     for (const model of config.gemini.models) add("gemini", model, "writer", () => callGemini(model, ask, { key: config.gemini.key, fetchImpl, timeoutMs }));
     if (search) {
       for (const model of config.gemini.searchModels) {
-        add("gemini", model, "web search", () => callGemini(model, { search: true, messages: [{ role: "user", text: "Find the official website of the Supreme Court of Nigeria. Reply in one sentence." }], maxTokens: 256 }, { key: config.gemini.key, fetchImpl, timeoutMs: searchTimeoutMs }));
+        add("gemini", model, "web search", async () => {
+          try {
+            return await callGemini(model, { search: true, messages: [{ role: "user", text: "Find the official website of the Supreme Court of Nigeria. Reply in one sentence." }], maxTokens: 256 }, { key: config.gemini.key, fetchImpl, timeoutMs: searchTimeoutMs });
+          } catch (error) { throw searchRefusal(error); }
+        }, { markAs: healthKey(model, true) });
       }
     }
   }
