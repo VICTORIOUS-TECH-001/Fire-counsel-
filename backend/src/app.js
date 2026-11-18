@@ -13,6 +13,7 @@ import { trustedProxyNetworks } from "./config/trustedProxy.js";
 import { createWebsiteHandler } from "./website.js";
 import { createAiRouter } from "./routes/ai.js";
 import { createAdminAiRouter } from "./routes/adminAi.js";
+import { describeProviders } from "./services/ai/providers.js";
 import { createPresenceRouter } from "./routes/presence.js";
 import { describePastedKey, firebaseAdminStatus, getFirebaseAuth } from "./config/firebaseAdmin.js";
 import { createAdminDocumentsRouter } from "./routes/adminDocuments.js";
@@ -131,6 +132,10 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
     const healthy = database === "connected";
     const firebaseAdmin = firebaseAdminStatus(env);
     const firebaseKeyPasted = Boolean(String(env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim());
+    const aiKeys = describeProviders(env);
+    const aiKeyNotes = [["groq", aiKeys.groq], ["tavily", aiKeys.tavily]]
+      .filter(([, info]) => info.key_name && (info.warning || !/^(GROQ|TAVILY)_API_KEY$/.test(info.key_name)))
+      .map(([provider, info]) => ({ provider, setting_name: info.key_name, ...(info.warning ? { problem: info.warning } : {}) }));
     return res.status(healthy ? 200 : 503).json({
       service: "FIRE COUNSEL API",
       status: healthy ? "ok" : "degraded",
@@ -149,8 +154,13 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
         firebase_admin_key: firebaseAdmin.ok,
         gemini_key: Boolean(String(env.GEMINI_API_KEY || "").trim()),
         openrouter_key: Boolean(String(env.OPENROUTER_API_KEY || "").trim()),
+        groq_key: aiKeys.groq.configured,
+        tavily_key: aiKeys.tavily.configured,
         admin_emails: Boolean(String(env.ADMIN_EMAILS || "").trim())
       },
+      // Which Render setting name was found and, if the key looks wrong, why
+      // (names and hints only — never the key itself).
+      ...(aiKeyNotes.length ? { ai_key_notes: aiKeyNotes } : {}),
       timestamp: new Date().toISOString()
     });
   });
