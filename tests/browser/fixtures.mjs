@@ -32,21 +32,6 @@ export async function expectNoHorizontalOverflow(page) {
   }), { message: "Responsive layout fits the viewport without horizontal overflow" }).toMatchObject({ fits: true });
 }
 
-// DIAGNOSTIC: surface the overflowing element in the CI log on failure.
-export async function debugOverflow(page) {
-  const info = await page.evaluate(() => {
-    const viewport = window.innerWidth;
-    const overflowing = [...document.querySelectorAll("body *")].flatMap(element => {
-      const rect = element.getBoundingClientRect();
-      return rect.width > 0 && rect.right > viewport + 0.5
-        ? [{ id: element.id ? `#${element.id}` : element.tagName.toLowerCase(), cls: (element.className && element.className.baseVal === undefined ? String(element.className).slice(0, 40) : ""), right: Math.round(rect.right), width: Math.round(rect.width), scrollW: element.scrollWidth }]
-        : [];
-    }).slice(0, 12);
-    return { viewport, scrollWidth: document.documentElement.scrollWidth, bodyScrollWidth: document.body.scrollWidth, overflowing };
-  });
-  console.log("DEBUG-OVERFLOW " + JSON.stringify(info));
-}
-
 export const student = { uid: "synthetic-student", email: "student@example.invalid", displayName: "Synthetic Student", emailVerified: true, providerData: [{ providerId: "password" }] };
 export const admin = { uid: "synthetic-admin", email: "admin@example.invalid" };
 export const rowId = "223e4567-e89b-42d3-a456-426614174000";
