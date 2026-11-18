@@ -282,6 +282,47 @@ test("timed mock exam: start, answer, auto-save, submit, score, and send essays 
   await expectNoHorizontalOverflow(page);
 });
 
+test("the answer appears word by word while the AI is still writing", async ({ page }) => {
+  await stubAuth(page, { user: student });
+  const conversation = { id: "623e4567-e89b-42d3-a456-426614174000", mode: "chat", title: "Estoppel" };
+  const user = { id: "1", role: "user", status: "done", content: "Explain estoppel", meta: {} };
+  let polls = 0;
+  let finish = false;
+  await page.route("**/api/**", route => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/v1/ai/me") return json(route, { data: { configured: true, web_search: true, email_verified: true, allowance: null } });
+    if (path === `/api/v1/ai/conversations/${conversation.id}`) {
+      polls += 1;
+      const partial = polls === 1 ? "## Estoppel\n\nEstoppel stops a party" : "## Estoppel\n\nEstoppel stops a party from going back on a promise <img src=x onerror=alert(1)>";
+      const message = finish
+        ? { id: "2", role: "assistant", status: "done", content: "## Estoppel\n\nEstoppel stops a party from going back on a promise the other side relied on.", sources: [], meta: {} }
+        : { id: "2", role: "assistant", status: "pending", content: partial, sources: [], meta: { stage: "writing", streaming: true } };
+      return json(route, { data: { conversation, messages: [user, message] } });
+    }
+    if (path === "/api/v1/ai/messages" && request.method() === "POST") return json(route, { data: { conversation, messages: [user, { id: "2", role: "assistant", status: "pending", content: "", sources: [], meta: {} }] } }, 202);
+    if (path === "/api/v1/presence") return route.fulfill({ status: 204 });
+    return json(route, { data: [] });
+  });
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto("/ai.html");
+  await page.locator("#ai-input").fill("Explain estoppel");
+  await page.locator("#ai-send").click();
+  await expect(page.locator(".fc-wait-title")).toHaveText(/Fire is coming/);
+  const streaming = page.locator(".ai-streaming");
+  await expect(streaming.locator("h3")).toHaveText("Estoppel", { timeout: 10_000 });
+  await expect(streaming).toContainText("Writing…");
+  await expect(streaming).toContainText("Estoppel stops a party");
+  await expect(streaming).toContainText("going back on a promise", { timeout: 10_000 });
+  await expect(page.locator(".ai-streaming img")).toHaveCount(0);
+  await expectNoHorizontalOverflow(page);
+  if (process.env.SHOT_DIR) await page.screenshot({ path: `${process.env.SHOT_DIR}/streaming.png` });
+  finish = true;
+  await expect(page.locator(".ai-answer").last()).toContainText("the other side relied on", { timeout: 10_000 });
+  await expect(page.locator(".ai-streaming")).toHaveCount(0);
+  await expect(page.locator("[data-speak='2']")).toBeVisible();
+});
+
 test("the AI page shows a sign-in link when signed out and the study space links to it", async ({ page }) => {
   await stubAuth(page, { user: null });
   await page.goto("/ai.html");

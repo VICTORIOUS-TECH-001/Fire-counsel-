@@ -4,12 +4,12 @@ import { once } from "node:events";
 import { after, before, beforeEach, test } from "node:test";
 import express from "express";
 import { PGlite } from "@electric-sql/pglite";
-import { generate, parseJsonReply, describeProviders } from "../src/services/ai/providers.js";
+import { generate, parseJsonReply, describeProviders, callGemini } from "../src/services/ai/providers.js";
 import { assertPublicUrl, checkLink, extractUrls, isPrivateAddress, termsFrom, verifySources } from "../src/services/ai/linkCheck.js";
 import { composeSystem, loadPrompt, clearPromptCache, BUILT_IN_PROMPTS } from "../src/services/ai/prompts.js";
 import { getAllowance, reserveUsage, finishUsage } from "../src/services/ai/quota.js";
 import { validateAttachments } from "../src/services/ai/attachments.js";
-import { createStudio } from "../src/services/ai/studio.js";
+import { createStudio, libraryPhrases } from "../src/services/ai/studio.js";
 import { createAiRouter } from "../src/routes/ai.js";
 import { createAdminAiRouter } from "../src/routes/adminAi.js";
 import { createPresenceRouter } from "../src/routes/presence.js";
@@ -589,4 +589,168 @@ test("mock exams are validated, timed and stored for the timed-exam screen", asy
   // The marker task uses the lecturer-marking instruction.
   await studio.run("chat", { text: "Q: ... A: ...", options: { task: "marker", webSearch: false } });
   assert.match(requests.at(-1).system, /MARK MY ANSWER/);
+});
+
+// ---------------- speed-ups: streaming, parallel research, smarter search ----------------
+
+function sseResponse(events, { hangAfter = false, signal } = {}) {
+  const encoder = new TextEncoder();
+  const body = new ReadableStream({
+    start(controller) {
+      signal?.addEventListener("abort", () => controller.error(signal.reason || new Error("aborted")));
+      for (const event of events) controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\r\n\r\n`));
+      if (!hangAfter) controller.close();
+    }
+  });
+  return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+}
+
+test("answers stream word by word from Gemini and keep the grounding links", async () => {
+  const urls = [];
+  const fetchImpl = async (url, init) => {
+    urls.push(url);
+    return sseResponse([
+      { candidates: [{ content: { parts: [{ text: "thinking", thought: true }, { text: "Estoppel " }] } }] },
+      { candidates: [{ content: { parts: [{ text: "stops a party " }] } }] },
+      { modelVersion: "gemini-3.8-flash", candidates: [{ finishReason: "STOP", content: { parts: [{ text: "going back on its word." }] },
+        groundingMetadata: { groundingChunks: [{ web: { uri: "https://redirect.example/e", title: "nigerialii.org" } }] } }] }
+    ]);
+  };
+  const seen = [];
+  const result = await generate({ search: true, messages: [{ role: "user", text: "Q" }], onText: (text) => seen.push(text) }, { env: { GEMINI_API_KEY: "k", GEMINI_SEARCH_MODELS: "gemini-3.8-flash" }, fetchImpl });
+  assert.match(urls[0], /:streamGenerateContent\?alt=sse$/);
+  assert.equal(result.text, "Estoppel stops a party going back on its word.");
+  assert.deepEqual(seen.filter(Boolean), ["Estoppel ", "Estoppel stops a party ", "Estoppel stops a party going back on its word."]);
+  assert.equal(result.sources[0].url, "https://redirect.example/e");
+  assert.equal(result.model, "gemini-3.8-flash");
+  // JSON replies (mock exams, case extraction) are never streamed.
+  const plain = [];
+  await generate({ json: true, messages: [{ role: "user", text: "Q" }], onText: () => {} }, { env: { GEMINI_API_KEY: "k", GEMINI_MODELS: "m1" },
+    fetchImpl: async (url) => { plain.push(url); return jsonResponse(200, { candidates: [{ finishReason: "STOP", content: { parts: [{ text: "{}" }] } }] }); } });
+  assert.match(plain[0], /:generateContent$/);
+});
+
+test("a stream that goes silent fails fast instead of waiting the full time limit", async () => {
+  const started = Date.now();
+  await assert.rejects(
+    callGemini("m1", { messages: [{ role: "user", text: "Q" }], onText: () => {} }, { key: "k", timeoutMs: 5_000, idleMs: 80,
+      fetchImpl: async (url, init) => sseResponse([{ candidates: [{ content: { parts: [{ text: "Half an answ" }] } }] }], { hangAfter: true, signal: init.signal }) }),
+    (error) => error.code === "PROVIDER_TIMEOUT" && /middle of the answer/.test(error.message));
+  assert.ok(Date.now() - started < 2_000);
+});
+
+test("several cases are researched at the same time, with a cap for the free quota", async () => {
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const researched = [];
+  const generateFn = async (request) => {
+    if (request.json) return { text: JSON.stringify({ subject: "Contract", cases: [{ name: "Carlill v Carbolic" }, { name: "Balfour v Balfour" }, { name: "Hyde v Wrench" }, { name: "Felthouse v Bindley" }] }), sources: [], provider: "gemini", model: "m" };
+    if (request.search) {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      inFlight -= 1;
+      const name = request.messages[0].text.match(/: ([A-Z]\w+ v \w+)/)[1];
+      researched.push(name);
+      return { text: `Notes on ${name}`, sources: [{ url: `https://src.example/${name.split(" ")[0]}` }], searchQueries: [], provider: "gemini", model: "m" };
+    }
+    request.onText?.("## Partial");
+    const brief = request.messages.at(-1).text;
+    for (const name of ["Carlill", "Balfour", "Hyde", "Felthouse"]) assert.match(brief, new RegExp(`Notes on ${name}`));
+    return { text: "## Four cases", sources: [], provider: "gemini", model: "m" };
+  };
+  const partial = [];
+  const stages = [];
+  const started = Date.now();
+  const result = await createStudio({ db: pool, env: { AI_RESEARCH_PARALLEL: "2" }, generate: generateFn, verify: async (sources) => sources.map((s) => ({ ...s, status: "verified" })) })
+    .run("case", { text: "", attachments: [{ name: "page.png", mimeType: "image/png", data: "AA==" }], onPartial: (text) => partial.push(text), onProgress: (stage, detail) => stages.push(`${stage}:${detail}`) });
+  assert.equal(maxInFlight, 2, "two at a time, not one by one and not all at once");
+  assert.equal(researched.length, 4);
+  assert.ok(Date.now() - started < 4 * 40 + 60, "faster than one after another");
+  assert.equal(result.content.startsWith("## Four cases"), true);
+  assert.deepEqual(partial, ["## Partial"]);
+  assert.ok(stages.includes("researching_case:4 of 4 done"));
+  assert.equal(result.sources.length, 4);
+});
+
+test("chat searches the library and the web at the same time and streams the answer", async () => {
+  const log = [];
+  const slowDb = { query: async (text, values) => {
+    if (!/material_chunks/.test(text)) return pool.query(text, values);
+    log.push("library start");
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    log.push("library end");
+    return { rows: [] };
+  } };
+  const generateFn = async (request) => {
+    if (request.search) {
+      log.push("web start");
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      log.push("web end");
+      return { text: "notes", sources: [], searchQueries: [], provider: "gemini", model: "m" };
+    }
+    request.onText("Partial answer");
+    return { text: "Full answer", sources: [], provider: "gemini", model: "m" };
+  };
+  const partial = [];
+  const result = await createStudio({ db: slowDb, env: {}, generate: generateFn, verify: async () => [] })
+    .run("chat", { text: "What is the rule in Carlill v Carbolic Smoke Ball Co?", onPartial: (text) => partial.push(text) });
+  assert.ok(log.indexOf("web start") < log.indexOf("library end"), `library and web overlap: ${log.join(", ")}`);
+  assert.deepEqual(partial, ["Partial answer"]);
+  assert.match(result.content, /Full answer/);
+});
+
+test("library search also looks for the exact case names, sections and quotes in the question", () => {
+  assert.deepEqual(libraryPhrases("Explain Carlill v. Carbolic Smoke Ball Co and section 36 of the Constitution."), ["Carlill Carbolic Smoke Ball", "section 36 Constitution"]);
+  assert.deepEqual(libraryPhrases('What does "consideration must move from the promisee" mean?'), ["consideration must move from the promisee"]);
+  assert.deepEqual(libraryPhrases("hello"), []);
+});
+
+test("link checks keep their order, run a few at a time and share recent results", async () => {
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const fetchImpl = async (url) => {
+    inFlight += 1;
+    maxInFlight = Math.max(maxInFlight, inFlight);
+    await new Promise((resolve) => setTimeout(resolve, url.endsWith("/0") ? 60 : 5));
+    inFlight -= 1;
+    return new Response("<title>Carlill</title> Carlill", { status: 200, headers: { "content-type": "text/html" } });
+  };
+  const lookup = async () => [{ address: "93.184.216.34", family: 4 }];
+  const sources = Array.from({ length: 10 }, (_, i) => ({ url: `https://site${i}.example/${i}` }));
+  const checked = await verifySources(sources, { terms: ["carlill"], fetchImpl, lookup, concurrency: 3 });
+  assert.deepEqual(checked.map((c) => c.url), sources.map((s) => s.url));
+  assert.equal(maxInFlight, 3);
+  assert.ok(checked.every((c) => c.status === "verified"));
+});
+
+test("while the AI is writing, the partial answer is saved so the page can show it", async t => {
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const studioFactory = () => ({ run: async (mode, input) => {
+    input.onPartial("The rule in Carlill");
+    input.onPartial("The rule in Carlill is that an advert can be an offer");
+    await gate;
+    return { content: "The rule in Carlill is that an advert can be an offer. Done.", sources: [], provider: "gemini", model: "m", meta: {} };
+  } });
+  const request = await serve(t, app => app.use("/api/v1/ai", createAiRouter({ poolProvider: () => pool, verifyToken: stubVerify, env: { GEMINI_API_KEY: "k" }, studioFactory, configured: () => true })));
+  const sent = await (await request("/api/v1/ai/messages", { method: "POST", body: { mode: "chat", text: "Carlill?", options: { webSearch: false } } })).json();
+  const id = sent.data.conversation.id;
+  let last;
+  for (let i = 0; i < 60; i += 1) {
+    last = (await (await request(`/api/v1/ai/conversations/${id}`)).json()).data.messages.at(-1);
+    if (last.content) break;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.equal(last.status, "pending");
+  assert.equal(last.content, "The rule in Carlill is that an advert can be an offer", "only the latest text is saved, not every word");
+  assert.equal(last.meta.streaming, true);
+  release();
+  for (let i = 0; i < 60; i += 1) {
+    last = (await (await request(`/api/v1/ai/conversations/${id}`)).json()).data.messages.at(-1);
+    if (last.status !== "pending") break;
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  }
+  assert.equal(last.status, "done");
+  assert.match(last.content, /Done\.$/);
 });

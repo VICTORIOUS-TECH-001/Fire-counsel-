@@ -172,6 +172,10 @@ function initStudio() {
         return `<div class="ai-msg ai-msg-ai"><span class="ai-avatar">🔥</span><div class="ai-bubble ai-pending" data-stalled="true">${fire}<div class="fc-wait-text"><strong class="fc-wait-title">The fire is taking too long…</strong><span class="fc-wait-stage">The AI service seems overloaded. Your request was not counted if it fails.</span><div class="fc-wait-actions"><button class="button soft" type="button" data-check="true">Check again</button><button class="button primary" type="button" data-retry="${escapeHTML(message.id)}" data-fresh="true">Send again</button></div></div></div></div>`;
       }
       const meta = message.meta || {};
+      if (String(message.content || "").trim()) {
+        // Word-by-word: show the answer as it is being written.
+        return `<div class="ai-msg ai-msg-ai"><span class="ai-avatar">🔥</span><div class="ai-bubble ai-answer ai-streaming" aria-busy="true"><div class="fc-stream-bar" role="status"><span class="fc-stream-flame" aria-hidden="true">🔥</span><strong>Writing…</strong><small data-wait="${escapeHTML(message.id)}">${escapeHTML(waitText(message))}</small></div><div class="ai-markdown">${renderMarkdown(message.content)}</div><span class="fc-caret" aria-hidden="true"></span></div></div>`;
+      }
       const long = mode === "case" || mode === "notes";
       let stage = STAGES[meta.stage] || "Getting ready…";
       if (meta.stage_detail && (meta.stage === "researching_case" || meta.stage === "checking")) stage = meta.stage === "checking" ? `Opening and checking ${meta.stage_detail}…` : `Researching case ${meta.stage_detail}…`;
@@ -231,7 +235,7 @@ function initStudio() {
     }
   }
 
-  function renderThread() {
+  function renderThread({ keepScroll = false } = {}) {
     const workspaceView = messages.length || mode !== "chat" || task ? "chat" : "home";
     document.body.dataset.view = workspaceView;
     if (!messages.length) {
@@ -239,9 +243,12 @@ function initStudio() {
       thread.innerHTML = workspaceView === "home" ? "" : `<div class="ai-empty"><span>🔥</span><strong>${escapeHTML(info.title)}</strong><p>${escapeHTML(info.help)}</p></div>`;
       return;
     }
-    thread.innerHTML = messages.map(messageHtml).join("");
     const scroller = workspace.scrollHeight > workspace.clientHeight ? workspace : thread;
-    scroller.scrollTop = scroller.scrollHeight;
+    // While an answer is being written, only follow it if the student has not scrolled up to read.
+    const follow = !keepScroll || scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 160;
+    thread.innerHTML = messages.map(messageHtml).join("");
+    const after = workspace.scrollHeight > workspace.clientHeight ? workspace : thread;
+    if (follow) after.scrollTop = after.scrollHeight;
     if (messages.some((m) => m.status === "pending" && !stalled.has(m.id)) && !tickTimer) tickTimer = setInterval(tick, 1000);
   }
 
@@ -280,10 +287,12 @@ function initStudio() {
         if (mySession !== session || conversationId !== id) return;
         if (response.ok) {
           const pending = body.data.messages.some((m) => m.status === "pending");
-          const stageOf = (list) => list.map((m) => `${m.id}:${m.status}:${m.meta?.stage || ""}:${m.meta?.stage_detail || ""}`).join("|");
-          if (!pending || stageOf(body.data.messages) !== stageOf(messages)) { messages = body.data.messages; renderThread(); }
+          const stageOf = (list) => list.map((m) => `${m.id}:${m.status}:${m.meta?.stage || ""}:${m.meta?.stage_detail || ""}:${String(m.content || "").length}`).join("|");
+          const streaming = pending && body.data.messages.some((m) => m.status === "pending" && String(m.content || "").trim());
+          if (!pending || stageOf(body.data.messages) !== stageOf(messages)) { messages = body.data.messages; renderThread({ keepScroll: pending }); }
           if (pending && messages.some((m) => stalled.has(m.id))) return;
-          if (pending) return schedulePoll(mySession, id, Math.min(delay + 1000, 6000));
+          // Poll quickly while words are arriving, slower while it is still searching.
+          if (pending) return schedulePoll(mySession, id, streaming ? 1500 : Math.min(delay + 1000, 6000));
           setBusy(false);
           setStatus("Answer ready.", "ok");
           const latest = messages.at(-1);

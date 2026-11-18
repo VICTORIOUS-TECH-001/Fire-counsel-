@@ -36,6 +36,7 @@ export function aiConfig(env = process.env) {
     gemini: { configured: Boolean(geminiKey), key: geminiKey, models: list(env.GEMINI_MODELS, DEFAULT_GEMINI_MODELS), searchModels: list(env.GEMINI_SEARCH_MODELS, DEFAULT_GEMINI_SEARCH_MODELS) },
     openrouter: { configured: Boolean(openrouterKey), key: openrouterKey, models: list(env.OPENROUTER_MODELS, DEFAULT_OPENROUTER_MODELS), referer: env.RENDER_EXTERNAL_URL || (env.PUBLIC_HOST ? `https://${env.PUBLIC_HOST}` : "https://fire-counsel.onrender.com") },
     timeoutMs: Math.min(Math.max(Number(env.AI_TIMEOUT_MS) || 240_000, 10_000), 600_000),
+    streamIdleMs: Math.min(Math.max(Number(env.AI_STREAM_IDLE_MS) || 60_000, 5_000), 300_000),
     configured: Boolean(geminiKey || openrouterKey)
   };
 }
@@ -89,7 +90,105 @@ async function readError(response) {
   }
 }
 
-export async function callGemini(model, request, { key, fetchImpl = fetch, timeoutMs = 240_000 }) {
+function geminiResult(model, data, text, candidate) {
+  const grounding = candidate?.groundingMetadata || {};
+  const sources = (grounding.groundingChunks || [])
+    .map((chunk) => chunk?.web)
+    .filter((web) => web && typeof web.uri === "string")
+    .map((web) => ({ url: web.uri, title: String(web.title || "").slice(0, 300), origin: "google_search" }));
+  return {
+    text,
+    sources,
+    searchQueries: (grounding.webSearchQueries || []).filter((q) => typeof q === "string").slice(0, 30),
+    provider: "gemini",
+    model: data?.modelVersion || model,
+    truncated: candidate?.finishReason === "MAX_TOKENS"
+  };
+}
+
+/**
+ * Streams the answer as it is written (Server-Sent Events) and reports the
+ * text so far through request.onText. Instead of one fixed time limit, the
+ * model must start within timeoutMs and then never go silent for idleMs —
+ * a slow but steady long answer is not cut off, a stuck one fails fast.
+ */
+async function streamGemini(model, request, { key, fetchImpl, timeoutMs, idleMs }) {
+  const controller = new AbortController();
+  let timer = setTimeout(() => controller.abort(new DOMException("first token timeout", "TimeoutError")), timeoutMs);
+  const keepAlive = () => { clearTimeout(timer); timer = setTimeout(() => controller.abort(new DOMException("stream idle", "TimeoutError")), idleMs); };
+  let text = "";
+  let last = null;
+  let lastCandidate = null;
+  try {
+    let response;
+    try {
+      response = await fetchImpl(`${GEMINI_BASE}/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+        body: JSON.stringify(geminiBody(request)),
+        signal: controller.signal
+      });
+    } catch (error) {
+      throw new AiError(504, "Gemini did not respond in time.", "PROVIDER_TIMEOUT", { retryable: true, cause: error });
+    }
+    if (!response.ok) throw classifyHttp(response.status, await readError(response), "Gemini");
+    if (!response.body?.getReader) {
+      // Some proxies return the whole reply at once.
+      const raw = await response.text();
+      const events = raw.split(/\n/).filter((line) => line.startsWith("data:")).map((line) => { try { return JSON.parse(line.slice(5)); } catch { return null; } }).filter(Boolean);
+      for (const data of events) {
+        last = data;
+        lastCandidate = data?.candidates?.[0] || lastCandidate;
+        text += (data?.candidates?.[0]?.content?.parts || []).filter((part) => typeof part.text === "string" && !part.thought).map((part) => part.text).join("");
+      }
+    } else {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      try {
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          keepAlive();
+          buffer += decoder.decode(value, { stream: true });
+          let cut;
+          while ((cut = buffer.search(/\r?\n\r?\n/)) >= 0) {
+            const event = buffer.slice(0, cut);
+            buffer = buffer.slice(cut).replace(/^\r?\n\r?\n/, "");
+            const payload = event.split(/\r?\n/).filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).join("");
+            if (!payload || payload === "[DONE]") continue;
+            let data;
+            try { data = JSON.parse(payload); } catch { continue; }
+            last = data;
+            const candidate = data?.candidates?.[0];
+            if (candidate) lastCandidate = { ...lastCandidate, ...candidate, groundingMetadata: candidate.groundingMetadata || lastCandidate?.groundingMetadata };
+            const piece = (candidate?.content?.parts || []).filter((part) => typeof part.text === "string" && !part.thought).map((part) => part.text).join("");
+            if (piece) {
+              text += piece;
+              try { request.onText(text); } catch { /* progress display only */ }
+            }
+          }
+        }
+      } catch (error) {
+        throw new AiError(504, text ? "Gemini stopped in the middle of the answer." : "Gemini did not respond in time.", "PROVIDER_TIMEOUT", { retryable: true, cause: error });
+      }
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!lastCandidate) {
+    const reason = last?.promptFeedback?.blockReason;
+    throw new AiError(422, reason ? `Gemini declined this request (${reason}).` : "Gemini returned no answer.", "PROVIDER_EMPTY", { retryable: !reason });
+  }
+  text = text.trim();
+  if (!text) {
+    throw new AiError(422, lastCandidate.finishReason === "SAFETY" ? "Gemini declined this request for safety reasons." : "Gemini returned an empty answer.", "PROVIDER_EMPTY", { retryable: lastCandidate.finishReason !== "SAFETY" });
+  }
+  return geminiResult(model, last, text, lastCandidate);
+}
+
+export async function callGemini(model, request, { key, fetchImpl = fetch, timeoutMs = 240_000, idleMs = 60_000 }) {
+  if (typeof request.onText === "function" && !request.json) return streamGemini(model, request, { key, fetchImpl, timeoutMs, idleMs });
   let response;
   try {
     response = await fetchImpl(`${GEMINI_BASE}/${encodeURIComponent(model)}:generateContent`, {
@@ -112,19 +211,7 @@ export async function callGemini(model, request, { key, fetchImpl = fetch, timeo
   if (!text) {
     throw new AiError(422, candidate.finishReason === "SAFETY" ? "Gemini declined this request for safety reasons." : "Gemini returned an empty answer.", "PROVIDER_EMPTY", { retryable: candidate.finishReason !== "SAFETY" });
   }
-  const grounding = candidate.groundingMetadata || {};
-  const sources = (grounding.groundingChunks || [])
-    .map((chunk) => chunk?.web)
-    .filter((web) => web && typeof web.uri === "string")
-    .map((web) => ({ url: web.uri, title: String(web.title || "").slice(0, 300), origin: "google_search" }));
-  return {
-    text,
-    sources,
-    searchQueries: (grounding.webSearchQueries || []).filter((q) => typeof q === "string").slice(0, 30),
-    provider: "gemini",
-    model: data.modelVersion || model,
-    truncated: candidate.finishReason === "MAX_TOKENS"
-  };
+  return geminiResult(model, data, text, candidate);
 }
 
 function openRouterContent(text, attachments = []) {
@@ -209,7 +296,8 @@ export async function generate(request, { env = process.env, fetchImpl = fetch }
     const models = orderModels(request.search ? config.gemini.searchModels : config.gemini.models);
     for (const model of models) {
       try {
-        const result = await callGemini(model, request, { key: config.gemini.key, fetchImpl, timeoutMs: request.timeoutMs || config.timeoutMs });
+        if (typeof request.onText === "function") { try { request.onText(""); } catch { /* display only */ } }
+        const result = await callGemini(model, request, { key: config.gemini.key, fetchImpl, timeoutMs: request.timeoutMs || config.timeoutMs, idleMs: config.streamIdleMs });
         unhealthy.delete(model);
         return result;
       } catch (error) {
