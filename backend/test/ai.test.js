@@ -958,3 +958,71 @@ test("provider error messages include the provider's own reason", async () => {
   assert.match(results[1].error, /rejected the API key.*User not found/);
   resetProviderHealth();
 });
+
+test("a pasted code example or 'Bearer' around a key is cleaned, and a non-key value is explained", async () => {
+  const key = "sk-or-v1-0123456789abcdef0123456789abcdef";
+  const snippet = `fetch("https://openrouter.ai/api/v1/chat/completions", {\n  headers: { "Authorization": "Bearer ${key}" }\n})`;
+  const fromSnippet = describeProviders({ OPENROUTER_API_KEY: snippet });
+  assert.equal(fromSnippet.openrouter.configured, true);
+  assert.match(fromSnippet.openrouter.warning, /extra text around the key/);
+  const seen = [];
+  const fetchImpl = async (url, init) => { seen.push(init.headers.Authorization); return jsonResponse(200, { model: "m", choices: [{ message: { content: "ok" } }] }); };
+  await generate({ messages: [{ role: "user", text: "hi" }] }, { env: { OPENROUTER_API_KEY: snippet }, fetchImpl });
+  await generate({ messages: [{ role: "user", text: "hi" }] }, { env: { OPENROUTER_API_KEY: ` "Bearer ${key}"\u200B ` }, fetchImpl });
+  assert.deepEqual(seen, [`Bearer ${key}`, `Bearer ${key}`]);
+  assert.equal(describeProviders({ OPENROUTER_API_KEY: `Bearer ${key}` }).openrouter.warning, null);
+  assert.match(describeProviders({ OPENROUTER_API_KEY: "openai/gpt-4o" }).openrouter.warning, /start with sk-or-v1-/);
+  assert.match(describeProviders({ GROQ_API_KEY: "Authorization: Bearer gsk_abcdefghijklmnopqrstuvwx" }).groq.warning, /extra text/);
+  assert.equal(describeProviders({ GEMINI_API_KEY: "AIzaSyA0123456789abcdefghijklmnopqrstuv" }).gemini.warning, null);
+});
+
+test("free-plan Gemini 3 search quota (0): one try, all Gemini 3 search models skipped, Tavily searches instead", async () => {
+  const { resetProviderHealth, providerHealth } = await import("../src/services/ai/providers.js");
+  resetProviderHealth();
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    if (url.includes("tavily")) { calls.push({ url, kind: "tavily" }); return jsonResponse(200, { query: "q", results: [{ url: "https://nigerialii.org/x", title: "Case", content: "text", score: 0.9 }] }); }
+    const body = JSON.parse(init.body);
+    calls.push({ url, kind: body.tools ? "gemini-search" : "gemini-write" });
+    if (body.tools) return jsonResponse(429, { error: { message: "Quota exceeded for metric: search_grounding_request, limit: 0" } });
+    return jsonResponse(200, { candidates: [{ finishReason: "STOP", content: { parts: [{ text: "notes from Tavily pages" }] } }] });
+  };
+  const env = { GEMINI_API_KEY: "AIzaSyA0123456789abcdefghijklmnopqrstuv", TAVILY_API_KEY: "tvly-abcdefghijkl" };
+  const first = await generate({ search: true, messages: [{ role: "user", text: "Q" }] }, { env, fetchImpl });
+  assert.equal(first.searchProvider, "tavily");
+  assert.deepEqual(calls.map((c) => c.kind), ["gemini-search", "tavily", "gemini-write"], "the other Gemini 3 models share the same quota and are not tried");
+  const health = providerHealth();
+  for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.6-flash"]) {
+    const row = health.find((h) => h.model === `search:${model}`);
+    assert.equal(row.code, "SEARCH_QUOTA");
+    assert.match(row.message, /FREE Gemini plan[\s\S]*Tavily[\s\S]*limit: 0/);
+    assert.ok(row.retry_in_seconds > 3000);
+  }
+  calls.length = 0;
+  await generate({ search: true, messages: [{ role: "user", text: "Q2" }] }, { env, fetchImpl });
+  assert.deepEqual(calls.map((c) => c.kind), ["tavily", "gemini-write"], "next time Tavily is used straight away");
+  // Without Tavily the student is told why, in plain words.
+  resetProviderHealth();
+  await assert.rejects(generate({ search: true, messages: [{ role: "user", text: "Q" }] }, { env: { GEMINI_API_KEY: env.GEMINI_API_KEY }, fetchImpl }), (error) => error.code === "SEARCH_QUOTA" && /Tavily/.test(error.message));
+  resetProviderHealth();
+});
+
+test("a model closed to new users is skipped for a day; a busy model that never starts is left after the first-token limit", async () => {
+  const { resetProviderHealth, providerHealth } = await import("../src/services/ai/providers.js");
+  resetProviderHealth();
+  const sse = (text) => new Response(`data: ${JSON.stringify({ candidates: [{ finishReason: "STOP", content: { parts: [{ text }] } }] })}\n\n`, { status: 200, headers: { "content-type": "text/event-stream" } });
+  const fetchImpl = (url, init) => {
+    if (url.includes("/old:")) return Promise.resolve(jsonResponse(404, { error: { message: "This model models/old is no longer available to new users." } }));
+    if (url.includes("/busy:")) return new Promise((_, reject) => init.signal.addEventListener("abort", () => reject(init.signal.reason)));
+    return Promise.resolve(sse("streamed answer"));
+  };
+  const started = Date.now();
+  const result = await generate({ messages: [{ role: "user", text: "hi" }], onText: () => {}, timeoutMs: 100_000 }, { env: { GEMINI_API_KEY: "AIzaSyA0123456789abcdefghijklmnopqrstuv", GEMINI_MODELS: "old,busy,good", AI_FIRST_TOKEN_MS: "1000" }, fetchImpl });
+  assert.equal(result.text, "streamed answer");
+  assert.ok(Date.now() - started < 5000, "did not wait the full 100 s for the busy model");
+  const health = providerHealth();
+  assert.equal(health.find((h) => h.model === "old").code, "MODEL_RETIRED");
+  assert.ok(health.find((h) => h.model === "old").retry_in_seconds > 20 * 3600);
+  assert.equal(health.find((h) => h.model === "busy").code, "PROVIDER_TIMEOUT");
+  resetProviderHealth();
+});

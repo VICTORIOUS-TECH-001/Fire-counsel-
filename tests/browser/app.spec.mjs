@@ -448,7 +448,7 @@ test("admin AI panel shows Groq and Tavily keys and a health row for every model
     configured: true,
     gemini: { configured: true, models: ["gemini-3.8-flash"], search_models: ["gemini-2.5-flash-lite"] },
     groq: { configured: true, key_name: "GROQ_API_KEY", warning: null, models: ["openai/gpt-oss-120b", "openai/gpt-oss-20b"] },
-    openrouter: { configured: true, models: ["openrouter/free"] },
+    openrouter: { configured: true, models: ["openrouter/free"], warning: "OpenRouter keys start with sk-or-v1-. What is saved does not look like a key: paste ONLY the key from openrouter.ai/keys (not the TypeScript or REST code)." },
     tavily: { configured: true, key_name: "TRIVILY_API_KEY", warning: "Tavily keys normally start with tvly-. Check that the whole key was pasted.", depth: "basic" }
   };
   const models = [
@@ -476,7 +476,8 @@ test("admin AI panel shows Groq and Tavily keys and a health row for every model
   await expect(status).toContainText("Groq (fast backup)");
   await expect(status).toContainText("Tavily (backup web search)");
   await expect(status).toContainText("TRIVILY_API_KEY");
-  await expect(status.locator(".fc-warn")).toContainText("tvly-");
+  await expect(status.locator(".fc-warn").filter({ hasText: "tvly-" })).toHaveCount(1);
+  await expect(status.locator(".fc-warn").filter({ hasText: "sk-or-v1-" })).toContainText("not the TypeScript or REST code");
   await page.locator("#ai-test-button").click();
   await expect(page.locator("#ai-test-result")).toContainText("Working: Groq (openai/gpt-oss-120b)");
   await expect(page.locator("#ai-test-result")).toContainText("Web search works via Tavily (3 sources)");
