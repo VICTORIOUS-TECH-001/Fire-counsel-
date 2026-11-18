@@ -158,16 +158,17 @@ test("Firestore student pages are owned, validated and publish-gated", async () 
   await assertFails(getDoc(pageRef(otherDb)));
   await assertFails(getDoc(pageRef(anonymousDb)));
 
-  // Publishing flips public readability on; making it private flips it off.
+  // The creation timestamp is immutable for owners and admins alike. The
+  // withSecurityRulesDisabled helper resolves to void, so the seed timestamp is
+  // known and the preserved value is simply reused.
+  const seedCreatedAt = Timestamp.fromMillis(5000);
   await testEnv.withSecurityRulesDisabled(async (context) => {
-    await setDoc(doc(context.firestore(), "studentPages", "test-student"), { ...validStudentPage(), published: true, createdAt: Timestamp.fromMillis(5000), updatedAt: Timestamp.fromMillis(5000) });
+    await setDoc(doc(context.firestore(), "studentPages", "test-student"), { ...validStudentPage(), published: true, createdAt: seedCreatedAt, updatedAt: Timestamp.fromMillis(5000) });
   });
   await assertSucceeds(getDoc(pageRef(anonymousDb)));
 
-  // The creation timestamp is immutable for owners and admins alike.
   await assertFails(setDoc(pageRef(ownerDb), { ...validStudentPage(), published: true, createdAt: Timestamp.fromMillis(9999), updatedAt: serverTimestamp() }));
-  const preserved = await testEnv.withSecurityRulesDisabled(async (context) => (await getDoc(doc(context.firestore(), "studentPages", "test-student"))).data());
-  await assertSucceeds(setDoc(pageRef(ownerDb), { ...validStudentPage(), published: true, createdAt: preserved.createdAt, updatedAt: serverTimestamp() }));
+  await assertSucceeds(setDoc(pageRef(ownerDb), { ...validStudentPage(), published: true, createdAt: seedCreatedAt, updatedAt: serverTimestamp() }));
 
   // The collection cannot be listed by students or visitors.
   await assertFails(getDocs(collection(anonymousDb, "studentPages")));

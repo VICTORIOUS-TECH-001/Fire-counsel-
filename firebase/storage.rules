@@ -2,7 +2,7 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     function signedInAdmin() {
-      return request.auth != null && request.auth.token.admin == true;
+      return request.auth != null && request.auth.token.get('admin', false) == true;
     }
 
     // Homepage photos can be displayed publicly. Only a server-issued Firebase

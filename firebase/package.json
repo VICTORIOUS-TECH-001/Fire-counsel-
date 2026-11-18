@@ -7,7 +7,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test --test-concurrency=1 tests/security.rules.test.mjs",
+    "test": "node --test --test-concurrency=1",
     "test:local": "node --test tests/study-data-compat.test.mjs tests/content-schema.test.mjs",
     "test:rules": "firebase emulators:exec --config ../firebase.json --project demo-fire-counsel-rules --only firestore,storage \"npm test\""
   },
