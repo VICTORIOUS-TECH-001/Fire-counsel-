@@ -441,6 +441,7 @@ test("admin sections navigate correctly and a student cannot unlock database con
 
 test("admin AI panel shows Groq and Tavily keys and a health row for every model", async ({ page }) => {
   await stubAuth(page, { user: admin });
+  let gatewayTimeout = false;
   const providers = {
     configured: true,
     gemini: { configured: true, models: ["gemini-3.8-flash"], search_models: ["gemini-2.5-flash-lite"] },
@@ -461,6 +462,7 @@ test("admin AI panel shows Groq and Tavily keys and a health row for every model
     if (path.endsWith("/catalog")) return json(route, { data: catalog });
     if (path === "/api/v1/presence") return route.fulfill({ status: 204 });
     if (path === "/api/v1/admin/ai/status") return json(route, { data: { providers, skipped_models: [], database: "configured", schema_ready: true, prompts: [], limits: null, today: {}, timezone: "Africa/Lagos" } });
+    if (path === "/api/v1/admin/ai/test" && gatewayTimeout) return route.fulfill({ status: 524, contentType: "text/html", body: "<html>A timeout occurred</html>" });
     if (path === "/api/v1/admin/ai/test") return json(route, { data: { ok: true, provider: "groq", model: "openai/gpt-oss-120b", reply: "FIRE COUNSEL AI is connected.", fallback: true, search: { ok: true, provider: "tavily", model: "tavily", sources: 3 }, models } });
     return json(route, { data: [] });
   });
@@ -484,6 +486,13 @@ test("admin AI panel shows Groq and Tavily keys and a health row for every model
   await expect(rows.nth(3)).toContainText("Tavily");
   await expect(rows.nth(3)).toContainText("3 sources");
   if (process.env.SHOT_DIR) await page.locator("#panel-ai").screenshot({ path: `${process.env.SHOT_DIR}/admin-health.png` });
+  // A gateway timeout is explained in plain words, not "Request failed (524)".
+  gatewayTimeout = true;
+  await page.locator("#ai-test-button").click();
+  await expect(page.locator("#ai-test-result")).toContainText("took too long");
+  await expect(page.locator("#ai-test-result")).toHaveAttribute("data-kind", "error");
+  await expect(page.locator("#ai-test-models tbody tr")).toHaveCount(0);
+  await expect(page.locator("#ai-test-button")).toBeEnabled();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 

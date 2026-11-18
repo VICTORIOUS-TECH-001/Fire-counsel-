@@ -889,3 +889,26 @@ test("admin AI test checks the health of Gemini, Groq, OpenRouter and Tavily one
   assert.deepEqual(body.data.search, { ok: true, provider: "tavily", model: "tavily", sources: 1 });
   resetProviderHealth();
 });
+
+test("the admin AI test checks every service at the same time and never runs past its deadline", async () => {
+  const { resetProviderHealth, testModels } = await import("../src/services/ai/providers.js");
+  resetProviderHealth();
+  const fetchImpl = async (url) => {
+    if (url.includes("/hang:")) return new Promise(() => {}); // never answers, ignores the abort signal
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    if (url.includes("tavily")) return jsonResponse(200, { results: [{ title: "SC", url: "https://supremecourt.gov.ng/", content: "x" }] });
+    if (url.includes("groq") || url.includes("openrouter")) return jsonResponse(200, { model: "m", choices: [{ message: { content: "FIRE COUNSEL AI is connected." } }] });
+    return jsonResponse(200, { candidates: [{ finishReason: "STOP", content: { parts: [{ text: "FIRE COUNSEL AI is connected." }] } }] });
+  };
+  const env = { GEMINI_API_KEY: "g", GEMINI_MODELS: "a,b,c,hang", GROQ_API_KEY: "gsk_x", OPENROUTER_API_KEY: "o", TAVILY_API_KEY: "tvly-x" };
+  const started = Date.now();
+  const results = await testModels({ env, fetchImpl, search: true, deadlineMs: 600 });
+  const took = Date.now() - started;
+  assert.ok(took < 1_000, `finished in ${took} ms (one after another would take over 1 s)`);
+  assert.deepEqual(results.map((r) => [r.provider, r.model, r.ok]), [
+    ["gemini", "a", true], ["gemini", "b", true], ["gemini", "c", true], ["gemini", "hang", false], ["gemini", "gemini-2.5-flash-lite", true],
+    ["groq", "m", true], ["groq", "m", true], ["openrouter", "m", true], ["tavily", "tavily", true]]);
+  assert.equal(results[3].code, "TEST_TIMEOUT");
+  assert.match(results[3].error, /No reply within/);
+  resetProviderHealth();
+});

@@ -479,47 +479,61 @@ export async function generate(request, { env = process.env, fetchImpl = fetch }
 }
 
 /**
- * Admin diagnostics: asks every configured model for a one-line reply, one by
- * one, and reports which work and how long each took.
+ * Admin diagnostics: asks every configured model/service for a one-line reply
+ * AT THE SAME TIME and reports which work and how long each took. Everything
+ * finishes within `deadlineMs` (default 50 s), well under the ~100 s limit of
+ * Render's Cloudflare proxy — a slow model is reported as "still waiting"
+ * instead of making the whole test fail.
  */
-export async function testModels({ env = process.env, fetchImpl = fetch, search = false, timeoutMs = 30_000 } = {}) {
+export async function testModels({ env = process.env, fetchImpl = fetch, search = false, timeoutMs = 25_000, searchTimeoutMs = 40_000, deadlineMs = 50_000 } = {}) {
   const config = aiConfig(env);
   const ask = { messages: [{ role: "user", text: "Reply with exactly this sentence: FIRE COUNSEL AI is connected." }], maxTokens: 64, temperature: 0 };
-  const results = [];
-  const run = async (provider, model, role, call) => {
-    const started = Date.now();
-    try {
-      const reply = await call();
-      unhealthy.delete(model);
-      results.push({ provider, model: reply.model || model, role, ok: true, ms: Date.now() - started, reply: reply.text.slice(0, 120), sources: reply.sources?.length || 0 });
-    } catch (error) {
-      markModel(model, error);
-      results.push({ provider, model, role, ok: false, ms: Date.now() - started, code: error?.code || "ERROR", error: String(error?.message || error).slice(0, 240) });
-    }
-  };
+  const jobs = [];
+  const add = (provider, model, role, call, { markAs = model } = {}) => jobs.push({ provider, model, role, call, markAs });
   if (config.gemini.configured) {
-    for (const model of config.gemini.models) await run("gemini", model, "writer", () => callGemini(model, ask, { key: config.gemini.key, fetchImpl, timeoutMs }));
+    for (const model of config.gemini.models) add("gemini", model, "writer", () => callGemini(model, ask, { key: config.gemini.key, fetchImpl, timeoutMs }));
     if (search) {
       for (const model of config.gemini.searchModels) {
-        await run("gemini", model, "web search", () => callGemini(model, { search: true, messages: [{ role: "user", text: "Find the official website of the Supreme Court of Nigeria. Reply in one sentence." }], maxTokens: 256 }, { key: config.gemini.key, fetchImpl, timeoutMs: Math.max(timeoutMs, 60_000) }));
+        add("gemini", model, "web search", () => callGemini(model, { search: true, messages: [{ role: "user", text: "Find the official website of the Supreme Court of Nigeria. Reply in one sentence." }], maxTokens: 256 }, { key: config.gemini.key, fetchImpl, timeoutMs: searchTimeoutMs }));
       }
     }
   }
   if (config.groq.configured) {
-    for (const model of config.groq.models) await run("groq", model, "fast backup", () => callGroq(model, ask, { key: config.groq.key, fetchImpl, timeoutMs, tokensPerMinute: config.groq.tokensPerMinute }));
-  } else if (config.groq.warning) {
-    results.push({ provider: "groq", model: "—", role: "fast backup", ok: false, ms: 0, code: "BAD_KEY", error: config.groq.warning });
+    for (const model of config.groq.models) add("groq", model, "fast backup", () => callGroq(model, ask, { key: config.groq.key, fetchImpl, timeoutMs, tokensPerMinute: config.groq.tokensPerMinute }));
   }
   if (config.openrouter.configured) {
-    await run("openrouter", config.openrouter.models.join(", "), "backup", () => callOpenRouter(ask, { key: config.openrouter.key, models: config.openrouter.models, referer: config.openrouter.referer, fetchImpl, timeoutMs }));
+    add("openrouter", config.openrouter.models.join(", "), "backup", () => callOpenRouter(ask, { key: config.openrouter.key, models: config.openrouter.models, referer: config.openrouter.referer, fetchImpl, timeoutMs }));
   }
   if (config.tavily.configured) {
     // One basic search = 1 of the 1,000 free monthly credits.
-    await run("tavily", "tavily", "backup web search", async () => {
-      const found = await searchTavily("Supreme Court of Nigeria official website", { key: config.tavily.key, fetchImpl, depth: "basic", maxResults: 3, timeoutMs: Math.max(timeoutMs, 20_000) });
+    add("tavily", "tavily", "backup web search", async () => {
+      const found = await searchTavily("Supreme Court of Nigeria official website", { key: config.tavily.key, fetchImpl, depth: "basic", maxResults: 3, timeoutMs: Math.min(searchTimeoutMs, 30_000) });
       if (!found.results.length) throw new AiError(422, "Tavily answered but found no pages.", "PROVIDER_EMPTY");
       return { text: `${found.results.length} pages found, e.g. ${found.results[0].url}`, sources: found.results, model: "tavily" };
     });
+  }
+  const testStarted = Date.now();
+  let stopTimer;
+  const deadline = new Promise((resolve) => { stopTimer = setTimeout(resolve, deadlineMs); });
+  const results = await Promise.all(jobs.map(async ({ provider, model, role, call, markAs }) => {
+    const started = Date.now();
+    const attempt = (async () => {
+      try {
+        const reply = await call();
+        unhealthy.delete(markAs);
+        return { provider, model: reply.model || model, role, ok: true, ms: Date.now() - started, reply: String(reply.text || "").slice(0, 120), sources: reply.sources?.length || 0 };
+      } catch (error) {
+        markModel(markAs, error);
+        return { provider, model, role, ok: false, ms: Date.now() - started, code: error?.code || "ERROR", error: String(error?.message || error).slice(0, 240) };
+      }
+    })();
+    const late = deadline.then(() => ({ provider, model, role, ok: false, ms: Date.now() - started, code: "TEST_TIMEOUT",
+      error: `No reply within ${Math.round((Date.now() - testStarted) / 1000)} s. It may be overloaded or the model may not exist; students' requests skip it automatically.` }));
+    return Promise.race([attempt, late]);
+  }));
+  clearTimeout(stopTimer);
+  if (!config.groq.configured && config.groq.warning) {
+    results.push({ provider: "groq", model: "—", role: "fast backup", ok: false, ms: 0, code: "BAD_KEY", error: config.groq.warning });
   }
   return results;
 }
