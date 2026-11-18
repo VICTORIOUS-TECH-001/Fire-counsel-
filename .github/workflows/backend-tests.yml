@@ -16,6 +16,12 @@ on:
     branches: [Step-2]
     paths:
       - "backend/**"
+      - "app.js"
+      - "index.html"
+      - "styles.css"
+      - "firebase-client.mjs"
+      - "config.js"
+      - "sw.js"
       - ".github/workflows/backend-tests.yml"
 
 jobs:
