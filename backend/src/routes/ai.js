@@ -100,7 +100,7 @@ export function createAiRouter({
       const allowance = await getAllowance(poolProvider(), req.user.uid, { env, isAdmin: req.user.admin });
       res.json({ data: {
         configured: config.configured,
-        web_search: config.gemini.configured,
+        web_search: config.gemini.configured || config.tavily.configured,
         email_verified: req.user.emailVerified,
         admin: req.user.admin,
         allowance

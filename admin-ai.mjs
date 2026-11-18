@@ -51,7 +51,9 @@ function renderStatus(data) {
     <dt>Google Gemini (main)</dt><dd>${state(p.gemini.configured, "KEY ADDED", "NO KEY")}</dd>
     <dt>Writing models</dt><dd>${escapeHTML(p.gemini.models.join(", "))}</dd>
     <dt>Web-search model</dt><dd>${escapeHTML(p.gemini.search_models.join(", "))}</dd>
+    <dt>Groq (fast backup)</dt><dd>${state(Boolean(p.groq?.configured), "KEY ADDED", "NO KEY")} ${escapeHTML((p.groq?.models || []).join(", "))}${p.groq?.key_name ? ` <small>(${escapeHTML(p.groq.key_name)})</small>` : ""}${p.groq?.warning ? `<br><small class="fc-warn">⚠ ${escapeHTML(p.groq.warning)}</small>` : ""}</dd>
     <dt>OpenRouter (backup)</dt><dd>${state(p.openrouter.configured, "KEY ADDED", "NO KEY")} ${escapeHTML(p.openrouter.models.join(", "))}</dd>
+    <dt>Tavily (backup web search)</dt><dd>${state(Boolean(p.tavily?.configured), "KEY ADDED", "NO KEY")}${p.tavily?.key_name ? ` <small>(${escapeHTML(p.tavily.key_name)})</small>` : ""}${p.tavily?.warning ? `<br><small class="fc-warn">⚠ ${escapeHTML(p.tavily.warning)}</small>` : ""}</dd>
     <dt>Database tables</dt><dd>${state(data.schema_ready, "READY", "NOT INSTALLED")}</dd>
   </dl>${data.schema_ready ? "" : `<p class="fc-status" data-kind="error">The AI tables are not in Neon yet. On GitHub open <b>Actions → “Neon database migration (AI, website, uploads)” → Run workflow</b>.</p>`}`;
   const today = data.today || {};
@@ -125,6 +127,17 @@ $("#ai-prompt-reset")?.addEventListener("click", async () => {
 });
 
 // ---------------------------------------------------------------- test & extract
+const PROVIDER_NAMES = { gemini: "Google Gemini", groq: "Groq", openrouter: "OpenRouter", tavily: "Tavily" };
+
+// One row per model/service: healthy or not, how fast, and why it failed.
+function renderHealth(models) {
+  const holder = $("#ai-test-models");
+  if (!holder) return;
+  if (!models.length) { holder.innerHTML = ""; return; }
+  holder.innerHTML = `<table class="fc-health"><thead><tr><th>Service</th><th>Health</th></tr></thead><tbody>${models.map((m) => `<tr data-ok="${m.ok}">
+    <td><strong>${escapeHTML(PROVIDER_NAMES[m.provider] || m.provider)}</strong><small class="fc-health-job">${escapeHTML(m.role)}</small><code>${escapeHTML(m.model)}</code></td>
+    <td>${m.ok ? `<span class="fc-state" data-ok="true">HEALTHY</span><small>${(m.ms / 1000).toFixed(1)}s${m.sources ? ` · ${m.sources} sources` : ""}</small>` : `<span class="fc-state" data-ok="false">${escapeHTML(String(m.code || "FAILED").replace(/^PROVIDER_/, "").replace(/_/g, " "))}</span><small>${escapeHTML(m.error || "")}</small>`}</td></tr>`).join("")}</tbody></table>`;
+}
 $("#ai-test-button")?.addEventListener("click", async () => {
   const button = $("#ai-test-button");
   button.disabled = true;
@@ -132,10 +145,11 @@ $("#ai-test-button")?.addEventListener("click", async () => {
   try {
     const body = await api("/api/v1/admin/ai/test", { method: "POST", body: JSON.stringify({ search: $("#ai-test-search").checked }) });
     const d = body.data;
-    let text = `Working: ${d.provider === "gemini" ? "Google Gemini" : "OpenRouter backup"} (${d.model}) replied “${d.reply}”.`;
-    if (d.fallback) text += " Gemini did not answer, so the backup was used.";
-    if (d.search) text += d.search.ok ? ` Web search works (${d.search.sources} sources).` : ` Web search failed: ${d.search.error}`;
-    setText("#ai-test-result", text, d.search && !d.search.ok ? "error" : "ok");
+    let text = d.ok ? `Working: ${PROVIDER_NAMES[d.provider] || d.provider} (${d.model}) replied “${d.reply}”.` : "No AI model answered — see the table below.";
+    if (d.fallback) text += " Gemini did not answer, so a backup was used.";
+    if (d.search) text += d.search.ok ? ` Web search works via ${PROVIDER_NAMES[d.search.provider] || d.search.provider} (${d.search.sources} sources).` : ` Web search failed: ${d.search.error}`;
+    setText("#ai-test-result", text, !d.ok || (d.search && !d.search.ok) ? "error" : "ok");
+    renderHealth(d.models || []);
   } catch (error) {
     setText("#ai-test-result", error.message, "error");
   } finally {

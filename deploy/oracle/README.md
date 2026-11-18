@@ -28,6 +28,7 @@ Copy the start script (link 5 above) into a notes app:
 - After `DATABASE_URL=`, paste the Neon connection string.
 - After `GEMINI_API_KEY=`, paste the Gemini key.
 - After `OPENROUTER_API_KEY=`, paste the OpenRouter key (or leave it empty).
+- Optional: add a line `GROQ_API_KEY=` with your Groq key (starts with `gsk_`) and a line `TAVILY_API_KEY=` with your Tavily key (starts with `tvly-`).
 - Replace the line `PASTE THE WHOLE FIREBASE KEY FILE HERE…` with the **whole** Firebase key file (from `{` to `}`).
 
 Do not change anything else, and never put the filled-in copy on GitHub.
