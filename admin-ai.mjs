@@ -127,6 +127,18 @@ $("#ai-prompt-reset")?.addEventListener("click", async () => {
 });
 
 // ---------------------------------------------------------------- test & extract
+// Plain-language reasons when the test itself cannot reach the server.
+function testErrorText(error) {
+  const status = Number(error?.status) || 0;
+  if (status === 524 || status === 504) return "The test took too long and the website's gateway stopped waiting. Press Test again — the server may have been waking up from sleep.";
+  if (status === 502 || (status === 503 && !error.code)) return "The server is starting up or restarting (this happens after a deploy or 15 minutes of no visitors). Wait 1 minute and press Test again.";
+  if (status === 401) return "Your sign-in has expired. Sign out and sign in again, then press Test.";
+  if (status === 403) return "This account is not an administrator, so it cannot run the AI test.";
+  if (status === 429) return "Too many requests in a short time. Wait a few minutes and press Test again.";
+  if (!status) return `Could not reach the server (${error?.message || "network error"}). Check your internet connection and press Test again.`;
+  return error.message;
+}
+
 const PROVIDER_NAMES = { gemini: "Google Gemini", groq: "Groq", openrouter: "OpenRouter", tavily: "Tavily" };
 
 // One row per model/service: healthy or not, how fast, and why it failed.
@@ -141,7 +153,8 @@ function renderHealth(models) {
 $("#ai-test-button")?.addEventListener("click", async () => {
   const button = $("#ai-test-button");
   button.disabled = true;
-  setText("#ai-test-result", "Testing… (web search can take up to a minute)", "");
+  setText("#ai-test-result", "Testing every AI service at the same time… this takes up to 1 minute.", "");
+  if ($("#ai-test-models")) $("#ai-test-models").innerHTML = "";
   try {
     const body = await api("/api/v1/admin/ai/test", { method: "POST", body: JSON.stringify({ search: $("#ai-test-search").checked }) });
     const d = body.data;
@@ -151,7 +164,7 @@ $("#ai-test-button")?.addEventListener("click", async () => {
     setText("#ai-test-result", text, !d.ok || (d.search && !d.search.ok) ? "error" : "ok");
     renderHealth(d.models || []);
   } catch (error) {
-    setText("#ai-test-result", error.message, "error");
+    setText("#ai-test-result", testErrorText(error), "error");
   } finally {
     button.disabled = !verified;
   }
