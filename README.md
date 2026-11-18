@@ -28,15 +28,21 @@ for Nigerian legal education and other common-law jurisdictions.
   statutes, past questions, authority relationships and research sources
 - PostgreSQL full-text retrieval; pgvector columns/indexes are prepared for
   a later semantic retrieval implementation
-- GitHub Actions workflow for backend syntax checks and unit tests
+- GitHub Actions workflow for backend tests and frontend JavaScript syntax checks
 
-## Important integration boundary
+## Student sign-in and Legal AI
 
-The current browser PWA still has no Firebase web sign-in screen or connected
-AI chat interface. The backend is protected and will reject unauthenticated
-requests. This is intentional: Gemini credentials and the legal database must
-never be exposed to anonymous browser code. Complete the Firebase web app
-configuration and sign-in flow before connecting the student chat interface.
+The PWA now includes Firebase Email/Password sign-in and a Legal AI workspace.
+The browser obtains a Firebase ID token and sends it to the protected backend.
+The Firebase web configuration is public client configuration; Gemini keys,
+Firebase service-account credentials and Neon database credentials remain
+server-side only.
+
+Set `window.FIRE_COUNSEL_CONFIG.apiBaseUrl` in `config.js` to the HTTPS URL
+of the deployed Render API. Set the exact deployed frontend origin in the
+backend's `CORS_ORIGINS` environment variable. Until the API URL and Render
+secrets are configured, local study tools continue to work and the AI page
+shows a setup notice.
 
 Admin-only document uploads are not implemented yet. The database design
 preserves the agreed policy: administrators upload approved course materials;
