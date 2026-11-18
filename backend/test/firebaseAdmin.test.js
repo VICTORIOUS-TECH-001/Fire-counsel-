@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
-import { firebaseAdminStatus, parseServiceAccount } from "../src/config/firebaseAdmin.js";
+import { describePastedKey, firebaseAdminStatus, parseServiceAccount } from "../src/config/firebaseAdmin.js";
 
 const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const pem = privateKey.export({ type: "pkcs8", format: "pem" });
@@ -21,7 +21,18 @@ test("accepts the downloaded key file and common phone paste damage", () => {
     realNewlines: json.replace(/\\n/g, "\n"),
     // private_key double-escaped (literal backslash-n characters).
     doubleEscaped: JSON.stringify({ ...account, private_key: pem.replace(/\n/g, "\\n") }),
-    base64: Buffer.from(json).toString("base64")
+    base64: Buffer.from(json).toString("base64"),
+    // Phone viewers and keyboards: curly quotes, non-breaking spaces, zero-width characters.
+    curlyQuotes: json.replace(/"/g, (_, i) => (i % 2 ? "\u201C" : "\u201D")),
+    nbsp: json.replace(/ {2}/g, "\u00A0\u00A0").replace(/: /g, ":\u00A0"),
+    zeroWidth: "\u200B" + json.replace(/,/g, ",\u200B"),
+    // Extra text copied around the file (viewer labels, code fences).
+    viewerLabel: `Pretty-print\n${json}\nfire-counsel-firebase-adminsdk.json`,
+    fenced: "```json\n" + json + "\n```",
+    // Long lines wrapped by a phone viewer: breaks inside the key, email and id.
+    wrapped: json.replace(/(.{37})/g, "$1\n"),
+    // JSON broken beyond repair, but the three needed values are intact.
+    brokenJson: json.replace(/,\n/g, "\n").replace("\"client_id\": \"1\"", "client_id: 1")
   };
   for (const [name, value] of Object.entries(variants)) {
     assert.deepEqual(status(value), { ok: true }, name);
@@ -48,4 +59,16 @@ test("names the exact problem without ever echoing the key", () => {
     assert.doesNotMatch(JSON.stringify(result), /AIza|PRIVATE KEY|gserviceaccount/);
   }
   assert.deepEqual(status(json, "another-project"), { ok: false, code: "project_mismatch" });
+});
+
+test("health details say what was found, never what it is", () => {
+  const cut = describePastedKey(json.slice(0, 900));
+  assert.equal(cut.starts_with_brace, true);
+  assert.equal(cut.ends_with_brace, false);
+  assert.equal(cut.found_project_id, true);
+  assert.equal(cut.found_private_key, false);
+  const full = describePastedKey(json);
+  assert.deepEqual(Object.keys(full).sort(), ["characters", "ends_with_brace", "found_client_email", "found_private_key", "found_project_id", "starts_with_brace"]);
+  assert.equal(full.found_private_key && full.found_client_email && full.ends_with_brace, true);
+  assert.doesNotMatch(JSON.stringify(full), /PRIVATE|fire-counsel|gserviceaccount/);
 });
