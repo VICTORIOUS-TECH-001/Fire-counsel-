@@ -22,18 +22,33 @@ function adminError(code) {
   return Object.assign(new Error(FIREBASE_ADMIN_ERRORS[code]), { code: `firebase-admin/${code}`, reason: code });
 }
 
+// Invisible or "typographic" characters that phone keyboards and text viewers
+// insert when copying. None of them can appear in a real key file.
+function cleanCopiedText(value) {
+  return String(value ?? "")
+    .replace(/[\u200B-\u200D\u2060\uFEFF\u00AD]/g, "")
+    .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, " ")
+    .replace(/[\u201C\u201D\u201E\u201F\u2033\u00AB\u00BB]/g, "\"")
+    .replace(/[\u2018\u2019\u201A\u201B\u2032]/g, "'")
+    .replace(/[\u2028\u2029]/g, "\n");
+}
+
 function unwrap(value) {
-  let text = String(value ?? "").replace(/^\uFEFF/, "").trim();
+  let text = cleanCopiedText(value).trim();
   text = text.replace(/^(?:export\s+)?FIREBASE_SERVICE_ACCOUNT_JSON\s*=\s*/i, "").trim();
   for (let i = 0; i < 2; i += 1) {
     const first = text[0];
     if (text.length > 1 && (first === "\"" || first === "'" || first === "`") && text.at(-1) === first) text = text.slice(1, -1).trim();
   }
-  if (text && !text.startsWith("{") && /^[A-Za-z0-9+/=_\s-]+$/.test(text)) {
+  if (text && !text.includes("{") && /^[A-Za-z0-9+/=_\s-]+$/.test(text)) {
     // Some hosts suggest storing the file base64-encoded; accept that too.
     const decoded = Buffer.from(text.replace(/\s+/g, ""), "base64").toString("utf8").trim();
     if (decoded.startsWith("{")) text = decoded;
   }
+  // Drop anything copied around the file itself (viewer labels, ``` fences).
+  const open = text.indexOf("{");
+  const close = text.lastIndexOf("}");
+  if (open > 0 && close > open) text = text.slice(open, close + 1);
   return text;
 }
 
@@ -49,6 +64,7 @@ function escapeRawNewlinesInStrings(text) {
       if (ch === "\\") { escaped = true; out += ch; continue; }
       if (ch === "\"") { inString = false; out += ch; continue; }
       if (ch === "\n") { out += "\\n"; continue; }
+      if (ch === "\t") { out += "\\t"; continue; }
       if (ch === "\r") continue;
       out += ch;
     } else {
@@ -64,12 +80,45 @@ function parseJson(text) {
   try { return JSON.parse(escapeRawNewlinesInStrings(text)); } catch { return undefined; }
 }
 
+const PEM_PATTERN = /-----BEGIN(RSA)?PRIVATEKEY-----([A-Za-z0-9+/=]+)-----END\1PRIVATEKEY-----/;
+
+// Rebuilds the PEM block even if line breaks were lost, doubled, escaped or
+// inserted at random (long-line wrapping in phone viewers).
+function findPrivateKey(text) {
+  // Whitespace first: a wrapped line can split a "\n" escape into "\" + break + "n".
+  const compact = String(text ?? "").replace(/\s+/g, "").replace(/\\[nr]/g, "");
+  const match = compact.match(PEM_PATTERN);
+  if (!match) return null;
+  const label = match[1] ? "RSA PRIVATE KEY" : "PRIVATE KEY";
+  const body = match[2].match(/.{1,64}/g).join("\n");
+  return `-----BEGIN ${label}-----\n${body}\n-----END ${label}-----\n`;
+}
+
+function findField(text, name) {
+  const compact = text.replace(/\s+/g, "").replace(/\\[nr]/g, "");
+  const match = compact.match(new RegExp(`"${name}":"([^"]+)"`));
+  return match ? match[1] : null;
+}
+
+// Last resort when the JSON itself is broken: the Admin SDK only needs these
+// three values, so pull them out of whatever was pasted.
+function salvageAccount(text) {
+  const projectId = findField(text, "project_id");
+  const clientEmail = findField(text, "client_email");
+  const privateKey = findPrivateKey(text);
+  if (!projectId || !clientEmail || !privateKey) return null;
+  return { type: "service_account", project_id: projectId, client_email: clientEmail, private_key: privateKey };
+}
+
 export function parseServiceAccount(raw) {
   const text = unwrap(raw);
   if (!text) throw adminError("missing_key");
-  if (/\bapiKey\b/.test(text) && /\bauthDomain\b/.test(text)) throw adminError("web_config_not_admin_key");
-  const account = parseJson(text);
-  if (account === undefined) throw adminError(text.startsWith("{") && !text.endsWith("}") ? "key_cut_off" : "invalid_json");
+  if (/\bapiKey\b/.test(text) && /\bauthDomain\b/.test(text) && !/PRIVATE\s*KEY/.test(text)) throw adminError("web_config_not_admin_key");
+  let account = parseJson(text);
+  if (account === undefined) {
+    account = salvageAccount(text);
+    if (!account) throw adminError(text.startsWith("{") && !text.endsWith("}") ? "key_cut_off" : "invalid_json");
+  }
   if (!account || typeof account !== "object" || Array.isArray(account) || account.type !== "service_account") throw adminError("not_a_service_account");
   for (const field of ["project_id", "client_email", "private_key"]) {
     if (typeof account[field] !== "string" || !account[field].trim()) throw adminError("key_incomplete");
@@ -77,12 +126,34 @@ export function parseServiceAccount(raw) {
   let privateKey = account.private_key.replace(/\r/g, "");
   // Double-escaped keys arrive with literal backslash-n instead of line breaks.
   if (!privateKey.includes("\n") && privateKey.includes("\\n")) privateKey = privateKey.replace(/\\n/g, "\n");
-  try { createPrivateKey(privateKey); } catch { throw adminError("private_key_damaged"); }
-  return { ...account, project_id: account.project_id.trim(), client_email: account.client_email.trim(), private_key: privateKey };
+  try { createPrivateKey(privateKey); } catch {
+    const rebuilt = findPrivateKey(privateKey);
+    try { if (!rebuilt) throw new Error(); createPrivateKey(rebuilt); privateKey = rebuilt; } catch { throw adminError("private_key_damaged"); }
+  }
+  return {
+    ...account,
+    project_id: account.project_id.replace(/\s+/g, ""),
+    client_email: account.client_email.replace(/\s+/g, ""),
+    private_key: privateKey
+  };
+}
+
+// Yes/no facts about what was pasted, to tell a bad copy apart from a wrong
+// file. Never includes any part of the key itself.
+export function describePastedKey(raw) {
+  const text = unwrap(raw);
+  return {
+    characters: text.length,
+    starts_with_brace: text.startsWith("{"),
+    ends_with_brace: text.endsWith("}"),
+    found_project_id: Boolean(findField(text, "project_id")),
+    found_client_email: Boolean(findField(text, "client_email")),
+    found_private_key: Boolean(findPrivateKey(text))
+  };
 }
 
 function configuredProjectId(env, account) {
-  const fromEnv = unwrap(env.FIREBASE_PROJECT_ID);
+  const fromEnv = unwrap(env.FIREBASE_PROJECT_ID).replace(/\s+/g, "");
   return fromEnv || account.project_id;
 }
 
