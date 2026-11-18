@@ -45,13 +45,14 @@ def _retrieve_context(question: str, jurisdiction: str,
     query = """
     WITH q AS (SELECT websearch_to_tsquery('english', %s) AS term)
     SELECT kind, title, body, citation, court, year, source_url, verification_status,
-           page_number, course_name
+           legal_status, page_number, course_name, effective_from, effective_to
     FROM (
       SELECT 'material' AS kind, m.title, dc.chunk_text AS body,
              NULL::text AS citation, NULL::text AS court, NULL::integer AS year,
              NULL::text AS source_url, 'context_only'::text AS verification_status,
-             dc.page_number, c.name AS course_name,
-             ts_rank(dc.search_vector, q.term) AS rank
+             'not_applicable'::text AS legal_status, dc.page_number,
+             c.name AS course_name, NULL::date AS effective_from,
+             NULL::date AS effective_to, ts_rank(dc.search_vector, q.term) AS rank
       FROM document_chunks dc
       JOIN materials m ON m.id = dc.material_id
       LEFT JOIN courses c ON c.id = dc.course_id
@@ -62,16 +63,16 @@ def _retrieve_context(question: str, jurisdiction: str,
       UNION ALL
       SELECT 'authority', la.case_name, concat_ws(' ', la.material_facts, la.issues,
              la.holding, la.ratio_decidendi), la.citation, la.court, la.year,
-             la.source_url, la.verification_status, NULL::integer, NULL::text,
-             ts_rank(la.search_vector, q.term)
+             la.source_url, la.verification_status, la.legal_status, NULL::integer,
+             NULL::text, NULL::date, NULL::date, ts_rank(la.search_vector, q.term)
       FROM legal_authorities la CROSS JOIN q
       WHERE la.search_vector @@ q.term
         AND (la.jurisdiction = %s OR la.jurisdiction = 'All')
       UNION ALL
       SELECT 'statute', s.title, concat_ws(' ', s.provision, s.text),
              NULL::text, NULL::text, s.year, s.source_url,
-             s.verification_status, NULL::integer, NULL::text,
-             ts_rank(s.search_vector, q.term)
+             s.verification_status, 'not_applicable'::text, NULL::integer, NULL::text,
+             s.effective_from, s.effective_to, ts_rank(s.search_vector, q.term)
       FROM statutes s CROSS JOIN q
       WHERE s.search_vector @@ q.term
         AND (s.jurisdiction = %s OR s.jurisdiction = 'All')
@@ -103,7 +104,7 @@ def _retrieve_context(question: str, jurisdiction: str,
 
     result = {"materials": [], "authorities": [], "statutes": [], "past_questions": []}
     for row in rows:
-        kind, title, body, citation, court, year, url, status, page, course_name = row
+        kind, title, body, citation, court, year, url, status, legal_status, page, course_name, effective_from, effective_to = row
         if kind == "material":
             result["materials"].append({
                 "title": title, "excerpt": body, "page_number": page,
@@ -113,12 +114,13 @@ def _retrieve_context(question: str, jurisdiction: str,
             result["authorities"].append({
                 "case_name": title, "proposition_context": body, "citation": citation,
                 "court": court, "year": year, "source_url": url,
-                "verification_status": status
+                "verification_status": status, "legal_status": legal_status
             })
         elif kind == "statute":
             result["statutes"].append({
                 "title": title, "provision_text": body, "year": year,
-                "source_url": url, "verification_status": status
+                "source_url": url, "verification_status": status,
+                "effective_from": effective_from, "effective_to": effective_to
             })
     result["past_questions"] = [
         {"question": r[0], "year": r[1], "section": r[2], "course": r[3]}
@@ -129,10 +131,16 @@ def _retrieve_context(question: str, jurisdiction: str,
 
 def _needs_online_research(question: str, evidence: dict) -> bool:
     """Search automatically when the internal authority base is weak or freshness matters."""
-    verified = sum(
+    verified_cases = sum(
         item.get("verification_status") == "verified"
-        for item in evidence.get("authorities", []) + evidence.get("statutes", [])
+        and item.get("legal_status") == "good_law"
+        for item in evidence.get("authorities", [])
     )
+    verified_statutes = sum(
+        item.get("verification_status") == "verified"
+        for item in evidence.get("statutes", [])
+    )
+    verified = verified_cases + verified_statutes
     freshness_terms = (
         "latest", "current law", "recent decision", "recent case",
         "amendment", "as at", "2025", "2026", "overruled", "good law"
