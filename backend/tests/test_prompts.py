@@ -29,7 +29,7 @@ def test_automatic_research_runs_when_authorities_are_missing():
 
 def test_automatic_research_skips_when_sufficient_verified_sources_exist():
     evidence = {
-        "authorities": [{"verification_status": "verified"}],
+        "authorities": [{"verification_status": "verified", "legal_status": "good_law"}],
         "statutes": [{"verification_status": "verified"}],
     }
     assert not _needs_online_research("Explain offer", evidence)
