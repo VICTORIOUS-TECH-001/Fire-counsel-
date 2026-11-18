@@ -30,7 +30,7 @@ export function createAdminAiRouter({
 
   router.get("/status", async (req, res) => {
     const providers = describeProviders(env);
-    const data = { providers, skipped_models: providerHealth(), database: configured() ? "configured" : "not_configured", schema_ready: false, prompts: [], limits: null, today: {}, timezone: timezone(env) };
+    const data = { providers, skipped_models: providerHealth(), database: configured() ? "configured" : "not_configured", schema_ready: false, prompts: [], limits: null, today: {}, timezone: timezone(env), render_service: env.RENDER_SERVICE_NAME ? String(env.RENDER_SERVICE_NAME).slice(0, 100) : null };
     if (!configured()) return res.json({ data });
     try {
       const db = poolProvider();

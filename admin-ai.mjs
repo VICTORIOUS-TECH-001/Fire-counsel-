@@ -56,6 +56,11 @@ function renderStatus(data) {
     <dt>Tavily (backup web search)</dt><dd>${state(Boolean(p.tavily?.configured), "KEY ADDED", "NO KEY")}${p.tavily?.key_name ? ` <small>(${escapeHTML(p.tavily.key_name)})</small>` : ""}${p.tavily?.warning ? `<br><small class="fc-warn">⚠ ${escapeHTML(p.tavily.warning)}</small>` : ""}</dd>
     <dt>Database tables</dt><dd>${state(data.schema_ready, "READY", "NOT INSTALLED")}</dd>
   </dl>${data.schema_ready ? "" : `<p class="fc-status" data-kind="error">The AI tables are not in Neon yet. On GitHub open <b>Actions → “Neon database migration (AI, website, uploads)” → Run workflow</b>.</p>`}`;
+  if (data.render_service && $("#ai-render-service")) $("#ai-render-service").textContent = data.render_service;
+  const missing = ["groq", "tavily"].filter((name) => p[name] && !p[name].configured && !p[name].warning);
+  if (missing.length) {
+    $("#ai-provider-status").insertAdjacentHTML("beforeend", `<p class="fc-status" data-kind="error">The server cannot see the ${missing.map((name) => name === "groq" ? "Groq" : "Tavily").join(" and ")} key${missing.length > 1 ? "s" : ""}. In Render, open the service <b>${escapeHTML(data.render_service || "fire-counsel-2")}</b> (the one this website runs on) → <b>Environment</b> → add ${missing.map((name) => `<code>${name === "groq" ? "GROQ_API_KEY" : "TAVILY_API_KEY"}</code>`).join(" and ")} → <b>Save, rebuild, and deploy</b>.</p>`);
+  }
   const today = data.today || {};
   $("#ai-today").innerHTML = `<dl class="fc-kv">${FEATURES.map(([key, label]) => `<dt>${label}</dt><dd>${today[key]?.used || 0} used${today[key]?.failed ? ` · ${today[key].failed} failed` : ""}</dd>`).join("")}</dl><p>Time zone: ${escapeHTML(data.timezone)}</p>`;
   if (data.limits) {

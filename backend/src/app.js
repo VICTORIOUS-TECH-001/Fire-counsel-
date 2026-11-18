@@ -161,6 +161,9 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
       // Which Render setting name was found and, if the key looks wrong, why
       // (names and hints only — never the key itself).
       ...(aiKeyNotes.length ? { ai_key_notes: aiKeyNotes } : {}),
+      // Render sets this automatically: shows WHICH service's Environment
+      // page the keys must be added to.
+      ...(env.RENDER_SERVICE_NAME ? { render_service: String(env.RENDER_SERVICE_NAME).slice(0, 100) } : {}),
       timestamp: new Date().toISOString()
     });
   });

@@ -100,7 +100,7 @@ test("Gemini is primary: the key goes in a header and grounding links are return
   assert.equal(result.text, "Answer");
   assert.equal(result.provider, "gemini");
   assert.deepEqual(result.sources, [{ url: "https://redirect.example/abc", title: "bailii.org", origin: "google_search" }]);
-  assert.match(calls[0].url, /gemini-2\.5-flash-lite:generateContent$/);
+  assert.match(calls[0].url, /gemini-3\.5-flash-lite:generateContent$/, "newer keys cannot use 2.5 models, so a Gemini 3 model searches first");
   assert.equal(calls[0].url.includes("secret-key"), false);
   assert.equal(calls[0].init.headers["x-goog-api-key"], "secret-key");
   assert.deepEqual(calls[0].body.tools, [{ google_search: {} }]);
@@ -900,7 +900,7 @@ test("the admin AI test checks every service at the same time and never runs pas
     if (url.includes("groq") || url.includes("openrouter")) return jsonResponse(200, { model: "m", choices: [{ message: { content: "FIRE COUNSEL AI is connected." } }] });
     return jsonResponse(200, { candidates: [{ finishReason: "STOP", content: { parts: [{ text: "FIRE COUNSEL AI is connected." }] } }] });
   };
-  const env = { GEMINI_API_KEY: "g", GEMINI_MODELS: "a,b,c,hang", GROQ_API_KEY: "gsk_x", OPENROUTER_API_KEY: "o", TAVILY_API_KEY: "tvly-x" };
+  const env = { GEMINI_API_KEY: "g", GEMINI_MODELS: "a,b,c,hang", GEMINI_SEARCH_MODELS: "gemini-2.5-flash-lite", GROQ_API_KEY: "gsk_x", OPENROUTER_API_KEY: "o", TAVILY_API_KEY: "tvly-x" };
   const started = Date.now();
   const results = await testModels({ env, fetchImpl, search: true, deadlineMs: 600 });
   const took = Date.now() - started;
@@ -910,5 +910,51 @@ test("the admin AI test checks every service at the same time and never runs pas
     ["groq", "m", true], ["groq", "m", true], ["openrouter", "m", true], ["tavily", "tavily", true]]);
   assert.equal(results[3].code, "TEST_TIMEOUT");
   assert.match(results[3].error, /No reply within/);
+  resetProviderHealth();
+});
+
+test("keys are found even under unusual Render setting names, or by their gsk_ / tvly- prefix", () => {
+  const odd = describeProviders({ "Groq key": "gsk_abcdefghijklmnop", MY_SEARCH: "tvly-abcdefghijklmnop", GROQ_MODELS: "x" });
+  assert.deepEqual([odd.groq.configured, odd.groq.key_name, odd.tavily.configured, odd.tavily.key_name], [true, "Groq key", true, "MY_SEARCH"]);
+  const none = describeProviders({ GEMINI_API_KEY: "AIzaSomething", GROQ_MODELS: "openai/gpt-oss-120b" });
+  assert.deepEqual([none.groq.configured, none.tavily.configured], [false, false]);
+});
+
+test("a Gemini model that refuses Google Search on this key is skipped for search, but still writes", async () => {
+  const { resetProviderHealth, providerHealth } = await import("../src/services/ai/providers.js");
+  resetProviderHealth();
+  const urls = [];
+  const fetchImpl = async (url, init) => {
+    urls.push(url);
+    const searching = Boolean(JSON.parse(init.body).tools);
+    if (url.includes("/old:")) return jsonResponse(404, { error: { message: "models/old is not found for API version v1beta" } });
+    if (url.includes("/nosearch:") && searching) return jsonResponse(400, { error: { message: "Search Grounding is not supported for this model." } });
+    return jsonResponse(200, { candidates: [{ finishReason: "STOP", content: { parts: [{ text: "ok" }] }, groundingMetadata: { groundingChunks: [{ web: { uri: "https://x.example/", title: "x" } }] } }] });
+  };
+  const env = { GEMINI_API_KEY: "g", GEMINI_SEARCH_MODELS: "old,nosearch,good", GEMINI_MODELS: "nosearch" };
+  const first = await generate({ search: true, messages: [{ role: "user", text: "Q" }] }, { env, fetchImpl });
+  assert.equal(first.text, "ok");
+  assert.deepEqual(urls.map((u) => u.match(/models\/(\w+):/)[1]), ["old", "nosearch", "good"]);
+  const health = providerHealth();
+  assert.ok(health.some((h) => h.model === "search:nosearch" && h.code === "SEARCH_UNSUPPORTED" && h.retry_in_seconds > 3600));
+  assert.match(health.find((h) => h.model === "search:old").message, /not available for this key.*not found/);
+  urls.length = 0;
+  await generate({ search: true, messages: [{ role: "user", text: "Q2" }] }, { env, fetchImpl });
+  assert.deepEqual(urls.map((u) => u.match(/models\/(\w+):/)[1]), ["good"], "refusing models are skipped next time");
+  urls.length = 0;
+  const written = await generate({ messages: [{ role: "user", text: "write" }] }, { env, fetchImpl });
+  assert.equal(written.model, "nosearch", "the same model still writes answers");
+  resetProviderHealth();
+});
+
+test("provider error messages include the provider's own reason", async () => {
+  const { resetProviderHealth, testModels } = await import("../src/services/ai/providers.js");
+  resetProviderHealth();
+  const fetchImpl = async (url) => url.includes("openrouter")
+    ? jsonResponse(401, { error: { message: "User not found." } })
+    : jsonResponse(503, { error: { message: "The model is overloaded. Please try again later." } });
+  const results = await testModels({ env: { GEMINI_API_KEY: "g", GEMINI_MODELS: "m1", OPENROUTER_API_KEY: "o" }, fetchImpl });
+  assert.match(results[0].error, /busy or overloaded.*The model is overloaded/);
+  assert.match(results[1].error, /rejected the API key.*User not found/);
   resetProviderHealth();
 });
