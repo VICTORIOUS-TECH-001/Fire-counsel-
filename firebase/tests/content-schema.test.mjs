@@ -5,9 +5,12 @@ import {
   SITE_CONTENT_LIMITS,
   STUDENT_PAGE_LIMITS,
   cleanStudentPage,
+  siteContentFromDocument,
   validateSiteContent,
   validateStudentPage
 } from "../content-schema.mjs";
+
+import { DEFAULT_WORKSPACE } from "../../workspace-config.mjs";
 
 const bundled = JSON.parse(readFileSync(new URL("../../data/site-content.json", import.meta.url), "utf8"));
 
@@ -43,6 +46,47 @@ test("site content rejects missing sections, extra sections and bad brands", () 
   const unnamed = structuredClone(bundled);
   unnamed.brand.name = "";
   assert.equal(validateSiteContent(unnamed).ok, false);
+});
+
+test("stored site content strips only Firestore metadata, never unknown editor fields", () => {
+  const document = { ...bundled, updatedAt: { seconds: 1234 }, updatedBy: "synthetic-admin" };
+  assert.deepEqual(siteContentFromDocument(document), bundled);
+  assert.equal(validateSiteContent(document).ok, false, "editors cannot supply server-owned metadata");
+  assert.equal(siteContentFromDocument({ ...document, privateKeys: {} }), null);
+  assert.equal(siteContentFromDocument({ ...document, hero: {} }), null);
+  assert.equal(siteContentFromDocument(null), null);
+  assert.equal(document.updatedBy, "synthetic-admin", "the stored snapshot is not mutated");
+});
+
+test("the optional workspace section can publish with homepage content and is bounded", () => {
+  const content = { ...bundled, workspace: structuredClone(DEFAULT_WORKSPACE) };
+  assert.deepEqual(validateSiteContent(content), { ok: true, errors: [] });
+  assert.deepEqual(siteContentFromDocument({ ...content, updatedAt: {}, updatedBy: "admin" }), content);
+  for (const workspace of [null, [], "not a map", { notices: ["x".repeat(SITE_CONTENT_LIMITS.DEEP_STRING + 1)] }, { menu: Array(41).fill({}) }]) {
+    assert.equal(validateSiteContent({ ...bundled, workspace }).ok, false);
+  }
+});
+
+test("nested field whitelists and required text match the shared homepage publishing schema", () => {
+  for (const change of [
+    c => { c.brand.extra = true; },
+    c => { delete c.brand.markAlt; },
+    c => { c.brand.tagline = null; },
+    c => { c.brand.name = 123; },
+    c => { c.navigation[0].extra = true; },
+    c => { delete c.navigation[0].href; },
+    c => { c.navigation[0].label = 123; },
+    c => { c.hero.extra = true; },
+    c => { c.hero.slides[0].eyebrow = null; },
+    c => { c.hero.slides[0].title = 123; },
+    c => { c.hero.slides[0].primaryLabel = null; }
+  ]) {
+    const copy = structuredClone(bundled);
+    change(copy);
+    const result = validateSiteContent(copy);
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.length, "bad imports produce a validation message, not a TypeError");
+  }
 });
 
 test("slide validation bounds counts, text sizes, images and links", () => {

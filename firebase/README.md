@@ -1,11 +1,11 @@
 # Firebase browser configuration and Auth
 
 `firebase/firebase-config.mjs` is the Web configuration the browser actually loads.
-It already names the `fire-counsel` project, Auth domain, bucket, app ID and
-measurement ID. The Web API key is still a placeholder until you paste `apiKey`
-from **Firebase Console → Project settings → General → Your apps → Config**.
-Commit that public key with the site. It identifies the app; it is not an admin
-credential and it does not replace Security Rules or the Admin SDK.
+It already includes the `fire-counsel` project's public Web API key, Auth domain,
+bucket, app ID and measurement ID. Confirm these against **Firebase Console →
+Project settings → General → Your apps → Config** if the project changes. The
+Web key identifies the app; it is not an admin credential and does not replace
+Security Rules or the Admin SDK. Do not replace it with a provider/private key.
 
 `client.mjs` initializes the Firebase Web SDK only after that key is present.
 `auth-client.mjs` implements Google-only popup sign-in (redirect when the popup is blocked or the page is inside a frame),
@@ -14,11 +14,15 @@ verification emails, reauthenticated security changes for existing linked accoun
 changes. Email registration/sign-in/reset helpers and the corresponding auth UI are removed. It supplies Firebase ID-token headers and a persisted installation
 marker for protected student same-origin `/api/...` calls. `auth.html` is
 the shared sign-in page; the admin page requests `/api/v1/admin/me` and treats
-the backend response—not a browser claim—as authoritative. It does not grant
-admin claims. Publishing homepage content (incl. slides) and student-page
-editing write directly to Firestore; the deployed security rules re-verify the
-Google session and admin claim or document ownership on every request, so a manipulated UI
-cannot widen access.
+the backend response—not a browser claim—as authoritative. Its one-time admin
+button calls a server endpoint restricted to verified `ADMIN_EMAILS`; the browser
+cannot choose its own claim. Homepage publishing (including slides, restores and
+workspace changes) calls the Google/admin-protected **POST `/api/v1/admin/site/firebase`**.
+The API fully validates the shared schema and owns timestamps/UID before writing
+with the Admin SDK. **Every browser homepage write is denied**, including admin
+writes: full-size validation exceeded the 1,000-expression rules budget. Student-page
+editing remains direct to Firestore; deployed rules independently re-verify the
+Google session and admin claim or ownership. A manipulated UI cannot widen access.
 
 The provided config confirms the project ID, Auth domain, Storage bucket, app
 ID and measurement ID. It does **not** verify the live project's Firestore
@@ -49,12 +53,12 @@ just to turn the provider on.
    user (or publish the app). Otherwise Google refuses the account even though
    Firebase shows Google as enabled. Also confirm the browser API key allows
    this site and the Identity Toolkit API (**APIs & Services → Credentials**).
-5. Open **Project settings → General → Your apps → Config**. In
-   `firebase/firebase-config.mjs`, replace `REPLACE_WITH_FIREBASE_WEB_API_KEY`
-   with that `apiKey`. Keep `authDomain` as `fire-counsel.firebaseapp.com` unless
-   Firebase Hosting gives you a different one. Publish this file with the site.
-   The old ignored `firebase-config.local.mjs` is not loaded anymore; a key that
-   exists only on one computer never reaches the sign-in page.
+5. Open **Project settings → General → Your apps → Config** and verify the
+   committed `firebase/firebase-config.mjs` matches this Web app. The actual
+   public `apiKey` is already present. Keep `authDomain` as
+   `fire-counsel.firebaseapp.com` unless a reviewed Firebase setup changes it.
+   Publish this file with the site; the ignored `firebase-config.local.mjs` is
+   not loaded. Server/provider credentials must never go in either Web config.
 6. Open `/auth.html` and choose **Continue with Google**. Allow popups. If the
    page is inside a frame, or the popup is blocked, the same button uses redirect
    sign-in instead. A normal first success creates the user under
@@ -161,10 +165,14 @@ cleanup does not clear browser study data, and that the shared Firestore
 content validators (`content-schema.mjs`) accept the bundled homepage content
 while rejecting malformed slides, links, images and student pages. `npm run test:rules` runs the Firestore
 and Storage suite against local emulators using a `demo-` project ID; it covers
-anonymous/student/admin reads and writes, the validated admin `siteContent`
-publish path (including forged metadata and unsafe slide images/links),
-`studentPages` owner-write/publish-gating/immutable-createdAt rules, slide
-upload type/size, public reads, and admin-only deletion. It never targets the
+anonymous/student/admin reads, universal `siteContent` browser-write denial,
+trusted full 12-slide/8-link server-seeded content, `studentPages`
+owner/admin writes, publish gating, immutable timestamps, exact fields and
+maximum sizes, plus slide upload type/size, public reads and admin-only deletion.
+The backend API tests separately exercise verified Google/admin authorization,
+full homepage schema/Unicode/metadata validation, fixed path/project, byte caps,
+safe failures and independence from Neon; they use injected Admin SDK boundaries,
+not live credentials. It never targets the
 live Firebase project.
 
 The root `npm test` and `npm run test:browser` additionally cover page wiring,
@@ -175,11 +183,26 @@ flows. Browser stubs do not test live Firebase sign-in, real provider linking or
 verification/reset/change-email delivery. The profile SQL tests use in-memory
 PGlite, not Neon; no tests automatically run the migration against a live database.
 
-The six security-rule scenarios **passed in the Java 21 GitHub Actions job**
-against the demo-project emulators. The emulator command also reruns three local
-study-compatibility tests. Java 21+ is still absent from this sandbox, so the
-rules command cannot start here; the successful emulator run is remote CI,
-not verification of the active Firebase project.
+The security-rule scenarios run in the **Java 21 GitHub Actions job** against
+demo-project emulators, including optional workspace content and denied homepage
+writes from **every** browser session, including Google administrators. The command also reruns the local schema and
+study-compatibility tests. Java 21+ is absent from this sandbox, so current rule
+gate results must be read from CI (see [STATUS.md](../STATUS.md)); they do not
+verify or deploy the active Firebase project.
+
+For the exact **Firestore Database → Rules** and separate **Storage → Rules**
+console steps, admin-claim refresh, runtime AI-key diagnostics and Render group
+linkage, see [deployment troubleshooting](../DEPLOYMENT.md#5-groqtavily-still-show-false-after-saving-keys).
+A browser permission denial is not proof of a missing connection. **Deploy the
+matching frontend and API before publishing these rules**; the legacy direct
+browser publisher will be denied. Keep the repository root in the API deployment
+(the backend imports the shared schema). The Admin SDK bypasses rules and needs
+matching service-account IAM access, an enabled Firestore API and an existing
+`(default)` database; `/api/health` checks credentials locally, not those live
+permissions. Published content is read without its server-owned metadata.
+Homepage and workspace share the same primary/Neon archive channels, but primary
+publishing does not require the archive. Unconfirmed replies never claim rollback
+or trigger archiving. Rules never grant an administrator claim by themselves.
 
 Storage download tests compare the SDK's ArrayBuffer through a Uint8Array.
 Deletion tests require student/anonymous permission denials, confirm that those

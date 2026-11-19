@@ -1,10 +1,12 @@
-// Website editing with preview and publish, stored in Neon (Firebase Storage
-// now needs the paid Blaze plan).
+// Website publishing: primary Firestore content through the verified admin
+// API; Neon keeps drafts, archives, public JSON fallback and slide photos.
 //
-//  Admin:   GET  /api/v1/admin/site                 draft, published, versions
+//  Admin:   POST /api/v1/admin/site/firebase        validated primary publish
+//           GET  /api/v1/admin/site                 Neon draft, fallback, versions
 //           PUT  /api/v1/admin/site/draft           save the draft (not public)
-//           POST /api/v1/admin/site/publish         make content live
-//           POST /api/v1/admin/site/versions/:id/restore
+//           POST /api/v1/admin/site/publish         Neon archive/fallback only
+//           GET  /api/v1/admin/site/versions/:id    archive for browser Firebase restore
+//           POST /api/v1/admin/site/versions/:id/restore  legacy Neon fallback only
 //           POST /api/v1/admin/site/images          raw JPG/PNG/WEBP -> /media/<id>.<ext>
 //  Public:  GET  /data/site-content.json            published content (falls back to the bundled file)
 //           GET  /media/<id>.<ext>                  slideshow photos
@@ -12,6 +14,9 @@ import express from "express";
 import { getPool } from "../config/database.js";
 import { verifyFirebaseToken } from "../middleware/verifyFirebaseToken.js";
 import { requireAdmin } from "../middleware/requireAdmin.js";
+import { FieldValue } from "firebase-admin/firestore";
+import { getFirebaseFirestore } from "../config/firebaseAdmin.js";
+import { validateSiteContent as validatePublicSiteContent } from "../../../firebase/content-schema.mjs";
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const UUID_RE = new RegExp(`^${UUID}$`, "i");
@@ -111,10 +116,54 @@ export function createAdminSiteRouter({
   verifyToken = verifyFirebaseToken,
   adminGate = requireAdmin,
   configured = () => Boolean(process.env.DATABASE_URL),
-  onPublish = () => {}
+  onPublish = () => {},
+  firestoreProvider = getFirebaseFirestore,
+  firestoreTimestamp = () => FieldValue.serverTimestamp()
 } = {}) {
   const router = express.Router();
   router.use(verifyToken, adminGate);
+
+  // Full 12-slide/8-link validation exceeds Firestore's 1000-expression rule
+  // budget. Validate the complete shared schema here, behind verified Google
+  // tokens and admin claims, and deny ALL browser writes in the deployed rules.
+  // This primary publish is deliberately independent of the Neon archive.
+  router.post("/firebase", async (req, res) => {
+    const body = req.body;
+    if (!body || typeof body !== "object" || Array.isArray(body)
+      || Object.keys(body).some(key => !["content", "projectId"].includes(key))
+      || typeof body.projectId !== "string" || !body.projectId) {
+      return res.status(400).json({ error: "Supply content and the matching Firebase projectId only.", code: "VALIDATION_ERROR" });
+    }
+    const check = validatePublicSiteContent(body.content);
+    if (!check.ok) return res.status(400).json({ error: check.errors[0], code: "VALIDATION_ERROR" });
+    if (Buffer.byteLength(JSON.stringify(body.content)) > MAX_CONTENT_BYTES) {
+      return res.status(413).json({ error: "Website content must stay under 512 KB. Upload photos instead of embedding them.", code: "CONTENT_TOO_LARGE" });
+    }
+    try {
+      const db = firestoreProvider();
+      if (db.projectId !== body.projectId) {
+        return res.status(409).json({ error: "The API and website use different Firebase projects. Match FIREBASE_PROJECT_ID and the service account to the website's fire-counsel project.", code: "FIREBASE_PROJECT_MISMATCH" });
+      }
+      await db.doc("siteContent/public").set({
+        ...body.content,
+        updatedAt: firestoreTimestamp(),
+        updatedBy: req.user.uid
+      });
+      return res.json({ data: { published: true, channel: "firestore" } });
+    } catch (error) {
+      const code = String(error?.code || "").toLowerCase();
+      if (["7", "permission-denied", "5", "not-found"].includes(code)) {
+        return res.status(503).json({ error: "The server could not write Firestore. Check service-account IAM access, the Firestore API and the (default) database in the matching Firebase project. Browser rules do not grant the Admin SDK access.", code: "FIRESTORE_ACCESS_DENIED" });
+      }
+      if (code.startsWith("firebase-admin/") || code.startsWith("app/") || ["16", "unauthenticated"].includes(code)) {
+        return res.status(503).json({ error: "The server's Firebase Admin credentials are not usable. Check FIREBASE_SERVICE_ACCOUNT_JSON and FIREBASE_PROJECT_ID privately in Render; /api/health shows local setup diagnostics.", code: "FIREBASE_ADMIN_NOT_READY" });
+      }
+      // Never reflect SDK messages/details: they can contain private request or
+      // credential data. An unavailable/ambiguous response is not a rollback.
+      return res.status(503).json({ error: "Firebase publishing was not confirmed. Check Firestore availability and reload the live content before trying again.", code: "FIREBASE_PUBLISH_UNCONFIRMED" });
+    }
+  });
+
   router.use((req, res, next) => {
     if (!configured()) return res.status(503).json({ error: "Neon is not configured on this server.", code: "DATABASE_NOT_CONFIGURED" });
     return next();
@@ -184,6 +233,17 @@ export function createAdminSiteRouter({
       const note = typeof req.body?.note === "string" && req.body.note.trim() ? req.body.note.trim().slice(0, 200) : null;
       res.json({ data: await publish(content, note, req) });
     } catch (error) { failResponse(res, error); }
+  });
+
+  // Read an archive before the browser restores it to the primary Firestore
+  // channel. A Neon-only restore would be hidden by an existing live document.
+  router.get("/versions/:id", async (req, res) => {
+    if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: "Version not found.", code: "NOT_FOUND" });
+    try {
+      const { rows } = await poolProvider().query("SELECT content, created_at FROM site_content_versions WHERE id = $1", [req.params.id]);
+      if (!rows.length) return res.status(404).json({ error: "Version not found.", code: "NOT_FOUND" });
+      return res.json({ data: rows[0] });
+    } catch (error) { return failResponse(res, error); }
   });
 
   router.post("/versions/:id/restore", async (req, res) => {

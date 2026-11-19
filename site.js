@@ -75,10 +75,7 @@
     // never hold the homepage hostage.
     try {
       const { loadPublicSiteContent } = await import("./firebase/firestore-client.mjs");
-      const live = await Promise.race([
-        loadPublicSiteContent(),
-        new Promise(resolve => setTimeout(() => resolve(null), 2500))
-      ]);
+      const live = await loadPublicSiteContent(); // client time-boxes the read
       if (live) return live;
     } catch { /* Firebase not configured or unreachable — bundled content below */ }
     const response = await fetch("./data/site-content.json", {cache:"no-cache"});

@@ -135,6 +135,12 @@ export function aiConfig(env = process.env) {
   };
 }
 
+// Canonical setting presence in THIS process, not a provider authentication
+// check. Never return values, lengths, fragments or hashes of credentials.
+function runtimeSetting(env, name) {
+  return { name, state: env[name] === undefined ? "missing" : cleanValue(env[name]) ? "present" : "empty" };
+}
+
 // Public, secret-free description for the admin status panel.
 export function describeProviders(env = process.env) {
   const config = aiConfig(env);
@@ -142,8 +148,8 @@ export function describeProviders(env = process.env) {
     configured: config.configured,
     gemini: { configured: config.gemini.configured, warning: config.gemini.warning, models: config.gemini.models, search_models: config.gemini.searchModels },
     openrouter: { configured: config.openrouter.configured, warning: config.openrouter.warning, models: config.openrouter.models },
-    groq: { configured: config.groq.configured, key_name: config.groq.keyName, warning: config.groq.warning, models: config.groq.models },
-    tavily: { configured: config.tavily.configured, key_name: config.tavily.keyName, warning: config.tavily.warning, depth: config.tavily.depth }
+    groq: { configured: config.groq.configured, key_name: config.groq.keyName, runtime_setting: runtimeSetting(env, "GROQ_API_KEY"), warning: config.groq.warning, models: config.groq.models },
+    tavily: { configured: config.tavily.configured, key_name: config.tavily.keyName, runtime_setting: runtimeSetting(env, "TAVILY_API_KEY"), warning: config.tavily.warning, depth: config.tavily.depth }
   };
 }
 

@@ -1,6 +1,6 @@
 // Student workspace (study.html): applies the administrator's workspace
-// settings (Admin → Student workspace, saved in Neon with the website
-// content), and runs the dashboard's planner, progress, deadlines,
+// settings (Admin → Student workspace, live in Firestore with a Neon fallback),
+// and runs the dashboard's planner, progress, deadlines,
 // notifications and the quick "Ask Fire Counsel AI" box.
 // Personal planner tasks stay in this browser (localStorage) only.
 import { mergeWorkspace, menuHTML, tilesHTML, linkAttrs, icon, escapeHTML, daysUntil, dueLabel, pageOf } from "./workspace-config.mjs";
@@ -219,9 +219,16 @@ async function loadConfig() {
   const cached = store.read(CONFIG_CACHE_KEY, null);
   if (cached) apply(cached);
   try {
-    const response = await fetch("./data/site-content.json", { cache: "no-cache" });
-    if (!response.ok) return;
-    const content = await response.json();
+    let content = null;
+    try {
+      const { loadPublicSiteContent } = await import("./firebase/firestore-client.mjs");
+      content = await loadPublicSiteContent();
+    } catch { /* offline/unconfigured: use the same Neon/bundled fallback as the homepage */ }
+    if (!content) {
+      const response = await fetch("./data/site-content.json", { cache: "no-cache" });
+      if (!response.ok) return;
+      content = await response.json();
+    }
     const workspace = content && typeof content === "object" ? content.workspace || null : null;
     store.write(CONFIG_CACHE_KEY, workspace);
     if (JSON.stringify(workspace) !== JSON.stringify(cached)) apply(workspace);

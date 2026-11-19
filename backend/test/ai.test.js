@@ -915,6 +915,27 @@ test("web search still works with Groq + Tavily even when the Gemini key is wron
   resetProviderHealth();
 });
 
+test("a nonempty unprefixed Tavily credential is sent unchanged, not rejected as missing", async t => {
+  const { resetProviderHealth } = await import("../src/services/ai/providers.js");
+  resetProviderHealth();
+  t.after(resetProviderHealth);
+  const bare = "synthetic-unprefixed-tavily-credential";
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, authorization: init.headers.Authorization });
+    if (url.includes("api.tavily.com")) return jsonResponse(200, { results: [{ url: "https://example.org/report", title: "Synthetic report", content: "Verified test content" }] });
+    return jsonResponse(200, { model: "synthetic-model", choices: [{ message: { content: "Answer with sources" } }] });
+  };
+  const env = { GROQ_API_KEY: "gsk_synthetic", TAVILY_API_KEY: bare };
+  const result = await generate({ search: true, messages: [{ role: "user", text: "Find a report" }] }, { env, fetchImpl });
+  assert.equal(result.searchProvider, "tavily");
+  assert.equal(calls.find(call => call.url.includes("api.tavily.com")).authorization, `Bearer ${bare}`);
+  const info = describeProviders(env);
+  assert.equal(info.tavily.configured, true);
+  assert.deepEqual(info.tavily.runtime_setting, { name: "TAVILY_API_KEY", state: "present" });
+  assert.doesNotMatch(JSON.stringify(info), /synthetic-unprefixed/);
+});
+
 test("key names are forgiving, wrong keys are explained, and no key is ever shown", () => {
   const xai = describeProviders({ GROK_API_KEY: "xai-secret", TAVILY_KEY: "secret-no-prefix", GEMINI_API_KEY: "g" });
   assert.equal(xai.groq.configured, false);

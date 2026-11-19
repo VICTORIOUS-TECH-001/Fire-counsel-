@@ -84,7 +84,15 @@ test("students can edit and reload their own name as safe text, without identity
   expect(api.requests.find(request => request.method === "PATCH").body).toEqual({ full_name: name });
   await page.locator("#student-nav [data-page=dashboard]").click();
   await expect(page.locator("#profile-role")).toHaveText("Student profile · this browser");
-  await page.reload();
+  // Rehydrate from the actual GET after reload, not a prior document or a
+  // background tab's throttled render frame. The API and text checks remain strict.
+  await page.bringToFront();
+  const [reloaded] = await Promise.all([
+    page.waitForResponse(response => response.url().endsWith("/api/v1/profile") && response.request().method() === "GET"),
+    page.reload()
+  ]);
+  expect(reloaded.ok()).toBe(true);
+  expect((await reloaded.json()).data.full_name).toBe(name);
   await expect(page.locator("#student-profile-name")).toHaveText(name);
   const storage = await page.evaluate(() => JSON.stringify({ ...localStorage }));
   expect(storage).not.toContain(name);

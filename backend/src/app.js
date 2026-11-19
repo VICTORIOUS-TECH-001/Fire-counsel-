@@ -159,9 +159,20 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
         tavily_key: aiKeys.tavily.configured,
         admin_emails: Boolean(String(env.ADMIN_EMAILS || "").trim())
       },
+      // This is a runtime-presence check, NOT a call to Groq/Tavily. missing =
+      // no such variable in this process; empty = saved but blank after cleanup.
+      // Aliases may still configure a provider; setup above reflects that.
+      config_diagnostics_version: 1,
+      ai_key_check: {
+        kind: "presence_only",
+        groq: aiKeys.groq.runtime_setting,
+        tavily: aiKeys.tavily.runtime_setting
+      },
       // Which Render setting name was found and, if the key looks wrong, why
       // (names and hints only — never the key itself).
       ...(aiKeyNotes.length ? { ai_key_notes: aiKeyNotes } : {}),
+      // Compare with Render's latest successful LIVE deploy, not just a build.
+      ...(/^[a-f0-9]{40}$/i.test(String(env.RENDER_GIT_COMMIT || "")) ? { render_commit: env.RENDER_GIT_COMMIT } : {}),
       // Render sets this automatically: shows WHICH service's Environment
       // page the keys must be added to.
       ...(env.RENDER_SERVICE_NAME ? { render_service: String(env.RENDER_SERVICE_NAME).slice(0, 100) } : {}),

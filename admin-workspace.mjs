@@ -1,9 +1,8 @@
 // Admin Studio → Student workspace. A form editor for everything on the
-// students' dashboard (study.html). "Publish to all students" saves it in Neon
-// as the "workspace" part of the published website content (the same
-// protected publish route as Pages & JSON, which checks the Firebase admin
-// claim). "Preview" opens the dashboard with the unpublished changes in this
-// browser only.
+// students' dashboard (study.html). "Publish to all students" updates the same
+// primary Firestore content as Pages & JSON through the protected publishing
+// API, then archives it in Neon. Every API write checks Google/admin separately.
+// "Preview" is local to this browser.
 import { DEFAULT_WORKSPACE, DESTINATIONS, ICON_NAMES, PROGRESS_KEYS, icon, mergeWorkspace, escapeHTML } from "./workspace-config.mjs";
 
 const $ = (selector) => document.querySelector(selector);
@@ -11,6 +10,7 @@ const PREVIEW_KEY = "fire-counsel-workspace-preview";
 const editor = $("#ws-admin-editor");
 
 let authClient = null;
+let firestoreClient = null;
 let verified = false;
 let session = 0;
 let draft = mergeWorkspace(null);
@@ -42,6 +42,16 @@ async function api(path, options = {}) {
   return body;
 }
 
+// An unavailable archive must not hide the primary Firestore document or
+// cause an unknown unpublished draft to be overwritten.
+async function archivedSite() {
+  try {
+    const { data } = await api("/api/v1/admin/site");
+    if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("The Neon archive reply could not be read.");
+    return { data, error: null };
+  } catch (error) { return { data: {}, error }; }
+}
+
 function setEnabled(on) {
   for (const id of ["ws-admin-preview", "ws-admin-reset", "ws-admin-publish", "ws-admin-preview-2", "ws-admin-publish-2"]) {
     const node = document.getElementById(id);
@@ -49,7 +59,7 @@ function setEnabled(on) {
   }
   editor?.querySelectorAll("input, select, textarea, button").forEach((node) => { node.disabled = !on; });
   const state = $("#ws-admin-state");
-  if (state) state.textContent = on ? (dirty ? "UNPUBLISHED CHANGES" : "LIVE · SAVED IN NEON") : "SIGN IN AS ADMIN";
+  if (state) state.textContent = on ? (dirty ? "UNPUBLISHED CHANGES" : "LIVE · SAVED IN FIREBASE") : "SIGN IN AS ADMIN";
 }
 function markDirty() {
   dirty = true;
@@ -208,17 +218,24 @@ function cleaned() {
 async function loadWorkspace(mySession = session) {
   setStatus("Loading the student workspace settings…");
   try {
-    const { data } = await api("/api/v1/admin/site");
+    const [{ data, error: archiveError }, live] = await Promise.all([
+      archivedSite(),
+      firestoreClient?.loadPublicSiteContent() || null
+    ]);
     if (mySession !== session) return;
-    let workspace = data.published?.content?.workspace;
-    if (workspace === undefined) {
+    let workspace = (live || data.published?.content)?.workspace;
+    if (workspace === undefined && !live) {
       try { workspace = (await (await fetch("./data/site-content.json", { cache: "no-cache" })).json())?.workspace; } catch { workspace = null; }
     }
+    // A verified-state event can start a newer Firebase load while this older
+    // fallback is in flight. Never let its late reply overwrite the live form.
+    if (mySession !== session) return;
     draft = mergeWorkspace(workspace || null);
     dirty = false;
     render();
     setEnabled(true);
-    setStatus(workspace ? "The live student workspace is loaded. Edit it, press Preview, then Publish to all students." : "Students currently see the original design. Edit it below, press Preview, then Publish to all students.", "ok");
+    const loaded = workspace ? "The live student workspace is loaded. Edit it, press Preview, then Publish to all students." : "Students currently see the original design. Edit it below, press Preview, then Publish to all students.";
+    setStatus(archiveError ? `${loaded} Neon drafts/history are unavailable: ${archiveError.message}` : loaded, archiveError ? "error" : "ok");
   } catch (error) {
     if (mySession !== session) return;
     render();
@@ -235,28 +252,42 @@ function preview() {
 
 async function publish(button) {
   if (!verified) return;
+  const mySession = session;
   const workspace = cleaned();
   if (!workspace.menu.some((item) => item.show)) { setStatus("Keep at least one menu link visible.", "error"); return; }
   for (const id of ["ws-admin-publish", "ws-admin-publish-2"]) { const node = document.getElementById(id); if (node) node.disabled = true; }
   setStatus("Publishing to all students…");
   try {
-    // Start from the latest live website content so nothing else changes.
-    const { data } = await api("/api/v1/admin/site");
-    let base = data.published?.content;
+    if (!firestoreClient) throw new Error("The Firebase publish client could not load. Reload this page online before publishing.");
+    // Start from the primary live document, not a possibly stale Neon archive.
+    const [{ data, error: archiveReadError }, live] = await Promise.all([
+      archivedSite(), firestoreClient.loadPublicSiteContent()
+    ]);
+    let base = live || data.published?.content;
     if (!base) base = await (await fetch("./data/site-content.json", { cache: "no-cache" })).json();
+    if (mySession !== session || !verified) return;
+    const content = { ...base, workspace };
     const draftSlot = data.draft;
-    const draftIsNewer = draftSlot && data.published && new Date(draftSlot.updated_at) > new Date(data.published.updated_at);
-    await api("/api/v1/admin/site/publish", { method: "POST", body: JSON.stringify({ content: { ...base, workspace }, note: "Student workspace updated" }) });
-    // Publishing also replaces the Pages & JSON draft; put back an unpublished
-    // draft (with the new workspace) so no one's website edits are lost.
-    if (draftIsNewer) await api("/api/v1/admin/site/draft", { method: "PUT", body: JSON.stringify({ content: { ...draftSlot.content, workspace } }) }).catch(() => {});
+    const draftIsNewer = draftSlot && (!data.published || new Date(draftSlot.updated_at) > new Date(data.published.updated_at));
+    await firestoreClient.publishSiteContent(content);
+    if (mySession !== session) return;
+    let archiveError = archiveReadError;
+    if (!archiveReadError) try {
+      await api("/api/v1/admin/site/publish", { method: "POST", body: JSON.stringify({ content, note: "Student workspace updated" }) });
+      if (mySession !== session) return;
+      // Preserve unpublished Pages & JSON edits when updating the workspace.
+      if (draftIsNewer) await api("/api/v1/admin/site/draft", { method: "PUT", body: JSON.stringify({ content: { ...draftSlot.content, workspace } }) });
+    } catch (error) { archiveError = error; }
+    if (mySession !== session) return;
     syncJsonEditor(workspace);
     draft = mergeWorkspace(workspace);
     dirty = false;
     setEnabled(true);
-    setStatus("Published. Every student sees the new workspace the next time their page opens or refreshes.", "ok");
+    setStatus(archiveError
+      ? `Live on Firebase, but the Neon archive/draft could not be saved: ${archiveError.message}`
+      : "Published on Firebase and archived in Neon. Students see the new workspace on their next refresh.", archiveError ? "error" : "ok");
   } catch (error) {
-    setStatus(error.message, "error");
+    if (mySession === session) setStatus(`Firebase publishing was not confirmed; the Neon archive was not changed: ${error.message}`, "error");
   } finally {
     for (const id of ["ws-admin-publish", "ws-admin-publish-2"]) { const node = document.getElementById(id); if (node) node.disabled = !verified; }
   }
@@ -303,5 +334,6 @@ render();
 document.addEventListener("fire-counsel:admin-state", (event) => onAdminState(event.detail?.state));
 try {
   authClient = await import("./firebase/auth-client.mjs");
+  firestoreClient = await import("./firebase/firestore-client.mjs");
   onAdminState($("#admin-auth-status")?.dataset.state);
 } catch { /* sign-in not configured: the editor stays read-only */ }

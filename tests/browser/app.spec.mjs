@@ -1,4 +1,4 @@
-import { test, expect, expectNoHorizontalOverflow, stubAuth, student, admin, json, rowId, catalog } from "./fixtures.mjs";
+import { test, expect, expectNoHorizontalOverflow, stubAuth, stubFirestore, student, admin, json, rowId, catalog } from "./fixtures.mjs";
 
 async function readyStudy(page, hash = "dashboard") {
   await page.goto(`/study.html#${hash}`);
@@ -757,9 +757,10 @@ test("students can read a saved PDF in the built-in reader and close it with Bac
   await expect(page.locator(".reader-overlay")).toHaveCount(0);
 });
 
-test("admin saves a website draft, previews it and publishes it to Neon", async ({ page, context }) => {
+test("admin previews a website draft, publishes to Firebase before Neon and restores the primary live document", async ({ page, context }) => {
   await stubAuth(page, { user: admin });
   const base = await (await page.request.get("/data/site-content.json")).json();
+  await stubFirestore(page, { content: base });
   const draft = { ...base, brand: { ...base.brand, name: "Draft Brand Name" } };
   const calls = [];
   await page.route("**/api/**", async route => {
@@ -770,8 +771,10 @@ test("admin saves a website draft, previews it and publishes it to Neon", async 
     if (path === "/api/v1/admin/site" && request.method() === "GET") {
       return json(route, { data: { draft: { content: draft, updated_at: "2026-11-02T10:00:00Z" }, published: { content: base, updated_at: "2026-11-01T10:00:00Z" }, versions: [{ id: rowId, note: "First", published_by: "admin@example.invalid", created_at: "2026-11-01T10:00:00Z" }, { id: "323e4567-e89b-42d3-a456-426614174000", note: "Older", published_by: "admin@example.invalid", created_at: "2026-10-01T10:00:00Z" }] } });
     }
+    if (path.startsWith("/api/v1/admin/site/versions/")) return json(route, { data: { content: base, created_at: "2026-11-01T10:00:00Z" } });
+    if (path === "/api/v1/admin/site/firebase") return route.fallback();
     if (path.startsWith("/api/v1/admin/site") || path.startsWith("/api/v1/admin/documents")) {
-      calls.push({ method: request.method(), path, type: request.headers()["content-type"], body: request.postData() });
+      calls.push({ method: request.method(), path, type: request.headers()["content-type"], body: request.postData(), firebaseWrites: path.endsWith("/publish") ? await page.evaluate(() => window.__firestore.writes.length) : null });
       if (path.endsWith("/usage")) return json(route, { data: { used_bytes: 1048576, budget_bytes: 367001600, files: 1, max_file_bytes: 26214400, ocr: { ai: true, ocr_space: false } } });
       if (path === "/api/v1/admin/documents" && request.method() === "GET") return json(route, { data: [{ id: rowId, purpose: "material", file_name: "Contract notes.pdf", size_bytes: 2048, status: "saved", method: "pdf_text", page_count: 12, warnings: [], result: { title: "Contract notes", version_number: 1, chunks: 9 }, has_file: true }] });
       if (path === "/api/v1/admin/documents" && request.method() === "POST") return json(route, { data: { id: rowId, status: "uploaded" } }, 202);
@@ -785,7 +788,7 @@ test("admin saves a website draft, previews it and publishes it to Neon", async 
   await page.locator("[data-panel=content]").click();
   await expect(page.locator("#editor-status")).toContainText("Unpublished draft loaded");
   await expect(page.locator("#json-editor")).toHaveValue(/Draft Brand Name/);
-  await expect(page.locator("#site-versions")).toContainText("LIVE NOW");
+  await expect(page.locator("#site-versions")).toContainText("LATEST ARCHIVE");
   await expect(page.locator("#publish-site")).toBeEnabled();
 
   await page.locator("#save-draft").click();
@@ -803,8 +806,12 @@ test("admin saves a website draft, previews it and publishes it to Neon", async 
   expect(JSON.parse(publish.body)).toMatchObject({ note: "New brand", content: { brand: { name: "Draft Brand Name" } } });
   expect(JSON.parse(calls.find(call => call.path.endsWith("/draft")).body).content.brand.name).toBe("Draft Brand Name");
 
-  await page.locator("[data-restore-version]").click();
-  await expect.poll(() => calls.some(call => call.path.endsWith("/restore"))).toBe(true);
+  expect(publish.firebaseWrites).toBe(1, "Firebase is already live before Neon is touched");
+  expect(await page.evaluate(() => window.__firestore.tokenRefreshes)).toEqual([true]);
+  await page.locator("[data-restore-version]").first().click();
+  await expect(page.locator("#editor-status")).toContainText("live again on Firebase");
+  expect(calls.filter(call => call.path.endsWith("/publish")).map(call => call.firebaseWrites)).toEqual([1, 2]);
+  expect(await page.evaluate(() => window.__firestore.document.brand.name)).toBe(base.brand.name);
 
   // Upload documents: the file is sent as-is with its own type.
   await page.locator("[data-panel=uploads]").click();

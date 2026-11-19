@@ -39,7 +39,7 @@
       <div class="sidebar-bottom"><span class="lock-icon">⌑</span><p>Neon editing requires Firebase sign-in and a server-verified admin claim.</p><a href="./index.html">← Back to FIRE COUNSEL</a></div>
     </aside>
     <section class="admin-main">
-      <div class="security-warning"><span class="warning-icon">!</span><div><strong>Staging admin studio.</strong><p>Database data, uploaded documents, website changes, AI settings, prompts and user limits are saved in Neon by the server only after it verifies your administrator account. Never paste API keys here: they belong in Render&rsquo;s Environment settings.</p></div></div>
+      <div class="security-warning"><span class="warning-icon">!</span><div><strong>Staging admin studio.</strong><p>Live website changes are published to Firestore; drafts, version archives, uploaded documents, database data, AI settings, prompts and user limits are saved in Neon. These writes require your verified administrator account. Never paste API keys here: they belong in Render&rsquo;s Environment settings.</p></div></div>
 
       <section class="integration-card admin-auth-card" id="admin-auth-status" data-state="checking" aria-labelledby="admin-auth-title">
         <div><span class="eyebrow">FIREBASE · SERVER AUTHORIZATION</span><h2 id="admin-auth-title">Checking administrator setup…</h2><p id="admin-auth-message" role="status" aria-live="polite">Sign in with the administrator account to make changes.</p></div>
@@ -153,7 +153,7 @@
           <p>Made a mistake? Restore an earlier version and it goes live again immediately.</p>
           <div id="site-versions"><p>Sign in as the administrator to see the history.</p></div>
         </section>
-        <div class="info-card"><span class="info-mark">i</span><p><strong>Nothing is live until you press Publish.</strong> Preview opens a new tab showing your unsaved changes to you only. Website content and photos are stored in Neon (Firebase Storage would need the paid Blaze plan).</p></div>
+        <div class="info-card"><span class="info-mark">i</span><p><strong>Nothing is live until you press Publish.</strong> Preview opens a new tab showing your unsaved changes to you only. The protected server validates your changes and publishes live content to Firestore for your verified Google administrator session. Direct browser homepage writes are blocked. Drafts, version archives and photos are stored in Neon; this photo-upload flow does not use Firebase Storage.</p></div>
       </section>
 
       <section class="admin-panel" id="panel-media" aria-labelledby="media-title" hidden>
@@ -176,7 +176,7 @@
             <div class="fc-row"><button class="button button-primary" id="ai-test-button" type="button" disabled>Test AI connection</button><label><input id="ai-test-search" type="checkbox"> also test web search</label></div>
             <p class="fc-status" id="ai-test-result" role="status" aria-live="polite"></p>
             <div id="ai-test-models" class="fc-health-wrap"></div>
-            <p><strong>To add or change a key:</strong> open <a href="https://dashboard.render.com" target="_blank" rel="noopener">dashboard.render.com</a> → the web service this site runs on (<b id="ai-render-service">fire-counsel-2</b>) → <b>Environment</b> → add <code>GEMINI_API_KEY</code> (from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>), <code>GROQ_API_KEY</code> (from <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>, starts with <code>gsk_</code>), <code>OPENROUTER_API_KEY</code> (from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>) and <code>TAVILY_API_KEY</code> (from <a href="https://app.tavily.com" target="_blank" rel="noopener">app.tavily.com</a>, starts with <code>tvly-</code>) → <b>Save</b>. Render restarts the site automatically.</p>
+            <p><strong>To add or change a key:</strong> open <a href="https://dashboard.render.com" target="_blank" rel="noopener">dashboard.render.com</a> → the web service this site runs on (<b id="ai-render-service">fire-counsel-2</b>) → <b>Environment</b> → add <code>GEMINI_API_KEY</code> (from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>), <code>GROQ_API_KEY</code> (from <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>, starts with <code>gsk_</code>), <code>OPENROUTER_API_KEY</code> (from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>) and <code>TAVILY_API_KEY</code> (from <a href="https://app.tavily.com" target="_blank" rel="noopener">app.tavily.com</a>; key prefixes can vary) → <b>Save and deploy</b>. If using an environment group, link it to this exact service and remove any blank/stale service-level overrides for these names. Confirm that the deployment becomes <b>Live</b>; saving keys on another service or only in GitHub does not configure this API.</p>
           </section>
           <section class="fc-admin-card" aria-labelledby="ai-today-title">
             <span class="eyebrow">TODAY</span><h2 id="ai-today-title">AI use across all students</h2>
