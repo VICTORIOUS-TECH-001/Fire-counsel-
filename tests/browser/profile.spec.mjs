@@ -44,6 +44,103 @@ async function finish(page, response) {
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
+test("Google sign-in shows the name, photo and welcome before the optional server profile replies or is enabled", async ({ page }) => {
+  const photo = "https://lh3.googleusercontent.com/a/synthetic-student=s96-c";
+  await stubAuth(page, { user: { ...google, photoURL: photo } });
+  await page.route(photo, route => route.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64") }));
+  let release, started;
+  const blocked = new Promise(resolve => { release = resolve; });
+  const requested = new Promise(resolve => { started = resolve; });
+  const methods = [];
+  await page.route("**/api/v1/profile", async route => {
+    methods.push(route.request().method());
+    started();
+    await blocked;
+    return json(route, { code: "STUDENT_PROFILES_DISABLED", error: "Student profiles are not enabled. Review the staging schema and profile migration first." }, 503);
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/study.html#profile");
+  await requested;
+  await expect(page.locator("#student-profile-title")).toHaveText("Google Student");
+  await expect(page.locator("#profile-welcome")).toHaveText("Welcome, Google Student!");
+  await expect(page.locator("#profile-display-email")).toHaveText(google.email);
+  await expect(page.locator("#profile-photo")).toBeVisible();
+  await expect(page.locator("#student-profile-photo")).toBeVisible();
+  await expect(page.locator("#ws-signin")).toBeHidden();
+  release();
+  await expect(page.locator("#student-profile-status")).toHaveAttribute("data-code", "STUDENT_PROFILES_DISABLED");
+  await expect(page.locator("#student-profile-status")).toContainText("signed in with Google");
+  await expect(page.locator("#student-profile-status")).not.toContainText("migration");
+  await expect(page.locator("#student-profile-title")).toHaveText("Google Student");
+  await expect(page.locator("#profile-photo")).toHaveAttribute("src", photo);
+  await expect(page.locator("#student-profile-form")).toBeHidden();
+  await expect(page.locator("#profile-security")).toBeHidden();
+  await expectNoHorizontalOverflow(page);
+  await page.locator("#profile-refresh").click();
+  await expect(page.locator("#student-profile-status")).toHaveAttribute("data-code", "STUDENT_PROFILES_DISABLED");
+  await expect(page.locator("#student-profile-name")).toHaveText("Google Student");
+  expect(methods).toEqual(["GET", "GET"], "Google identity never auto-creates a server profile or registers an installation");
+  const storage = await page.evaluate(() => JSON.stringify({ ...localStorage }));
+  for (const value of [google.displayName, google.email, photo]) expect(storage).not.toContain(value);
+  await page.locator("#menu-toggle").click();
+  await page.locator("#student-nav [data-page=dashboard]").click();
+  await expect(page.locator("#ws-account-welcome")).toHaveText("Welcome, Google Student!");
+  await expect(page.locator("#ws-welcome-title")).toHaveText("Welcome to FIRE COUNSEL,");
+  await expectNoHorizontalOverflow(page);
+});
+
+test("Google provider details and safe photo fallbacks survive outages, account switches and sign-out", async ({ page }) => {
+  const photo = "https://lh3.googleusercontent.com/a/provider-photo=s96-c";
+  const broken = "https://lh3.googleusercontent.com/a/missing-photo=s96-c";
+  const providerUser = { ...google, displayName: "", photoURL: null, providerData: [{ providerId: "google.com", displayName: "Provider Student", photoURL: photo }] };
+  await stubAuth(page, { user: providerUser });
+  await page.route(photo, route => route.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64") }));
+  await page.route(broken, route => route.fulfill({ status: 404, body: "Missing" }));
+  await page.route("**/api/v1/profile", route => json(route, { code: "PROFILE_UNAVAILABLE", error: "Synthetic profile outage" }, 503));
+  await page.goto("/study.html#profile");
+  await expect(page.locator("#student-profile-title")).toHaveText("Provider Student");
+  await expect(page.locator("#student-profile-status")).toContainText("Synthetic profile outage");
+  await expect(page.locator("#profile-photo")).toBeVisible();
+  await expect(page.locator("#student-profile-photo")).toBeVisible();
+  await expect(page.locator("#student-profile-link")).toHaveAttribute("aria-label", "Open profile for Provider Student");
+  await expect(page.locator("#student-profile-form")).toBeHidden();
+
+  const unsafe = ["http://lh3.googleusercontent.com/photo", "https://lh3.googleusercontent.com.evil.invalid/photo", "https://user@lh3.googleusercontent.com/photo", "data:image/png;base64,invalid"];
+  const requested = [];
+  page.on("request", request => requested.push(request.url()));
+  for (const photoURL of unsafe) {
+    const name = "Ada <img src=x onerror=unsafe()> Student";
+    await page.evaluate(user => window.__auth.setUser(user), { ...google, uid: "next-google-user", displayName: name, photoURL });
+    await expect(page.locator("#student-profile-title")).toHaveText(name);
+    await expect(page.locator("#student-profile-title img, #profile-welcome img")).toHaveCount(0);
+    for (const id of ["profile-photo", "student-profile-photo"]) {
+      await expect(page.locator(`#${id}`)).toBeHidden();
+      expect(await page.locator(`#${id}`).getAttribute("src")).toBeNull();
+    }
+    await expect(page.locator("#profile-initials")).toHaveText("A<");
+  }
+  expect(requested.some(url => unsafe.includes(url))).toBe(false);
+  await page.evaluate(user => window.__auth.setUser(user), { ...google, uid: "missing-name-user", displayName: "", photoURL: null });
+  await expect(page.locator("#student-profile-title")).toHaveText("Student");
+  await expect(page.locator("#profile-welcome")).toHaveText("Welcome, Student!");
+  await page.evaluate(user => window.__auth.setUser(user), { ...google, uid: "broken-photo-user", displayName: "Photo Fallback", photoURL: broken });
+  await expect(page.locator("#student-profile-title")).toHaveText("Photo Fallback");
+  for (const id of ["profile-photo", "student-profile-photo"]) {
+    await expect(page.locator(`#${id}`)).toHaveAttribute("src", broken);
+    await expect(page.locator(`#${id}`)).toBeHidden();
+  }
+  await expect(page.locator("#student-profile-avatar")).toHaveText("PF");
+  await page.locator("#profile-signout").click();
+  await expect(page.locator("#auth-gate-signin")).toBeVisible();
+  await expect(page.locator("#student-profile-name")).toHaveText("Student workspace");
+  for (const id of ["profile-welcome", "ws-account-welcome"]) {
+    await expect(page.locator(`#${id}`)).toHaveText("");
+    await expect(page.locator(`#${id}`)).toBeHidden();
+  }
+  for (const id of ["profile-photo", "student-profile-photo"]) expect(await page.locator(`#${id}`).getAttribute("src")).toBeNull();
+  expect(await page.locator("#ws-signin").getAttribute("hidden")).toBeNull();
+});
+
 test("Google details prefill a new profile and creation requires explicit installation acceptance", async ({ page }) => {
   await stubAuth(page, { user: google });
   const api = await profileApi(page, { initial: null, identity: google });
@@ -151,7 +248,11 @@ test("losing the saved installation blocks the old profile instead of rebinding 
   await expect(page.locator("#student-profile-status")).toHaveAttribute("data-code", "INSTALLATION_MISMATCH");
   await expect(page.locator("#student-profile-form")).toBeHidden();
   await expect(page.locator("#profile-security")).toBeHidden();
-  await expect(page.locator("#student-profile-name")).toHaveText("Student workspace");
+  // Google identity is independent of the denied server profile; it grants
+  // no installation access and must not label the profile as ready.
+  await expect(page.locator("#student-profile-name")).toHaveText(student.displayName);
+  await expect(page.locator("#profile-role")).toHaveText("Signed in with Google");
+  await expect(page.locator("#profile-device-details")).toBeHidden();
   expect(api.installation).toBe(original);
   expect(await page.evaluate(key => localStorage.getItem(key), installationKey)).not.toBe(original);
   expect(await page.evaluate(() => localStorage.getItem("lexmaster-sessions"))).toBe("7");
@@ -183,6 +284,8 @@ test("a delayed profile load cannot restore a signed-out user's details", async 
   await expect(page.locator("#student-profile-form")).toBeHidden();
   await expect(page.locator("#student-profile-name")).toHaveText("Student workspace");
   await expect(page.locator("#student-profile-status")).toContainText("Sign in");
+  await expect(page.locator("#profile-welcome")).toHaveText("");
+  await expect(page.locator("#ws-account-welcome")).toHaveText("");
   await expect(page.locator("#profile-page")).not.toContainText("Previous private profile");
 });
 

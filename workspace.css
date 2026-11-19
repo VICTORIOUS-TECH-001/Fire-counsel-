@@ -70,7 +70,8 @@ body.ws .ws-bell-panel a{color:var(--ws-sky);font-weight:700;font-size:13.5px}
 body.ws .ws-signin{padding:10px 16px;border-radius:999px;border:1px solid rgba(96,165,250,.6);color:#fff;font-weight:700;font-size:14px;white-space:nowrap}
 body.ws .ws-signin:hover{background:rgba(59,130,246,.18)}
 body.ws[data-theme] .ws-user{display:flex;align-items:center;gap:10px;padding:0;border:0;color:#fff;min-width:0}
-body.ws[data-theme] .ws-user .avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(140deg,#7c3aed,#4f46e5 55%,#2563eb);color:#fff;font-size:16px;font-weight:800;box-shadow:0 0 0 2px rgba(147,197,253,.35)}
+body.ws[data-theme] .ws-user .avatar{position:relative;flex:none;overflow:hidden;width:44px;height:44px;border-radius:50%;background:linear-gradient(140deg,#7c3aed,#4f46e5 55%,#2563eb);color:#fff;font-size:16px;font-weight:800;box-shadow:0 0 0 2px rgba(147,197,253,.35)}
+body.ws .ws-user .avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit}
 body.ws .ws-user .profile-info{display:grid;min-width:0}
 body.ws .ws-user .profile-info strong{font-size:15px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px}
 body.ws[data-theme] .ws-user .profile-info small{font-size:12.5px;color:var(--ws-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px}
@@ -93,6 +94,7 @@ body.ws .ws-date{display:inline-flex;margin-bottom:12px;padding:5px 12px;border-
 body.ws .ws-hero h1{margin:0;font:700 clamp(24px,2.5vw,36px)/1.14 var(--ws-serif);color:#fff;letter-spacing:0}
 body.ws .ws-hero h1 em{display:block;margin-top:4px;font-style:italic;background:linear-gradient(90deg,#bfdbfe,#60a5fa 60%,#93c5fd);-webkit-background-clip:text;background-clip:text;color:transparent}
 body.ws .ws-hero p{margin:12px 0 20px;font:italic 400 17px/1.4 var(--ws-serif);color:#dbe7ff}
+body.ws .ws-hero .ws-account-welcome{margin:0 0 10px;font:750 16px/1.45 Inter,ui-sans-serif,system-ui,sans-serif;color:#bfdbfe;overflow-wrap:anywhere}
 body.ws .ws-cta{display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:12px 22px;border:0;border-radius:999px;background:linear-gradient(135deg,#1d4ed8,#3b82f6 60%,#60a5fa);color:#fff;font-size:15.5px;font-weight:750;cursor:pointer;box-shadow:0 10px 24px rgba(37,99,235,.5),inset 0 1px 0 rgba(255,255,255,.25);transition:transform .15s,box-shadow .15s}
 body.ws .ws-cta:hover{transform:translateY(-1px);box-shadow:0 14px 30px rgba(37,99,235,.62),inset 0 1px 0 rgba(255,255,255,.3)}
 body.ws .ws-cta svg{width:19px;height:19px;stroke-width:2.2}

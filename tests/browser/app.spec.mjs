@@ -836,6 +836,9 @@ test("students see the administrator's published courses next to their personal 
   await stubAuth(page, { user: student });
   await page.route("**/api/v1/courses", route => json(route, { data: official }));
   await page.goto("/study.html#subjects");
+  // Only the explanatory notice was removed; both course types still work.
+  await expect(page.locator("#subjects-page .notice")).toHaveCount(0);
+  await expect(page.locator("#add-subject-button")).toBeVisible();
   // 2 official courses + 6 personal areas, minus the personal "Contract Law" duplicate.
   await expect(page.locator("#course-nav-count")).toHaveText("7");
   const cards = page.locator("#all-subjects .subject-card");
@@ -1022,6 +1025,11 @@ test("a saved password session cannot open either app page or enable auth contin
     await page.goto(path);
     await expect(page.locator("body")).toHaveAttribute("data-auth-gate", "locked");
     await expect(page.locator("#auth-gate-signin")).toBeVisible();
+    if (path === "/study.html") {
+      await expect(page.locator("#student-profile-title")).toHaveText("My student profile");
+      await expect(page.locator("#profile-welcome")).toHaveText("");
+      expect(await page.locator("#student-profile-photo").getAttribute("src")).toBeNull();
+    }
     expect(await page.evaluate(() => localStorage.getItem("fire-counsel-auth-gate-v2"))).toBeNull();
   }
   await page.goto("/auth.html");
@@ -1037,13 +1045,14 @@ test("a delayed Google-session check cannot unlock an app page after sign-out", 
     await page.goto(path);
     await expect(page.locator("body")).toHaveAttribute("data-auth-gate", "locked");
     await page.evaluate(user => {
-      window.__auth.checkGoogleSession = () => new Promise(resolve => { window.__auth.releaseGoogleCheck = resolve; });
+      window.__auth.pendingGoogleChecks = [];
+      window.__auth.checkGoogleSession = () => new Promise(resolve => { window.__auth.pendingGoogleChecks.push(resolve); });
       window.__auth.setUser(user);
     }, student);
     await expect(page.locator("body")).toHaveAttribute("data-auth-gate", "pending");
     await page.evaluate(() => window.__auth.setUser(null));
     await expect(page.locator("body")).toHaveAttribute("data-auth-gate", "locked");
-    await page.evaluate(() => window.__auth.releaseGoogleCheck(true));
+    await page.evaluate(() => window.__auth.pendingGoogleChecks.forEach(resolve => resolve(true)));
     await expect(page.locator("body")).toHaveAttribute("data-auth-gate", "locked");
     expect(await page.evaluate(() => localStorage.getItem("fire-counsel-auth-gate-v2"))).toBeNull();
   }
