@@ -40,23 +40,19 @@ service cloud.firestore {
     function isSafeImage(value) {
       return value is string
         && value.size() <= 2048
-        && (value.matches('(?i)^(\\.?/)?assets/[A-Za-z0-9_./-]+\\.(png|jpe?g|webp)$')
-          || value.matches('(?i)^/media/[0-9a-f-]{36}\\.(png|jpg|webp)$')
-          || value.matches('(?i)^https://firebasestorage\\.googleapis\\.com/v0/b/fire-counsel\\.firebasestorage\\.app/o/site%2Fslides%2F[A-Za-z0-9_.%-]+\\.(png|jpe?g|webp)(\\?alt=media(&token=[A-Za-z0-9_-]+)?)?$'));
+        && value.matches('(?i)^((\\.?/)?assets/[A-Za-z0-9_./-]+\\.(png|jpe?g|webp)|/media/[0-9a-f-]{36}\\.(png|jpg|webp)|https://firebasestorage\\.googleapis\\.com/v0/b/fire-counsel\\.firebasestorage\\.app/o/site%2Fslides%2F[A-Za-z0-9_.%-]+\\.(png|jpe?g|webp)(\\?alt=media(&token=[A-Za-z0-9_-]+)?)?)$');
     }
 
     function validNavItem(item) {
       return item is map
         && item.keys().hasOnly(["label", "href"])
-        && item.keys().hasAll(["label", "href"])
         && item.label is string && item.label.size() >= 1 && item.label.size() <= 60
         && isSafeLink(item.href);
     }
 
-    function validSlide(slide) {
+    function validSlide(slide, allowedKeys) {
       return slide is map
-        && slide.keys().hasOnly(["eyebrow", "title", "accent", "body", "image", "imageAlt", "imageCredit", "primaryLabel", "primaryHref", "secondaryLabel", "secondaryHref"])
-        && slide.keys().hasAll(["eyebrow", "title", "accent", "body", "image", "imageAlt", "imageCredit", "primaryLabel", "primaryHref", "secondaryLabel", "secondaryHref"])
+        && slide.keys().hasOnly(allowedKeys)
         && isBoundedText(slide.eyebrow, 120)
         && slide.title is string && slide.title.size() >= 1 && slide.title.size() <= 120
         && isBoundedText(slide.accent, 120)
@@ -70,22 +66,39 @@ service cloud.firestore {
         && isSafeLink(slide.secondaryHref);
     }
 
+    // Required fields are all dereferenced/type-checked below; a missing field
+    // fails closed. Repeating hasAll lists would waste the 1000-expression
+    // budget at the supported 12-slide/8-link maximum.
+    function validNavigation(items) {
+      let count = items.size();
+      return items is list && count >= 1 && count <= 8
+        && validNavItem(items[0])
+        && (count < 2 || validNavItem(items[1]))
+        && (count < 3 || validNavItem(items[2]))
+        && (count < 4 || validNavItem(items[3]))
+        && (count < 5 || validNavItem(items[4]))
+        && (count < 6 || validNavItem(items[5]))
+        && (count < 7 || validNavItem(items[6]))
+        && (count < 8 || validNavItem(items[7]));
+    }
+
     // 1..12 slides, every one validated (no list iteration in rules).
     function validSlides(slides) {
-      return slides is list
-        && slides.size() >= 1 && slides.size() <= 12
-        && validSlide(slides[0])
-        && (slides.size() < 2 || validSlide(slides[1]))
-        && (slides.size() < 3 || validSlide(slides[2]))
-        && (slides.size() < 4 || validSlide(slides[3]))
-        && (slides.size() < 5 || validSlide(slides[4]))
-        && (slides.size() < 6 || validSlide(slides[5]))
-        && (slides.size() < 7 || validSlide(slides[6]))
-        && (slides.size() < 8 || validSlide(slides[7]))
-        && (slides.size() < 9 || validSlide(slides[8]))
-        && (slides.size() < 10 || validSlide(slides[9]))
-        && (slides.size() < 11 || validSlide(slides[10]))
-        && (slides.size() < 12 || validSlide(slides[11]));
+      let count = slides.size();
+      let fields = ["eyebrow", "title", "accent", "body", "image", "imageAlt", "imageCredit", "primaryLabel", "primaryHref", "secondaryLabel", "secondaryHref"];
+      return slides is list && count >= 1 && count <= 12
+        && validSlide(slides[0], fields)
+        && (count < 2 || validSlide(slides[1], fields))
+        && (count < 3 || validSlide(slides[2], fields))
+        && (count < 4 || validSlide(slides[3], fields))
+        && (count < 5 || validSlide(slides[4], fields))
+        && (count < 6 || validSlide(slides[5], fields))
+        && (count < 7 || validSlide(slides[6], fields))
+        && (count < 8 || validSlide(slides[7], fields))
+        && (count < 9 || validSlide(slides[8], fields))
+        && (count < 10 || validSlide(slides[9], fields))
+        && (count < 11 || validSlide(slides[10], fields))
+        && (count < 12 || validSlide(slides[11], fields));
     }
 
     // The whole homepage document. The write must carry server-owned metadata
@@ -94,28 +107,17 @@ service cloud.firestore {
     function validSiteContent() {
       let data = request.resource.data;
       return data.keys().hasOnly(["brand", "navigation", "hero", "quickFacts", "learning", "caseNotes", "articles", "resources", "footer", "workspace", "updatedAt", "updatedBy"])
-        && data.keys().hasAll(["brand", "navigation", "hero", "quickFacts", "learning", "caseNotes", "articles", "resources", "footer", "updatedAt", "updatedBy"])
         && data.updatedAt == request.time
         && data.updatedBy is string && data.updatedBy == request.auth.uid
         && data.brand is map
         && data.brand.keys().hasOnly(["name", "tagline", "markImage", "markAlt"])
-        && data.brand.keys().hasAll(["name", "tagline", "markImage", "markAlt"])
         && data.brand.name is string && data.brand.name.size() >= 1 && data.brand.name.size() <= 80
         && isBoundedText(data.brand.tagline, 200)
         && isSafeImage(data.brand.markImage)
         && isBoundedText(data.brand.markAlt, 200)
-        && data.navigation is list && data.navigation.size() >= 1 && data.navigation.size() <= 8
-        && validNavItem(data.navigation[0])
-        && (data.navigation.size() < 2 || validNavItem(data.navigation[1]))
-        && (data.navigation.size() < 3 || validNavItem(data.navigation[2]))
-        && (data.navigation.size() < 4 || validNavItem(data.navigation[3]))
-        && (data.navigation.size() < 5 || validNavItem(data.navigation[4]))
-        && (data.navigation.size() < 6 || validNavItem(data.navigation[5]))
-        && (data.navigation.size() < 7 || validNavItem(data.navigation[6]))
-        && (data.navigation.size() < 8 || validNavItem(data.navigation[7]))
+        && validNavigation(data.navigation)
         && data.hero is map
         && data.hero.keys().hasOnly(["autoplayMs", "slides"])
-        && data.hero.keys().hasAll(["slides"])
         && (!data.hero.keys().hasAny(["autoplayMs"]) || (data.hero.autoplayMs is number && data.hero.autoplayMs >= 4000 && data.hero.autoplayMs <= 15000))
         && validSlides(data.hero.slides)
         && data.quickFacts is list && data.quickFacts.size() <= 40

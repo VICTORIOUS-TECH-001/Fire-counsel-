@@ -146,11 +146,38 @@ test("Firestore accepts optional workspace maps only on valid Google-admin site 
   await assertSucceeds(setDoc(siteRef(adminDb), content));
   const stored = await assertSucceeds(getDoc(siteRef(testEnv.unauthenticatedContext().firestore())));
   assert.equal(stored.data().workspace.welcome.title, "Hello class");
+  const bundled = JSON.parse(readFileSync(new URL("../../data/site-content.json", import.meta.url), "utf8"));
+  await assertSucceeds(setDoc(siteRef(adminDb), { ...bundled, workspace: content.workspace, updatedAt: serverTimestamp(), updatedBy: "test-admin" }));
   const atLimits = validSiteContent("test-admin");
   atLimits.workspace = content.workspace;
   atLimits.navigation = Array.from({ length: 8 }, () => ({ label: "Home", href: "#home" }));
   atLimits.hero.slides = Array.from({ length: 12 }, () => ({ ...content.hero.slides[0] }));
   await assertSucceeds(setDoc(siteRef(adminDb), atLimits));
+  const storageImage = "https://firebasestorage.googleapis.com/v0/b/fire-counsel.firebasestorage.app/o/site%2Fslides%2Fslide-1.jpg?alt=media&token=ab12-CD_34";
+  atLimits.brand.markImage = storageImage;
+  atLimits.hero.slides = atLimits.hero.slides.map(slide => ({ ...slide, image: storageImage }));
+  await assertSucceeds(setDoc(siteRef(adminDb), atLimits));
+  // Missing keys still fail closed after eliminating redundant hasAll checks.
+  for (const key of Object.keys(validSiteContent("test-admin"))) {
+    const missing = validSiteContent("test-admin");
+    delete missing[key];
+    await assertFails(setDoc(siteRef(adminDb), missing));
+  }
+  for (const key of Object.keys(content.brand)) {
+    const missing = validSiteContent("test-admin");
+    delete missing.brand[key];
+    await assertFails(setDoc(siteRef(adminDb), missing));
+  }
+  for (const key of Object.keys(content.hero.slides[0])) {
+    const missing = validSiteContent("test-admin");
+    delete missing.hero.slides[0][key];
+    await assertFails(setDoc(siteRef(adminDb), missing));
+  }
+  for (const key of ["label", "href"]) {
+    const missing = validSiteContent("test-admin");
+    delete missing.navigation[0][key];
+    await assertFails(setDoc(siteRef(adminDb), missing));
+  }
   for (const workspace of [null, [], "not a map"]) {
     await assertFails(setDoc(siteRef(adminDb), { ...content, workspace }));
   }
