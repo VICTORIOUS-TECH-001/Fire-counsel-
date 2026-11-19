@@ -139,28 +139,36 @@ test("Firestore allows public site-content reads and verified admin publishing o
 });
 
 async function assertFullSitePublish(reference, content, label) {
+  const coverage = async () => {
+    const response = await fetch(`http://127.0.0.1:8080/emulator/v1/projects/${PROJECT_ID}:ruleCoverage`);
+    const report = await response.json();
+    const observations = new Map();
+    const visit = node => {
+      if (!node || typeof node !== "object") return;
+      if (node.sourcePosition && Array.isArray(node.values)) {
+        observations.set(JSON.stringify(node.sourcePosition), {
+          line: node.sourcePosition.line,
+          count: node.values.reduce((sum, value) => sum + (Number(value.count) || 0), 0)
+        });
+      }
+      for (const value of Object.values(node)) visit(value);
+    };
+    visit(report.report);
+    return observations;
+  };
+  const before = await coverage().catch(() => new Map());
   try {
     return await assertSucceeds(setDoc(reference, content));
   } catch (error) {
     error.message = `${label}: ${error.message}`;
     if (/1000 expressions/.test(error.message)) {
       try {
-        const response = await fetch(`http://127.0.0.1:8080/emulator/v1/projects/${PROJECT_ID}:ruleCoverage`);
-        const report = await response.json();
-        const observations = [];
-        const visit = node => {
-          if (!node || typeof node !== "object") return;
-          if (node.sourcePosition && Array.isArray(node.values)) {
-            observations.push({
-              position: node.sourcePosition,
-              observations: node.values.reduce((sum, value) => sum + (Number(value.count) || 0), 0)
-            });
-          }
-          for (const value of Object.values(node)) visit(value);
-        };
-        visit(report.report);
-        observations.sort((a, b) => b.observations - a.observations);
-        error.message += `\nEmulator coverage (diagnostic, not the expression-limit counter): ${JSON.stringify(observations.length ? observations.slice(0, 12) : { ...report, rules: undefined }).slice(0, 2500)}`;
+        const lineVisits = {};
+        for (const [position, value] of await coverage()) {
+          const delta = value.count - (before.get(position)?.count || 0);
+          if (delta > 0) lineVisits[value.line] = Math.max(lineVisits[value.line] || 0, delta);
+        }
+        error.message += `\nEmulator per-line observation deltas (diagnostic, not the expression-limit counter): ${JSON.stringify(lineVisits)}`;
       } catch { /* Keep the original permission-denial failure if diagnostics fail. */ }
     }
     throw error;
@@ -240,7 +248,6 @@ test("Firestore slide and navigation text keeps its required types and character
   for (const [key, limit] of Object.entries(limits)) maximum.hero.slides[0][key] = "é".repeat(limit - 1) + "\n";
   maximum.navigation = Array.from({ length: 8 }, () => ({ label: "n".repeat(60), href: "#home" }));
   maximum.hero.slides = Array.from({ length: 12 }, () => ({ ...maximum.hero.slides[0] }));
-  await assertFullSitePublish(siteRef, maximum, "12 slides / 8 links with maximum-length multiline text");
   for (const [key, limit] of Object.entries(limits)) {
     for (const invalid of [null, false, 1, [], {}, "a".repeat(limit + 1)]) {
       const content = validSiteContent("test-admin");
@@ -263,6 +270,7 @@ test("Firestore slide and navigation text keeps its required types and character
   const missingTitle = validSiteContent("test-admin");
   missingTitle.hero.slides[0].title = "";
   await assertFails(setDoc(siteRef, missingTitle));
+  await assertFullSitePublish(siteRef, maximum, "12 slides / 8 links with maximum-length multiline text");
 });
 
 test("Firestore keeps UTF-16 text limits for emoji, combining marks and multiline content", async () => {

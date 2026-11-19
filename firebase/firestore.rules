@@ -23,7 +23,9 @@ service cloud.firestore {
     // to the same maximum the client validator enforces.
 
     function isBoundedText(value, max) {
-      return value is string && value.size() <= max;
+      // Rules string concatenation is strict (unlike JavaScript): a non-string
+      // operand fails. The empty prefix preserves the exact UTF-16 length.
+      return ('' + value).size() <= max;
     }
 
     // Links the homepage/student pages may point at: site-relative paths,
@@ -47,7 +49,7 @@ service cloud.firestore {
       return item is map
         && [
           item.size() == 2,
-          item.label is string, item.label.size() >= 1, item.label.size() <= 60,
+          item.label != "", ('' + item.label).size() <= 60,
           isSafeLink(item.href)
         ].hasOnly([true]);
     }
@@ -59,18 +61,18 @@ service cloud.firestore {
       return slide is map
         && [
           slide.size() == 11,
-          slide.eyebrow is string, slide.eyebrow.size() <= 120,
-          slide.title is string, slide.title.size() >= 1, slide.title.size() <= 120,
-          slide.accent is string, slide.accent.size() <= 120,
-          slide.body is string, slide.body.size() <= 600,
+          ('' + slide.eyebrow).size() <= 120,
+          slide.title != "", ('' + slide.title).size() <= 120,
+          ('' + slide.accent).size() <= 120,
+          ('' + slide.body).size() <= 600,
           slide.image.size() <= 2048,
           slide.image.matches('(?i)^((\\.?/)?assets/[A-Za-z0-9_./-]+\\.(png|jpe?g|webp)|/media/[0-9a-f-]{36}\\.(png|jpg|webp)|https://firebasestorage\\.googleapis\\.com/v0/b/fire-counsel\\.firebasestorage\\.app/o/site%2Fslides%2F[A-Za-z0-9_.%-]+\\.(png|jpe?g|webp)(\\?alt=media(&token=[A-Za-z0-9_-]+)?)?)$'),
-          slide.imageAlt is string, slide.imageAlt.size() <= 200,
-          slide.imageCredit is string, slide.imageCredit.size() <= 200,
-          slide.primaryLabel is string, slide.primaryLabel.size() <= 60,
+          ('' + slide.imageAlt).size() <= 200,
+          ('' + slide.imageCredit).size() <= 200,
+          ('' + slide.primaryLabel).size() <= 60,
           slide.primaryHref.size() <= 300,
           slide.primaryHref.matches('^(\\./|/|#)[^\\s"<>]*$|^https://[^\\s"<>]+$'),
-          slide.secondaryLabel is string, slide.secondaryLabel.size() <= 60,
+          ('' + slide.secondaryLabel).size() <= 60,
           slide.secondaryHref.size() <= 300,
           slide.secondaryHref.matches('^(\\./|/|#)[^\\s"<>]*$|^https://[^\\s"<>]+$')
         ].hasOnly([true]);
@@ -126,7 +128,7 @@ service cloud.firestore {
         data.updatedBy is string, data.updatedBy == request.auth.uid,
         data.brand is map,
         data.brand.size() == 4,
-        data.brand.name is string, data.brand.name.size() >= 1, data.brand.name.size() <= 80,
+        data.brand.name != "", ('' + data.brand.name).size() <= 80,
         isBoundedText(data.brand.tagline, 200),
         isSafeImage(data.brand.markImage),
         isBoundedText(data.brand.markAlt, 200),
