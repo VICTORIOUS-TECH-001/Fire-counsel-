@@ -55,6 +55,7 @@ export async function stubAuth(page, { user = null } = {}) {
     body: `
       import { browserInstallation, INSTALLATION_HEADER, needsStudentInstallation } from '/installation.mjs';
       export const firebaseAuth = { currentUser: ${JSON.stringify(user)} };
+      window.__firebaseAuth = firebaseAuth;
       const listeners = new Set();
       window.__auth = {
         googleCalls: 0, emailChanges: [], passwordChanges: 0, verificationCalls: 0, refreshCalls: 0,
@@ -85,6 +86,40 @@ export async function stubAuth(page, { user = null } = {}) {
       }
     `
   }));
+}
+
+// Stub only the SDK/network boundary, not firestore-client.mjs: publishing,
+// validation, metadata stripping and fresh-claim checks run the production code.
+export async function stubFirestore(page, { content = null } = {}) {
+  await page.route("**/firebase/client.mjs", route => route.fulfill({ contentType: "text/javascript", body: `
+    export const firebaseApp = { options: { projectId: 'fire-counsel' } };
+    export const firebaseSetupError = () => '';
+  ` }));
+  await page.route("https://www.gstatic.com/firebasejs/*/firebase-firestore-lite.js", route => route.fulfill({ contentType: "text/javascript", body: `
+    window.__firestore = { document: ${JSON.stringify(content && { ...content, updatedAt: { seconds: 1000 }, updatedBy: "synthetic-admin" })}, writes: [], tokenRefreshes: [], failWrites: null, adminClaim: true };
+    export const getFirestore = () => ({});
+    export const doc = (_db, collection, id) => ({ collection, id });
+    export const serverTimestamp = () => ({ seconds: 2000 });
+    export async function getDoc() {
+      const data = window.__firestore.document;
+      return { exists: () => Boolean(data), data: () => structuredClone(data) };
+    }
+    export async function setDoc(reference, content) {
+      if (window.__firestore.failWrites) throw Object.assign(new Error('Synthetic rule denial'), { code: window.__firestore.failWrites });
+      window.__firestore.document = structuredClone(content);
+      window.__firestore.writes.push({ reference, content: structuredClone(content) });
+    }
+  ` }));
+  await page.route("https://www.gstatic.com/firebasejs/*/firebase-auth.js", route => route.fulfill({ contentType: "text/javascript", body: `
+    export function getAuth() {
+      const auth = window.__firebaseAuth;
+      if (auth?.currentUser) auth.currentUser.getIdTokenResult = async (refresh) => {
+        window.__firestore.tokenRefreshes.push(refresh);
+        return { claims: { admin: window.__firestore.adminClaim && auth.currentUser?.uid === 'synthetic-admin', firebase: { sign_in_provider: auth.currentUser?.signInProvider } } };
+      };
+      return auth;
+    }
+  ` }));
 }
 
 export function json(route, body, status = 200) {

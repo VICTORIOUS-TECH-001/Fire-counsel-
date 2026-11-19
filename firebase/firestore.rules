@@ -93,7 +93,7 @@ service cloud.firestore {
     // so the public page can trust who published and when.
     function validSiteContent() {
       let data = request.resource.data;
-      return data.keys().hasOnly(["brand", "navigation", "hero", "quickFacts", "learning", "caseNotes", "articles", "resources", "footer", "updatedAt", "updatedBy"])
+      return data.keys().hasOnly(["brand", "navigation", "hero", "quickFacts", "learning", "caseNotes", "articles", "resources", "footer", "workspace", "updatedAt", "updatedBy"])
         && data.keys().hasAll(["brand", "navigation", "hero", "quickFacts", "learning", "caseNotes", "articles", "resources", "footer", "updatedAt", "updatedBy"])
         && data.updatedAt == request.time
         && data.updatedBy is string && data.updatedBy == request.auth.uid
@@ -123,7 +123,9 @@ service cloud.firestore {
         && data.caseNotes is map
         && data.articles is map
         && data.resources is map
-        && data.footer is map;
+        && data.footer is map
+        // The dashboard editor publishes this optional section with the page.
+        && (!data.keys().hasAny(["workspace"]) || data.workspace is map);
     }
 
     // Public homepage content, including the hero slides. Visitors read it

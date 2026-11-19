@@ -49,6 +49,7 @@ const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
 const CONTROL_CHARS_MULTILINE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 
 export const SITE_CONTENT_KEYS = Object.freeze(["brand", "navigation", "hero", "quickFacts", "learning", "caseNotes", "articles", "resources", "footer"]);
+export const SITE_CONTENT_OPTIONAL_KEYS = Object.freeze(["workspace"]);
 export const SLIDE_KEYS = Object.freeze(["eyebrow", "title", "accent", "body", "image", "imageAlt", "imageCredit", "primaryLabel", "primaryHref", "secondaryLabel", "secondaryHref"]);
 export const STUDENT_PAGE_KEYS = Object.freeze(["displayName", "headline", "bio", "links", "focusAreas", "published", "createdAt", "updatedAt"]);
 
@@ -85,17 +86,17 @@ function checkSlide(slide, errors, path) {
   for (const key of SLIDE_KEYS) {
     if (!(key in slide)) errors.push(`${path}.${key} is missing.`);
   }
-  if (!isText(slide.eyebrow ?? "", SITE_CONTENT_LIMITS.SHORT_TEXT)) errors.push(`${path}.eyebrow must be text up to ${SITE_CONTENT_LIMITS.SHORT_TEXT} characters.`);
-  if (!isText(slide.title ?? "", SITE_CONTENT_LIMITS.SHORT_TEXT) || !slide.title?.trim()) errors.push(`${path}.title must be non-empty text up to ${SITE_CONTENT_LIMITS.SHORT_TEXT} characters.`);
-  if (!isText(slide.accent ?? "", SITE_CONTENT_LIMITS.SHORT_TEXT)) errors.push(`${path}.accent must be text up to ${SITE_CONTENT_LIMITS.SHORT_TEXT} characters.`);
-  if (!isText(slide.body ?? "", SITE_CONTENT_LIMITS.LONG_TEXT)) errors.push(`${path}.body must be text up to ${SITE_CONTENT_LIMITS.LONG_TEXT} characters.`);
-  if (!isSafeImage(slide.image ?? "")) errors.push(`${path}.image must be a bundled asset, a /media/ upload, or a fire-counsel Storage slide URL.`);
-  if (!isText(slide.imageAlt ?? "", SITE_CONTENT_LIMITS.ALT_TEXT)) errors.push(`${path}.imageAlt must be text up to ${SITE_CONTENT_LIMITS.ALT_TEXT} characters.`);
-  if (!isText(slide.imageCredit ?? "", SITE_CONTENT_LIMITS.ALT_TEXT)) errors.push(`${path}.imageCredit must be text up to ${SITE_CONTENT_LIMITS.ALT_TEXT} characters.`);
-  if (!isText(slide.primaryLabel ?? "", SITE_CONTENT_LIMITS.LABEL)) errors.push(`${path}.primaryLabel must be text up to ${SITE_CONTENT_LIMITS.LABEL} characters.`);
-  if (!isSafeLink(slide.primaryHref ?? "")) errors.push(`${path}.primaryHref must be a site-relative or https link.`);
-  if (!isText(slide.secondaryLabel ?? "", SITE_CONTENT_LIMITS.LABEL)) errors.push(`${path}.secondaryLabel must be text up to ${SITE_CONTENT_LIMITS.LABEL} characters.`);
-  if (!isSafeLink(slide.secondaryHref ?? "")) errors.push(`${path}.secondaryHref must be a site-relative or https link.`);
+  if (!isText(slide.eyebrow, SITE_CONTENT_LIMITS.SHORT_TEXT)) errors.push(`${path}.eyebrow must be text up to ${SITE_CONTENT_LIMITS.SHORT_TEXT} characters.`);
+  if (!isText(slide.title, SITE_CONTENT_LIMITS.SHORT_TEXT) || !slide.title.trim()) errors.push(`${path}.title must be non-empty text up to ${SITE_CONTENT_LIMITS.SHORT_TEXT} characters.`);
+  if (!isText(slide.accent, SITE_CONTENT_LIMITS.SHORT_TEXT)) errors.push(`${path}.accent must be text up to ${SITE_CONTENT_LIMITS.SHORT_TEXT} characters.`);
+  if (!isText(slide.body, SITE_CONTENT_LIMITS.LONG_TEXT)) errors.push(`${path}.body must be text up to ${SITE_CONTENT_LIMITS.LONG_TEXT} characters.`);
+  if (!isSafeImage(slide.image)) errors.push(`${path}.image must be a bundled asset, a /media/ upload, or a fire-counsel Storage slide URL.`);
+  if (!isText(slide.imageAlt, SITE_CONTENT_LIMITS.ALT_TEXT)) errors.push(`${path}.imageAlt must be text up to ${SITE_CONTENT_LIMITS.ALT_TEXT} characters.`);
+  if (!isText(slide.imageCredit, SITE_CONTENT_LIMITS.ALT_TEXT)) errors.push(`${path}.imageCredit must be text up to ${SITE_CONTENT_LIMITS.ALT_TEXT} characters.`);
+  if (!isText(slide.primaryLabel, SITE_CONTENT_LIMITS.LABEL)) errors.push(`${path}.primaryLabel must be text up to ${SITE_CONTENT_LIMITS.LABEL} characters.`);
+  if (!isSafeLink(slide.primaryHref)) errors.push(`${path}.primaryHref must be a site-relative or https link.`);
+  if (!isText(slide.secondaryLabel, SITE_CONTENT_LIMITS.LABEL)) errors.push(`${path}.secondaryLabel must be text up to ${SITE_CONTENT_LIMITS.LABEL} characters.`);
+  if (!isSafeLink(slide.secondaryHref)) errors.push(`${path}.secondaryHref must be a site-relative or https link.`);
 }
 
 // Validates the homepage content document (without its write metadata). The
@@ -105,7 +106,7 @@ export function validateSiteContent(content) {
   const errors = [];
   if (!isPlainObject(content)) return { ok: false, errors: ["Site content must be one JSON object."] };
   for (const key of Object.keys(content)) {
-    if (!SITE_CONTENT_KEYS.includes(key)) errors.push(`"${key}" is not a supported top-level section.`);
+    if (!SITE_CONTENT_KEYS.includes(key) && !SITE_CONTENT_OPTIONAL_KEYS.includes(key)) errors.push(`"${key}" is not a supported top-level section.`);
   }
   for (const key of SITE_CONTENT_KEYS) {
     if (!(key in content)) errors.push(`The "${key}" section is missing.`);
@@ -114,17 +115,20 @@ export function validateSiteContent(content) {
 
   if (!isPlainObject(content.brand)) errors.push("brand must be an object.");
   else {
-    if (!isText(content.brand.name ?? "", 80) || !content.brand.name?.trim()) errors.push("brand.name must be non-empty text up to 80 characters.");
-    if (!isText(content.brand.tagline ?? "", SITE_CONTENT_LIMITS.ALT_TEXT)) errors.push("brand.tagline must be text up to 200 characters.");
-    if (!isSafeImage(content.brand.markImage ?? "")) errors.push("brand.markImage must be a bundled asset, a /media/ upload, or a fire-counsel Storage slide URL.");
-    if (!isText(content.brand.markAlt ?? "", SITE_CONTENT_LIMITS.ALT_TEXT)) errors.push("brand.markAlt must be text up to 200 characters.");
+    const brandKeys = ["name", "tagline", "markImage", "markAlt"];
+    for (const key of Object.keys(content.brand)) if (!brandKeys.includes(key)) errors.push(`brand.${key} is not a supported field.`);
+    for (const key of brandKeys) if (!(key in content.brand)) errors.push(`brand.${key} is missing.`);
+    if (!isText(content.brand.name, 80) || !content.brand.name.trim()) errors.push("brand.name must be non-empty text up to 80 characters.");
+    if (!isText(content.brand.tagline, SITE_CONTENT_LIMITS.ALT_TEXT)) errors.push("brand.tagline must be text up to 200 characters.");
+    if (!isSafeImage(content.brand.markImage)) errors.push("brand.markImage must be a bundled asset, a /media/ upload, or a fire-counsel Storage slide URL.");
+    if (!isText(content.brand.markAlt, SITE_CONTENT_LIMITS.ALT_TEXT)) errors.push("brand.markAlt must be text up to 200 characters.");
   }
 
   if (!Array.isArray(content.navigation) || content.navigation.length < 1 || content.navigation.length > SITE_CONTENT_LIMITS.MAX_NAVIGATION) {
     errors.push(`navigation must be a list of 1 to ${SITE_CONTENT_LIMITS.MAX_NAVIGATION} items.`);
   } else {
     content.navigation.forEach((item, index) => {
-      if (!isPlainObject(item) || !isText(item.label ?? "", SITE_CONTENT_LIMITS.LABEL) || !item.label?.trim() || !isSafeLink(item.href ?? "")) {
+      if (!isPlainObject(item) || Object.keys(item).some(key => !["label", "href"].includes(key)) || !isText(item.label, SITE_CONTENT_LIMITS.LABEL) || !item.label.trim() || !isSafeLink(item.href)) {
         errors.push(`navigation[${index}] needs a label up to ${SITE_CONTENT_LIMITS.LABEL} characters and a site-relative or https href.`);
       }
     });
@@ -132,6 +136,7 @@ export function validateSiteContent(content) {
 
   if (!isPlainObject(content.hero)) errors.push("hero must be an object.");
   else {
+    for (const key of Object.keys(content.hero)) if (!["slides", "autoplayMs"].includes(key)) errors.push(`hero.${key} is not a supported field.`);
     if ("autoplayMs" in content.hero && !(Number.isFinite(content.hero.autoplayMs) && content.hero.autoplayMs >= 4000 && content.hero.autoplayMs <= 15000)) {
       errors.push("hero.autoplayMs must be a number between 4000 and 15000.");
     }
@@ -146,9 +151,10 @@ export function validateSiteContent(content) {
   for (const key of ["learning", "caseNotes", "articles", "resources", "footer"]) {
     if (!isPlainObject(content[key])) errors.push(`${key} must be an object.`);
   }
+  if ("workspace" in content && !isPlainObject(content.workspace)) errors.push("workspace must be an object.");
   // Deep safety caps for the shallowly-checked sections (text size, list size,
   // nesting depth) so a malformed editor import cannot create a huge document.
-  for (const key of ["quickFacts", "learning", "caseNotes", "articles", "resources", "footer"]) {
+  for (const key of ["quickFacts", "learning", "caseNotes", "articles", "resources", "footer", ...SITE_CONTENT_OPTIONAL_KEYS]) {
     checkDeep(content[key], errors, key, 1);
     if (errors.length > 24) break;
   }
@@ -156,6 +162,14 @@ export function validateSiteContent(content) {
     if (JSON.stringify(content).length > SITE_CONTENT_LIMITS.DOCUMENT_CHARS) errors.push(`The whole document must stay under ${SITE_CONTENT_LIMITS.DOCUMENT_CHARS} characters.`);
   } catch { errors.push("Site content must be JSON-serializable."); }
   return { ok: errors.length === 0, errors };
+}
+
+// Firestore adds write metadata that the editor correctly cannot submit.
+// Strip ONLY those two fields on reads; unknown sections must still fail.
+export function siteContentFromDocument(document) {
+  if (!isPlainObject(document)) return null;
+  const { updatedAt: _updatedAt, updatedBy: _updatedBy, ...content } = document;
+  return validateSiteContent(content).ok ? content : null;
 }
 
 // Normalizes editor input into the exact studentPages document shape. Hard

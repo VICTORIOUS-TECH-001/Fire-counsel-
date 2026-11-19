@@ -1,7 +1,7 @@
 // Student workspace (study.html) settings: the built-in defaults, the icon
 // set and the safe-link rules. Used by the student page (workspace.mjs) and
-// the admin editor (admin-workspace.mjs). Admin changes are saved in Neon as
-// the "workspace" part of the published website content and override these
+// the admin editor (admin-workspace.mjs). Admin changes are published to Firebase
+// and archived in Neon as the "workspace" section, overriding these
 // defaults for every student.
 
 export const ICONS = {

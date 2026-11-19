@@ -64,3 +64,31 @@ Open `/admin.html`, sign in with the Google account carrying the server-issued a
 - Use **Refresh** to reload the list. Signing out clears it; a delayed response cannot restore another session's account data.
 
 Live prerequisites: matching Firebase Admin credentials with user-list access, the correct Neon `DATABASE_URL`, and migrations `002`–`005`. Local browser/API tests use synthetic users and in-memory/stub data and do not establish that these production services are configured.
+
+## 5. Groq/Tavily still show `false` after saving keys
+
+`/api/health` checks **environment-variable presence in the running API process**, not whether Groq/Tavily accepted a credential. A nonempty unprefixed Tavily key is accepted by this code (with a format warning); it is not silently classified as missing. Groq deliberately refuses an xAI `xai-` credential because that belongs to a different provider.
+
+For the service currently identified as **`fire-counsel-2`**:
+
+1. Open [Render](https://dashboard.render.com/) → **fire-counsel-2 → Environment**. Set `GROQ_API_KEY` and `TAVILY_API_KEY` as **environment variables**, with only their respective key values. A key saved only in GitHub Actions, another service, or a secret file is not a variable in this process. This provider layer does not read arbitrary `/etc/secrets/` files.
+2. **A new environment group is not required.** If using an existing group, go to this service's **Linked Environment Groups**, select it and press **Link**. Merely creating/editing a group does not attach it. Even a project-environment-scoped group still needs linking.
+3. Check just these two names for duplicates. A service-level variable **always overrides** the same name in a group, including a stale/blank service value. Conflicting names in several groups have no guaranteed precedence. Keep one authoritative value for each key; do not delete unrelated settings/groups. These precedence rules are documented in [Render's guide](https://render.com/docs/configure-environment-variables#linking-a-group-to-a-service).
+4. Choose **Save and deploy** (a rebuild is optional for runtime secrets) or **Save, rebuild, and deploy**. Under **Events**, verify that the new deployment actually becomes **Live**. A failed build/deploy can leave the previous instance answering requests.
+5. After deploying this diagnostic code, open [the live health endpoint](https://fire-counsel-2.onrender.com/api/health). It includes `config_diagnostics_version: 1`, `render_service`, and `render_commit` when Render supplies a valid commit SHA. Compare that SHA with the successful live deployment. If the new version field is absent, this code is not serving that response yet.
+6. `ai_key_check.groq.state` and `.tavily.state` report the **canonical setting's** `missing`, `empty` or `present` status. `setup.groq_key` / `setup.tavily_key` also account for supported aliases. No values, key fragments or hashes are exposed. `present` is not proof of provider validity.
+7. Once presence is true, use **Admin → AI studio settings → Test AI connection**, including **also test web search**, to distinguish accepted credentials from provider authentication/quota errors. Never share the keys or raw environment output to debug this.
+
+A `status: ok` response means the configured **database health check** succeeded. It does not test Firebase sign-in, deployed Firestore rules, provider authentication or group linkage. The repository's `render.yaml` declarations also do not prove that an already-created dashboard service received the values.
+
+## 6. Manually publish the Firebase rules
+
+A Firestore `permission-denied` reply is an authorization/validation denial, not proof that Firebase is disconnected. The server's `firebase_admin_key: true` flag only validates the service-account file **locally**; it does not inspect the live project's rules or grant a custom claim.
+
+1. Open [Firebase Console → fire-counsel](https://console.firebase.google.com/project/fire-counsel/overview). Back up the existing rules and review any paths used by other apps in that project before replacing them.
+2. Open **Build → Firestore Database**, select the **`(default)` database → Rules**. Replace the editor with the complete contents of [`firebase/firestore.rules`](firebase/firestore.rules), then press **Publish**. Do not paste Storage rules into this editor. The browser uses `siteContent/public` in this default database.
+3. Only for Firebase Storage operations: open **Build → Storage → Rules** for **`fire-counsel.firebasestorage.app`**. Paste the complete, separate [`firebase/storage.rules`](firebase/storage.rules), then **Publish**. Current admin photo uploads use Neon `/media/`, not Storage, so changing Storage rules/billing does not fix a Firestore content-publish denial.
+4. Sign in at `/admin.html` with the intended **Google** administrator. The verified email must be in Render's `ADMIN_EMAILS` if it needs the one-time **Make this account the administrator** button. That button calls the protected server endpoint and refreshes the ID token. Rules publishing alone **cannot** add `admin: true`; never put administrator emails or private keys into public rules to bypass the claim.
+5. Reload after rules propagation, then publish a small, reversible content change. This client refreshes and checks the Google/admin token before a write and reports schema validation before contacting Firestore. If a freshly verified Google-admin write is still denied, confirm the console project/database, the deployed rules version and any separately enforced App Check configuration. Do not enable allow-all/test-mode rules.
+
+The matching code fixes are also required: stored `updatedAt`/`updatedBy` metadata is removed **only on reads**, the optional public `workspace` map is accepted by client validation and rules, and all publish/restore paths update Firestore before the Neon archive. Both the homepage and student workspace read that primary channel, with Neon/bundled/offline fallbacks. A Neon archive failure is reported as partial success; it never falsely reports that an already-live Firebase write was rolled back. No rules, claims, Render settings or private credentials are deployed by local tests.

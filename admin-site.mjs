@@ -1,7 +1,7 @@
 // Admin Studio: website draft -> preview -> publish, version history and
-// homepage slide photos. Everything is saved in Neon by the server, and only
-// after it verifies the Firebase admin claim. The JSON editor (#json-editor,
-// managed by admin.js) holds the content being edited.
+// homepage slide photos. Firestore is the primary live content channel; Neon
+// holds drafts, version archives and photos. Both independently enforce the
+// Firebase admin claim. The JSON editor is managed by admin.js.
 const $ = (selector) => document.querySelector(selector);
 const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[ch]);
 const editor = $("#json-editor");
@@ -82,32 +82,33 @@ function setEnabled(on) {
 function renderVersions(versions = []) {
   const holder = $("#site-versions");
   if (!holder) return;
-  if (!versions.length) { holder.innerHTML = "<p>Nothing has been published from the admin studio yet. The live site shows the built-in content.</p>"; return; }
-  holder.innerHTML = `<ol class="fc-version-list">${versions.map((version, index) => `<li><div><strong>${index === 0 ? "LIVE NOW · " : ""}${escapeHTML(when(version.created_at))}</strong><small>${escapeHTML(version.note || "No note")} · ${escapeHTML(version.published_by || "")}</small></div>${index === 0 ? "" : `<button class="button button-light" type="button" data-restore-version="${escapeHTML(version.id)}">Restore this version</button>`}</li>`).join("")}</ol>`;
+  if (!versions.length) { holder.innerHTML = "<p>No versions are archived in Neon yet. Live Firebase content may still exist.</p>"; return; }
+  holder.innerHTML = `<ol class="fc-version-list">${versions.map((version, index) => `<li><div><strong>${index === 0 ? "LATEST ARCHIVE · " : ""}${escapeHTML(when(version.created_at))}</strong><small>${escapeHTML(version.note || "No note")} · ${escapeHTML(version.published_by || "")}</small></div><button class="button button-light" type="button" data-restore-version="${escapeHTML(version.id)}">Restore this version</button></li>`).join("")}</ol>`;
 }
 
-// after: "publish" keeps the editor and message; "restore" shows the restored
-// live content in the editor but keeps the message.
+// after: "publish" refreshes archives without replacing the editor/message.
 async function loadSite(mySession = session, after = "") {
   try {
-    const { data } = await api("/api/v1/admin/site");
+    const [{ data }, live] = await Promise.all([
+      api("/api/v1/admin/site"),
+      firestoreClient?.loadPublicSiteContent() || null
+    ]);
     if (mySession !== session) return;
-    publishedContent = data.published?.content || null;
+    publishedContent = live || (after === "publish" && publishedContent) || data.published?.content || null;
     renderVersions(data.versions);
     if (after === "publish") return;
-    if (after === "restore") { if (publishedContent) writeEditor(publishedContent); return; }
     const draft = data.draft;
     const draftIsNewer = draft && (!data.published || new Date(draft.updated_at) > new Date(data.published.updated_at));
     if (draftIsNewer) {
       writeEditor(draft.content);
       editorStatus(`Unpublished draft loaded (saved ${when(draft.updated_at)}). Preview it, then Publish.`, "ok");
-    } else if (data.published) {
-      writeEditor(data.published.content);
-      editorStatus(`Live content loaded (published ${when(data.published.updated_at)}).`, "ok");
+    } else if (publishedContent) {
+      writeEditor(publishedContent);
+      editorStatus(live ? "Live content loaded from Firebase." : `Neon fallback content loaded (archived ${when(data.published.updated_at)}).`, "ok");
     }
   } catch (error) {
     if (mySession !== session) return;
-    editorStatus(error.message, "error");
+    if (after !== "publish") editorStatus(error.message, "error");
     if (error.code === "SITE_SCHEMA_NOT_READY") renderVersions([]);
   }
 }
@@ -143,36 +144,39 @@ window.addEventListener("message", (event) => {
   event.source.postMessage({ type: "fire-counsel-preview", content }, location.origin);
 });
 
+// Every publish/restore must update the channel the homepage actually reads
+// first. Never silently fall back to a Neon-only "success" after Firebase fails.
+async function publishLive(content, note, mySession) {
+  if (!verified || mySession !== session) throw new Error("Your admin session changed. Sign in again before publishing.");
+  if (!firestoreClient) throw new Error("The Firebase publish client could not load. Reload this page online before publishing.");
+  await firestoreClient.publishSiteContent(content);
+  if (mySession !== session) return new Error("Your session changed before the Neon archive could be saved.");
+  publishedContent = content;
+  try {
+    await api("/api/v1/admin/site/publish", { method: "POST", body: JSON.stringify({ content, note }) });
+    return null;
+  } catch (error) { return error; } // Firebase is already live; report partial success.
+}
+
 $("#publish-site")?.addEventListener("click", async () => {
+  const mySession = session;
   let content;
   try { content = readEditor(); } catch (error) { editorStatus(error.message, "error"); return; }
   if (!window.confirm("Publish these changes? Every visitor will see them within a minute.")) return;
   const button = $("#publish-site");
   button.disabled = true;
   try {
-    // 1. The live channel: write siteContent/public directly to Firestore.
-    //    The deployed security rules re-verify this browser's admin claim and
-    //    the full document shape before anything is stored.
-    if (firestoreClient) {
-      editorStatus("Publishing the live content to Firebase…");
-      await firestoreClient.publishSiteContent(content);
-    }
-    // 2. Keep the Neon draft/version-history archive in step. A history
-    //    failure must not roll back the live Firebase publish.
-    try {
-      editorStatus(firestoreClient ? "Live on Firebase. Saving the version history in Neon…" : "Publishing…");
-      const note = $("#publish-note")?.value.trim() || "";
-      await api("/api/v1/admin/site/publish", { method: "POST", body: JSON.stringify({ content, note }) });
+    editorStatus("Publishing the live content to Firebase, then archiving in Neon…");
+    const note = $("#publish-note")?.value.trim() || "";
+    const historyError = await publishLive(content, note, mySession);
+    if (mySession !== session) return;
+    if (historyError) {
+      editorStatus(`Live on Firebase now — but the Neon version history could not be saved: ${historyError.message}`, "error");
+    } else {
       if ($("#publish-note")) $("#publish-note").value = "";
-      editorStatus(firestoreClient
-        ? "Published! The homepage reads this content live from Firebase, and the version is archived in Neon."
-        : "Published! The live website now shows these changes.", "ok");
-    } catch (historyError) {
-      editorStatus(firestoreClient
-        ? `Live on Firebase now — but the Neon version history could not be saved: ${historyError.message}`
-        : historyError.message, "error");
+      editorStatus("Published! The homepage reads this content live from Firebase, and the version is archived in Neon.", "ok");
     }
-    await loadSite(session, "publish");
+    await loadSite(mySession, "publish");
   } catch (error) {
     editorStatus(`Firebase publish failed, nothing went live: ${error.message}`, "error");
   } finally {
@@ -198,12 +202,19 @@ $("#site-versions")?.addEventListener("click", async (event) => {
   if (!button) return;
   if (!window.confirm("Put this older version back on the live website?")) return;
   button.disabled = true;
+  const mySession = session;
   try {
-    await api(`/api/v1/admin/site/versions/${encodeURIComponent(button.dataset.restoreVersion)}/restore`, { method: "POST" });
-    editorStatus("That version is live again and is now in the editor.", "ok");
-    await loadSite(session, "restore");
+    const { data } = await api(`/api/v1/admin/site/versions/${encodeURIComponent(button.dataset.restoreVersion)}`);
+    editorStatus("Restoring this version to Firebase, then archiving in Neon…");
+    const historyError = await publishLive(data.content, `Restored version from ${when(data.created_at)}`, mySession);
+    if (mySession !== session) return;
+    writeEditor(data.content);
+    editorStatus(historyError
+      ? `That version is live on Firebase, but its Neon archive could not be saved: ${historyError.message}`
+      : "That version is live again on Firebase and is now in the editor.", historyError ? "error" : "ok");
+    await loadSite(mySession, "publish");
   } catch (error) {
-    editorStatus(error.message, "error");
+    if (mySession === session) editorStatus(`Restore failed: ${error.message}`, "error");
     button.disabled = false;
   }
 });

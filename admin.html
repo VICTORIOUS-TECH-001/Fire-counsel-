@@ -39,7 +39,7 @@
       <div class="sidebar-bottom"><span class="lock-icon">⌑</span><p>Neon editing requires Firebase sign-in and a server-verified admin claim.</p><a href="./index.html">← Back to FIRE COUNSEL</a></div>
     </aside>
     <section class="admin-main">
-      <div class="security-warning"><span class="warning-icon">!</span><div><strong>Staging admin studio.</strong><p>Database data, uploaded documents, website changes, AI settings, prompts and user limits are saved in Neon by the server only after it verifies your administrator account. Never paste API keys here: they belong in Render&rsquo;s Environment settings.</p></div></div>
+      <div class="security-warning"><span class="warning-icon">!</span><div><strong>Staging admin studio.</strong><p>Live website changes are published to Firestore; drafts, version archives, uploaded documents, database data, AI settings, prompts and user limits are saved in Neon. These writes require your verified administrator account. Never paste API keys here: they belong in Render&rsquo;s Environment settings.</p></div></div>
 
       <section class="integration-card admin-auth-card" id="admin-auth-status" data-state="checking" aria-labelledby="admin-auth-title">
         <div><span class="eyebrow">FIREBASE · SERVER AUTHORIZATION</span><h2 id="admin-auth-title">Checking administrator setup…</h2><p id="admin-auth-message" role="status" aria-live="polite">Sign in with the administrator account to make changes.</p></div>
@@ -153,7 +153,7 @@
           <p>Made a mistake? Restore an earlier version and it goes live again immediately.</p>
           <div id="site-versions"><p>Sign in as the administrator to see the history.</p></div>
         </section>
-        <div class="info-card"><span class="info-mark">i</span><p><strong>Nothing is live until you press Publish.</strong> Preview opens a new tab showing your unsaved changes to you only. Website content and photos are stored in Neon (Firebase Storage would need the paid Blaze plan).</p></div>
+        <div class="info-card"><span class="info-mark">i</span><p><strong>Nothing is live until you press Publish.</strong> Preview opens a new tab showing your unsaved changes to you only. Live website content is stored in Firestore. Drafts, version archives and photos are stored in Neon; this photo-upload flow does not use Firebase Storage.</p></div>
       </section>
 
       <section class="admin-panel" id="panel-media" aria-labelledby="media-title" hidden>

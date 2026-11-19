@@ -138,6 +138,33 @@ test("Firestore allows public site-content reads and verified admin publishing o
   await assertFails(deleteDoc(doc(adminDb, "siteContent", "public")));
 });
 
+test("Firestore accepts optional workspace maps only on valid Google-admin site publishes", async () => {
+  const adminDb = googleContext("test-admin", { admin: true }).firestore();
+  const studentDb = googleContext("test-student").firestore();
+  const content = { ...validSiteContent("test-admin"), workspace: { welcome: { title: "Hello class" }, notices: ["New term"] } };
+  const siteRef = db => doc(db, "siteContent", "public");
+  await assertSucceeds(setDoc(siteRef(adminDb), content));
+  const stored = await assertSucceeds(getDoc(siteRef(testEnv.unauthenticatedContext().firestore())));
+  assert.equal(stored.data().workspace.welcome.title, "Hello class");
+  const atLimits = validSiteContent("test-admin");
+  atLimits.workspace = content.workspace;
+  atLimits.navigation = Array.from({ length: 8 }, () => ({ label: "Home", href: "#home" }));
+  atLimits.hero.slides = Array.from({ length: 12 }, () => ({ ...content.hero.slides[0] }));
+  await assertSucceeds(setDoc(siteRef(adminDb), atLimits));
+  for (const workspace of [null, [], "not a map"]) {
+    await assertFails(setDoc(siteRef(adminDb), { ...content, workspace }));
+  }
+  await assertFails(setDoc(siteRef(studentDb), { ...content, updatedBy: "test-student" }));
+  await assertFails(setDoc(siteRef(adminDb), { ...content, unexpected: {} }));
+  const passwordAdmin = testEnv.authenticatedContext("test-admin", { admin: true, firebase: { sign_in_provider: "password" } }).firestore();
+  await assertFails(setDoc(siteRef(passwordAdmin), content));
+  // Browser validation catches these before the network; rules remain the
+  // independent authority if an altered client skips that validation.
+  await assertFails(setDoc(siteRef(adminDb), { ...content, brand: { ...content.brand, extra: true } }));
+  await assertFails(setDoc(siteRef(adminDb), { ...content, hero: { ...content.hero, extra: true } }));
+  await assertFails(setDoc(siteRef(adminDb), { ...content, navigation: [{ label: "Home", href: "#home", extra: true }] }));
+});
+
 test("Firestore student pages are owned, validated and publish-gated", async () => {
   const ownerDb = googleContext("test-student").firestore();
   const otherDb = googleContext("other-student").firestore();

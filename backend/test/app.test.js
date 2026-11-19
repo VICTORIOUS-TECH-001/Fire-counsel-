@@ -58,7 +58,7 @@ test("CORS uses exact approved origins, not wildcard or suffix matches", async t
 
 test("every protected route rejects anonymous requests before database access", async t => {
   const base = await serve(t);
-  for (const path of ["/api/v1/me", "/api/v1/admin/me", "/api/v1/admin/database/catalog", "/api/v1/admin/database/materials", "/api/v1/materials", "/api/v1/profile"]) {
+  for (const path of ["/api/v1/me", "/api/v1/admin/me", "/api/v1/admin/database/catalog", "/api/v1/admin/database/materials", "/api/v1/admin/site/versions/123e4567-e89b-42d3-a456-426614174000", "/api/v1/materials", "/api/v1/profile"]) {
     const response = await fetch(`${base}${path}`);
     assert.equal(response.status, 401, path);
     assert.equal(response.headers.get("cache-control"), "no-store");
@@ -156,6 +156,40 @@ test("SERVE_WEBSITE accepts true however it was typed, and nothing else", async 
     const response = await fetch(`${base}/`);
     assert.equal(response.status === 200, served, `SERVE_WEBSITE=${JSON.stringify(value)}`);
   }
+});
+
+test("health diagnostics distinguish absent/blank runtime settings from credentials rejected by a provider", async t => {
+  const commit = "0123456789abcdef0123456789abcdef01234567";
+  const env = { DATABASE_URL: "synthetic-db", RENDER_GIT_COMMIT: commit };
+  const base = await serve(t, { env, databaseCheck: async () => true });
+  let body = await (await fetch(`${base}/api/health`)).json();
+  assert.equal(body.config_diagnostics_version, 1);
+  assert.equal(body.render_commit, commit);
+  assert.deepEqual(body.ai_key_check, {
+    kind: "presence_only",
+    groq: { name: "GROQ_API_KEY", state: "missing" },
+    tavily: { name: "TAVILY_API_KEY", state: "missing" }
+  });
+  env.GROQ_API_KEY = " \"\" ";
+  env.TAVILY_API_KEY = "\u200B  ";
+  body = await (await fetch(`${base}/api/health`)).json();
+  assert.equal(body.ai_key_check.groq.state, "empty");
+  assert.equal(body.ai_key_check.tavily.state, "empty");
+  assert.equal(body.setup.groq_key, false);
+  assert.equal(body.setup.tavily_key, false);
+  // A bare Tavily key is detected: a prefix warning must not mark it absent.
+  env.GROQ_API_KEY = "gsk_synthetic-private-groq";
+  env.TAVILY_API_KEY = "synthetic-private-tavily-without-prefix";
+  body = await (await fetch(`${base}/api/health`)).json();
+  assert.equal(body.ai_key_check.groq.state, "present");
+  assert.equal(body.ai_key_check.tavily.state, "present");
+  assert.equal(body.setup.groq_key, true);
+  assert.equal(body.setup.tavily_key, true);
+  assert.doesNotMatch(JSON.stringify(body), /synthetic-private|synthetic-db/);
+  env.RENDER_GIT_COMMIT = "not-a-commit-possibly-private";
+  body = await (await fetch(`${base}/api/health`)).json();
+  assert.equal(body.render_commit, undefined);
+  assert.doesNotMatch(JSON.stringify(body), /possibly-private/);
 });
 
 test("health page shows whether the Groq and Tavily keys are set, under any common name, without showing them", async t => {

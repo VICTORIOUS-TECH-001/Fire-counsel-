@@ -40,7 +40,7 @@ Individual overrides should be validated on the server, clamped so an effective 
 
 ## `siteContent/public` — homepage content and slides
 
-The admin studio (**Pages & JSON → Publish**) writes this document directly from the browser with the admin's Firebase session. The homepage (`site.js`) reads it first and falls back to the bundled `data/site-content.json` when Firebase is unconfigured, unreachable, or the document fails read-side validation. Neon still keeps the draft and the version history; a history failure never rolls back the live Firestore publish.
+The admin studio (**Pages & JSON → Publish**, **Restore this version**, and **Student workspace → Publish**) writes this document directly from the browser with the admin's Firebase session. The homepage (`site.js`) and student workspace (`workspace.mjs`) read it first and fall back to `data/site-content.json` (Neon on the API host, otherwise bundled) when Firebase is unconfigured, unreachable, or the document fails read-side validation. Required `updatedAt`/`updatedBy` metadata is removed only on reads; it is never accepted as editor input. Neon keeps drafts and version archives; a history failure never rolls back the live Firestore publish, and a Firestore denial never silently becomes a Neon-only success.
 
 Document shape (rules-enforced; limits mirrored in `firebase/content-schema.mjs`):
 
@@ -51,6 +51,7 @@ Document shape (rules-enforced; limits mirrored in `firebase/content-schema.mjs`
 | `hero.autoplayMs` | Optional number 4000–15000. |
 | `hero.slides` | 1–12 maps, each with exactly `eyebrow`, `title` (1–120), `accent`, `body` (≤ 600), `image`, `imageAlt`, `imageCredit` (≤ 200), `primaryLabel`, `primaryHref`, `secondaryLabel`, `secondaryHref`. |
 | `quickFacts`, `learning`, `caseNotes`, `articles`, `resources`, `footer` | Present; type-checked (list/map). Deep content caps are client-enforced. |
+| `workspace` | Optional public map from the dashboard editor. Same Google/admin requirement; deep caps are client-enforced. |
 | `updatedAt` | Must equal `request.time` — clients send `serverTimestamp()`. |
 | `updatedBy` | Must equal the caller's `uid`. |
 

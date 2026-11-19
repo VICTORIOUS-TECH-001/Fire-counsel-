@@ -4,7 +4,8 @@
 //  Admin:   GET  /api/v1/admin/site                 draft, published, versions
 //           PUT  /api/v1/admin/site/draft           save the draft (not public)
 //           POST /api/v1/admin/site/publish         make content live
-//           POST /api/v1/admin/site/versions/:id/restore
+//           GET  /api/v1/admin/site/versions/:id    archive for browser Firebase restore
+//           POST /api/v1/admin/site/versions/:id/restore  legacy Neon fallback only
 //           POST /api/v1/admin/site/images          raw JPG/PNG/WEBP -> /media/<id>.<ext>
 //  Public:  GET  /data/site-content.json            published content (falls back to the bundled file)
 //           GET  /media/<id>.<ext>                  slideshow photos
@@ -184,6 +185,17 @@ export function createAdminSiteRouter({
       const note = typeof req.body?.note === "string" && req.body.note.trim() ? req.body.note.trim().slice(0, 200) : null;
       res.json({ data: await publish(content, note, req) });
     } catch (error) { failResponse(res, error); }
+  });
+
+  // Read an archive before the browser restores it to the primary Firestore
+  // channel. A Neon-only restore would be hidden by an existing live document.
+  router.get("/versions/:id", async (req, res) => {
+    if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: "Version not found.", code: "NOT_FOUND" });
+    try {
+      const { rows } = await poolProvider().query("SELECT content, created_at FROM site_content_versions WHERE id = $1", [req.params.id]);
+      if (!rows.length) return res.status(404).json({ error: "Version not found.", code: "NOT_FOUND" });
+      return res.json({ data: rows[0] });
+    } catch (error) { return failResponse(res, error); }
   });
 
   router.post("/versions/:id/restore", async (req, res) => {

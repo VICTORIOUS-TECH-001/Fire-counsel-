@@ -380,6 +380,13 @@ test("publishing updates the live homepage content immediately and can be undone
   const state = (await (await fetch(`${base}/api/v1/admin/site`)).json()).data;
   assert.equal(state.versions.length, 2);
   assert.equal(state.draft.content.brand.name, "FIRE COUNSEL TYPO");
+  const archived = await fetch(`${base}/api/v1/admin/site/versions/${published.data.version_id}`);
+  assert.equal(archived.status, 200);
+  assert.deepEqual((await archived.json()).data.content, first, "restore can read the exact archive before publishing to Firebase");
+  assert.equal((await live()).brand.name, "FIRE COUNSEL TYPO", "reading a version never mutates the live content");
+  for (const id of ["bad-id", "00000000-0000-4000-8000-000000000000"]) {
+    assert.equal((await fetch(`${base}/api/v1/admin/site/versions/${id}`)).status, 404);
+  }
   assert.equal((await fetch(`${base}/api/v1/admin/site/versions/${published.data.version_id}/restore`, { method: "POST" })).status, 200);
   assert.equal((await live()).brand.name, "FIRE COUNSEL LIVE");
 
