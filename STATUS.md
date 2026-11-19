@@ -1,8 +1,20 @@
 # FIRE COUNSEL — status and verification report
 
-**Latest update:** 18 November 2026 (UTC), branch `arena/3619f8a2-fire-counsel`
+**Latest update:** 18 November 2026 (UTC), branch `arena/4e7a6fb1-fire-counsel`
 
-## Firebase publishing and missing runtime keys
+## Google account identity and welcome
+
+- Reproduced the screenshot regression with a delayed `/api/v1/profile` reply: the signed-in Google student's heading stayed **My student profile** instead of their name. A disabled/unavailable Neon profile then cleared the name/photo and left a misleading Sign in link in the header.
+- The workspace now uses the name, email and available photo already supplied by Google through Firebase Auth, including Google provider-data fallbacks. A checked Google session immediately shows **Welcome, <name>!** on the dashboard and profile, the account name/email and the photo in both the profile card and header. No extra Google API/scope, separate registration, automatic profile creation or installation binding is needed for this basic display. Existing administrator-authored welcome content remains intact.
+- Expected `STUDENT_PROFILES_DISABLED` is an account-only state with friendly Google sign-in text, not a staging-migration warning. Other profile/installation errors stay visible, editing/security controls remain closed, and no profile-ready event or protected entitlement is granted by displaying Google identity. Existing chosen names still take precedence once a valid saved profile loads.
+- Photos remain restricted to HTTPS Google image hosts; missing, unsafe or failed photos fall back to initials. Names use text nodes, not HTML. Sign-out/account changes clear previous greetings/photos, and stale token/profile replies cannot restore them. The header Sign in link follows the verified Google account, not a DOM name comparison. No new app-managed identity persistence was added.
+- Removed only the **Official courses come from your administrator** notice shown in the second screenshot. Official course sync and personal study areas remain functional. Shell cache **v28** refreshes the updated study shell without deleting existing study data.
+
+**Verification:** the new screenshot regression first failed with **My student profile** instead of **Google Student**, then passed after the fix. `npm test` passed: syntax **105** modules, frontend **72/72**, backend **153/153**, proxy **14/14**, Firebase local **13/13**. Complete Chromium suite **49/49** passed with whole-test retries disabled. New browser coverage exercises immediate Google identity before a server reply, disabled profiles and refresh, provider metadata, unsafe/broken photos, missing names, literal HTML-like names, account switches/sign-out, mobile layout and no automatic profile writes. Existing installation denial, session races, Google-only locks, saved-name editing, course sync, offline study and preserved storage tests also pass. No sleeps, skipped tests or relaxed width/authorization assertions were added.
+
+**Deployment boundary:** these are application changes; deploy the updated frontend to make them visible. No Render flags, Firebase providers/claims/rules, live accounts or database migrations were changed. This does not enable Neon student profiles, grant Premium/admin/course access, or remove server-side installation checks. Firestore/Storage rules and backend authorization are unchanged; live Google OAuth/photo delivery is not verified by the synthetic browser tests.
+
+## Previously merged Firebase publishing repair (PR #26)
 
 - Live read-only inspection of `https://fire-counsel-2.onrender.com/api/health` confirmed database `connected`, Groq/Tavily flags `false`, and service name `fire-counsel-2`. This checks runtime configuration, not provider acceptance. The source accepts nonempty unprefixed Tavily credentials; it does not require `tvly-`. The inspected response lacked the new diagnostic-version fields, so it did not prove this repair was deployed. Private Render settings/group linkage have **not** been inspected or changed.
 - Added secret-free canonical setting states (`missing` / `empty` / `present`), diagnostic version and Render commit SHA to health. The protected per-provider admin test checks actual credentials/quota. [DEPLOYMENT.md](DEPLOYMENT.md#5-groqtavily-still-show-false-after-saving-keys) separates linked groups, overriding service values, secret files, GitHub secrets and the successful **Live** commit; a new environment group is not inherently needed.

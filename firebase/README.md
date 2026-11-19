@@ -90,11 +90,18 @@ tokens are not TOTP factors.
 ### Identity is not course access
 
 Google sign-in authenticates the user without this app collecting their Google
-password. On first use, the app offers a separate, prefilled **student profile** at
-`/study.html#profile`: available name/email/photo come from Firebase. The student
-confirms the details and browser-installation warning before the Neon profile is
-created. Students can then edit their own profile without selecting any course,
-paying, obtaining membership or asking an administrator.
+password. The workspace immediately displays the available Google name, email
+and photo supplied through Firebase Auth, with **Welcome, <name>!** in the
+profile and dashboard. This works even if Neon student profiles are disabled or
+unreachable; no extra Google API call or separate profile is needed for identity
+display. Missing/unavailable photos use initials, and sign-out clears the display.
+
+Separately, when enabled, the app offers a prefilled **saved student profile** at
+`/study.html#profile`. The student confirms the details and browser-installation
+warning before that Neon profile is created. Students can then edit their saved
+name without selecting any course, paying, obtaining membership or asking an
+administrator. Displaying Google identity never grants those permissions or
+bypasses a denied server profile/installation check.
 
 Profile creation does **not** assign a university/course, approve membership,
 activate a paid plan, enforce quotas, or grant the `admin: true` claim. The

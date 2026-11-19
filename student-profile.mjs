@@ -32,18 +32,63 @@ function initials(name) {
   return String(name || "FC").trim().split(/\s+/).slice(0, 2).map(word => [...word][0] || "").join("").toLocaleUpperCase();
 }
 
-function setPhoto(value) {
-  const image = $("#profile-photo");
-  image.hidden = true;
-  image.removeAttribute("src");
-  try {
-    const url = new URL(value);
-    if (url.protocol !== "https:" || url.username || url.password || url.port || !url.hostname.endsWith(".googleusercontent.com")) return;
-    image.src = url.href;
-    image.hidden = false;
-  } catch { /* use initials instead of arbitrary profile-image URLs */ }
+// Google supplies these basic identity fields through Firebase Auth. They are
+// display-only: no Neon profile, installation binding or extra Google API call.
+function googleDetails() {
+  const google = currentUser?.providerData?.find(provider => provider.providerId === "google.com");
+  const name = [google?.displayName, currentUser?.displayName]
+    .find(value => typeof value === "string" && value.trim());
+  return {
+    name: name?.trim().replace(/\s+/g, " ").slice(0, 120) || "",
+    email: currentUser?.email || google?.email || "",
+    photos: [google?.photoURL, currentUser?.photoURL]
+  };
 }
-$("#profile-photo").addEventListener("error", () => { $("#profile-photo").hidden = true; });
+
+function setPhoto(...candidates) {
+  let source = null;
+  for (const value of candidates) {
+    try {
+      const url = new URL(value);
+      if (url.protocol === "https:" && !url.username && !url.password && !url.port && url.hostname.endsWith(".googleusercontent.com")) {
+        source = url.href;
+        break;
+      }
+    } catch { /* keep initials instead of loading arbitrary URLs */ }
+  }
+  for (const id of ["profile-photo", "student-profile-photo"]) {
+    const image = document.getElementById(id);
+    if (image.getAttribute("src") === source) continue;
+    image.hidden = true;
+    if (source) image.src = source;
+    else image.removeAttribute("src");
+  }
+}
+for (const id of ["profile-photo", "student-profile-photo"]) {
+  const image = document.getElementById(id);
+  image.addEventListener("load", () => { image.hidden = !image.getAttribute("src") || image.naturalWidth === 0; });
+  image.addEventListener("error", () => { image.hidden = true; });
+}
+
+function renderAccountIdentity(saved = null) {
+  const signedIn = Boolean(currentUser);
+  const google = googleDetails();
+  const name = saved?.full_name || google.name || "Student";
+  $("#student-profile-title").textContent = signedIn ? name : "My student profile";
+  $("#profile-display-email").textContent = signedIn ? saved?.email || google.email : "Sign in with Google to see your account.";
+  $("#student-profile-name").textContent = signedIn ? name : "Student workspace";
+  $("#profile-role").textContent = saved ? "Student profile · this browser" : signedIn ? "Signed in with Google" : "Local-first workspace";
+  $("#profile-initials").textContent = signedIn ? initials(name) : "FC";
+  $("#student-profile-avatar").textContent = signedIn ? initials(name) : "FC";
+  $("#student-profile-link").setAttribute("aria-label", signedIn ? `Open profile for ${name}` : "Open your profile");
+  $("#ws-signin").hidden = signedIn;
+  for (const id of ["profile-welcome", "ws-account-welcome"]) {
+    const greeting = document.getElementById(id);
+    greeting.textContent = signedIn ? `Welcome, ${name}!` : "";
+    greeting.hidden = !signedIn;
+  }
+  setPhoto(...(signedIn ? [saved?.photo_url, ...google.photos] : []));
+}
 
 function clearPasswords() {
   for (const input of document.querySelectorAll("#profile-security input[type=password]")) input.value = "";
@@ -54,16 +99,10 @@ function clearProfileDisplay() {
   form.hidden = true;
   $("#profile-security").hidden = true;
   $("#profile-device-details").hidden = true;
-  $("#student-profile-title").textContent = "My student profile";
-  $("#profile-display-email").textContent = currentUser?.email || "Sign in to create your profile.";
-  $("#student-profile-name").textContent = "Student workspace";
-  $("#profile-role").textContent = "Local-first workspace";
-  $("#student-profile-avatar").textContent = "FC";
-  $("#profile-initials").textContent = "FC";
+  renderAccountIdentity();
   $("#student-full-name").value = "";
   $("#student-email").value = "";
   for (const id of ["profile-bound-at", "profile-last-seen", "profile-observed-ip", "profile-ip-source"]) $(`#${id}`).textContent = "—";
-  setPhoto(null);
 }
 
 function updateControls() {
@@ -101,13 +140,7 @@ function renderProfile(data) {
   state = "ready";
   $("#student-full-name").value = data.full_name;
   $("#student-email").value = data.email;
-  $("#student-profile-title").textContent = data.full_name;
-  $("#profile-display-email").textContent = data.email;
-  $("#student-profile-name").textContent = data.full_name;
-  $("#profile-role").textContent = "Student profile · this browser";
-  $("#profile-initials").textContent = initials(data.full_name);
-  $("#student-profile-avatar").textContent = initials(data.full_name);
-  setPhoto(data.photo_url);
+  renderAccountIdentity(data);
   $("#profile-device-details").hidden = false;
   $("#profile-bound-at").textContent = formatDate(data.installation.bound_at);
   $("#profile-last-seen").textContent = formatDate(data.installation.last_seen_at);
@@ -122,10 +155,10 @@ function renderProfile(data) {
 
 function renderSetup() {
   state = "create";
-  $("#student-full-name").value = currentUser.displayName || "";
-  $("#student-email").value = currentUser.email || "";
-  $("#profile-initials").textContent = initials(currentUser.displayName);
-  setPhoto(currentUser.photoURL);
+  const google = googleDetails();
+  $("#student-full-name").value = google.name;
+  $("#student-email").value = google.email;
+  renderAccountIdentity();
   setStatus("Your Firebase account is signed in. Confirm the details supplied by Google, then accept the installation policy to create your student profile. No course or payment is involved.");
 }
 
@@ -152,6 +185,7 @@ async function loadProfile({ refresh = false, sync = false } = {}) {
   try {
     if (refresh) await authClient.refreshAccount();
     if (!isCurrent()) return;
+    renderAccountIdentity();
     const response = await authClient.apiRequest("/api/v1/profile", sync ? {
       method: "POST", body: JSON.stringify({ installation_policy: INSTALLATION_POLICY })
     } : {});
@@ -164,9 +198,13 @@ async function loadProfile({ refresh = false, sync = false } = {}) {
     if (refresh) notifyProfileReady();
   } catch (error) {
     if (!isCurrent()) return;
-    state = "error";
+    state = error.code === "STUDENT_PROFILES_DISABLED" ? "account" : "error";
     clearProfileDisplay();
-    setStatus(`${error.message || "Your profile could not be loaded."} Your browser-local study data is unaffected.`, "error", error.code);
+    if (state === "account") {
+      setStatus("You are signed in with Google. Your name, email and available profile photo are supplied by your Google account.", "ok", error.code);
+    } else {
+      setStatus(`${error.message || "Your saved student profile could not be loaded."} Your browser-local study data is unaffected.`, "error", error.code);
+    }
   } finally {
     if (isCurrent()) { profileBusy = false; updateControls(); }
   }
@@ -264,10 +302,10 @@ signOutButton.addEventListener("click", async () => {
   finally { signOutButton.disabled = false; }
 });
 
-function accountChanged(user) {
-  sessionScope.invalidate();
+async function accountChanged(user) {
+  const isCurrent = sessionScope.begin();
   profileScope.invalidate();
-  currentUser = user;
+  currentUser = null;
   state = "guest";
   profileBusy = false;
   securityBusy = false;
@@ -277,8 +315,22 @@ function accountChanged(user) {
   clearProfileDisplay();
   setSecurityStatus("");
   updateControls();
-  if (user) loadProfile();
-  else setStatus("Sign in with Google to create and edit your student profile. Your saved local study data is unaffected by signing out.");
+  if (!user) {
+    setStatus("Sign in with Google to see your name, email and profile photo. Your saved local study data is unaffected by signing out.");
+    return;
+  }
+  setStatus("Checking your Google account…");
+  try {
+    const googleSession = await authClient.hasGoogleSession(user);
+    if (!isCurrent()) return;
+    if (!googleSession) { setStatus("Sign in with Google again to see your account.", "error"); return; }
+    currentUser = user;
+    clearProfileDisplay();
+    updateControls();
+    loadProfile();
+  } catch {
+    if (isCurrent()) setStatus("Your Google session could not be verified. Connect and sign in again to see your account.", "error");
+  }
 }
 
 try {

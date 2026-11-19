@@ -296,11 +296,7 @@ for (const id of ["stat-cards", "stat-sessions", "stat-materials"]) {
   const node = document.getElementById(id);
   if (node) observer.observe(node, { childList: true, characterData: true, subtree: true });
 }
-// Hide "Sign in" once a student profile is showing.
-const nameNode = $("#student-profile-name");
-const syncSignIn = () => { const link = $("#ws-signin"); if (link && nameNode) link.hidden = nameNode.textContent.trim() !== "Student workspace"; };
-if (nameNode) new MutationObserver(syncSignIn).observe(nameNode, { childList: true, characterData: true, subtree: true });
-syncSignIn();
+// student-profile.mjs derives the account controls from Google Auth, not Neon readiness.
 document.addEventListener("fire-counsel:page", () => toggleBell(false));
 window.addEventListener("storage", (event) => { if (event.key === PLANNER_KEY) renderDeadlines(); });
 // Deadlines count days, so refresh them when the student comes back later.
