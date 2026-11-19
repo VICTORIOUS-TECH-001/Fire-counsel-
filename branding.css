@@ -1,0 +1,200 @@
+/* Shared FIRE COUNSEL branding. Loaded last on every page so the emblem,
+   wordmark and tagline have one centered, uncropped treatment. The original
+   gavel artwork is landscape (3:2), not a square app icon. */
+:root { --fc-admin-header-height: 180px; }
+
+.fc-brand-lockup,
+body.ws .fc-brand-lockup,
+.app ~ .site-footer .fc-brand-lockup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: fit-content;
+  min-width: 0;
+  max-width: 100%;
+  flex-shrink: 0;
+  text-align: center;
+  text-decoration: none;
+}
+.fc-brand-lockup > .fc-brand-copy {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  line-height: 1.2;
+}
+.fc-brand-lockup .fc-brand-copy strong,
+.fc-brand-lockup .fc-brand-copy small {
+  display: block;
+  max-width: 100%;
+  margin: 0;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.fc-brand-lockup .fc-brand-copy strong { font-size: 15px; letter-spacing: .1em; }
+.fc-brand-lockup .fc-brand-copy small { font-size: 9px; letter-spacing: .08em; }
+body.ws .ws-brand .fc-brand-copy strong,
+body.ws .ws-brand .fc-brand-copy small { white-space: normal; }
+
+.fc-brand-lockup .fc-brand-emblem,
+body.ws .fc-brand-lockup .fc-brand-emblem,
+.app ~ .site-footer .fc-brand-emblem,
+.auth-gate-card .fc-brand-emblem,
+.fc-title .fc-brand-emblem,
+.fc-logo.fc-brand-emblem {
+  display: block;
+  flex: none;
+  width: var(--fc-logo-width, 96px);
+  height: calc(var(--fc-logo-width, 96px) * 2 / 3);
+  max-width: 100%;
+  aspect-ratio: 3 / 2;
+  padding: 0;
+  overflow: hidden;
+  object-fit: contain;
+  object-position: center;
+  border: 1px solid rgba(242, 173, 73, .32);
+  border-radius: 14px;
+  background: #08090b;
+  box-shadow: 0 6px 20px rgba(20, 12, 5, .16);
+}
+.fc-brand-emblem img,
+body.ws .fc-brand-emblem img,
+.app ~ .site-footer .fc-brand-emblem img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  border-radius: inherit;
+}
+.fc-brand-lockup:focus-visible { outline: 3px solid #f2ad49; outline-offset: 6px; border-radius: 8px; }
+
+/* Public masthead: the logo gets its own truly centered row. Navigation and
+   its CTA sit below it; the mobile menu occupies a balanced side column. */
+html:has(.site-header) { scroll-padding-top: calc(var(--site-header-height, 184px) + 14px); }
+.site-header {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  justify-content: normal;
+  gap: 14px 16px;
+  height: auto;
+  padding-block: 14px;
+}
+.site-header > .site-brand { grid-column: 2; grid-row: 1; justify-self: center; }
+.site-header .menu-toggle { grid-column: 3; grid-row: 1; justify-self: end; margin: 0; }
+.site-header .primary-nav {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-content: center;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+}
+.site-header .nav-links { justify-content: center; flex-wrap: wrap; }
+
+/* Footer branding spans the whole footer, rather than sitting beside the
+   first link column. The study footer is centered in its content region. */
+.site-footer .footer-main,
+.app ~ .site-footer .footer-main { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 30px; }
+.site-footer .footer-brand,
+.app ~ .site-footer .footer-brand { grid-column: 1 / -1; display: grid; justify-items: center; text-align: center; }
+.site-footer .footer-brand > p,
+.app ~ .site-footer .footer-brand > p { max-width: 420px; margin: 16px auto 0; }
+.site-footer .footer-column,
+.app ~ .site-footer .footer-column { justify-items: center; text-align: center; }
+.site-footer .footer-disclaimer { text-align: center; }
+
+/* Sign-in, public student pages and the already-centered private-page gates. */
+.auth-brand.fc-brand-lockup { margin: 0 auto 28px; }
+.auth-brand .fc-brand-copy strong { font-size: 17px; }
+.auth-gate-card .fc-brand-emblem { --fc-logo-width: 108px; }
+
+/* Workspace: center the sidebar identity and repeat it in the main masthead
+   only while the sidebar is off-canvas. Both follow published brand settings. */
+body.ws .ws-brand { width: 100%; padding: 2px 6px 20px; margin-bottom: 12px; }
+body.ws .ws-top-brand { display: none; }
+body.ws .ws-brand .fc-brand-emblem { --fc-logo-width: 108px; }
+body.ws .ws-top-brand .fc-brand-copy strong { color: #fff; }
+body.ws .ws-top-brand .fc-brand-copy small { color: var(--ws-sky); }
+
+/* Admin masthead: controls have a separate row so no action can offset the
+   logo. Keep the sticky section navigation below the new header height. */
+.admin-topbar {
+  height: var(--fc-admin-header-height);
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 24px;
+}
+.admin-topbar .admin-top-actions { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; }
+.admin-sidebar { top: var(--fc-admin-header-height); height: calc(100vh - var(--fc-admin-header-height)); }
+
+/* AI: equal-width side tracks keep the brand centered despite the menu's
+   single button and the right-hand pair of controls having different widths. */
+.fc-top {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr) 100px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 12px;
+}
+.fc-top > .fc-round { justify-self: start; }
+.fc-top .fc-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  justify-self: center;
+  width: 100%;
+  max-width: 240px;
+  margin: 0;
+  padding: 0;
+}
+.fc-title .fc-brand-emblem { --fc-logo-width: 72px; border-radius: 11px; }
+.fc-title .fc-title-label { position: relative; display: block; width: 100%; padding-inline: 12px; overflow: visible; white-space: normal; }
+.fc-title #fc-mode-name { display: block; overflow: visible; white-space: normal; overflow-wrap: anywhere; text-align: center; font-size: 14px; font-weight: 700; line-height: 1.25; }
+.fc-title .fc-title-label svg { position: absolute; right: 0; top: 50%; width: 12px; height: 12px; transform: translateY(-50%); }
+.fc-top .fc-pill { justify-self: end; margin: 0; }
+.fc-home { text-align: center; }
+body.fc-ai .fc-logo { --fc-logo-width: 144px; margin: 0 auto 18px; clip-path: none; background: #08090b; }
+.fc-logo::after { content: none; }
+.fc-home .fc-sub { margin-inline: auto; }
+.fc-home .fc-suggest { align-items: center; justify-content: center; }
+.fc-drawer-head { position: relative; justify-content: center; padding: 4px 42px 8px; }
+.fc-drawer-head .fc-brand { width: 100%; }
+.fc-drawer-head > .fc-round { position: absolute; top: 0; right: 0; }
+
+@media (max-width: 900px) {
+  body.ws[data-theme] .ws-topbar {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    height: auto;
+    gap: 10px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+  body.ws .ws-top-brand { --fc-logo-width: 84px; display: flex; grid-column: 1 / -1; grid-row: 1; justify-self: center; }
+  body.ws .ws-topbar .ws-menu { grid-column: 1; grid-row: 2; }
+  body.ws .ws-topbar .ws-top-right { grid-column: 2; grid-row: 2; justify-self: end; margin-left: 0; }
+  body.ws .ws-topbar .ws-search { display: block !important; grid-column: 1 / -1; grid-row: 3; order: initial; width: 100%; max-width: none; }
+}
+@media (max-width: 760px) {
+  .site-header { --fc-logo-width: 84px; gap: 0 10px; padding: 12px 16px; }
+  .site-header .primary-nav { top: calc(100% + 8px); max-height: calc(100dvh - var(--site-header-height, 140px) - 24px); overflow-y: auto; }
+  .site-header .primary-nav .nav-links { display: grid; justify-content: stretch; }
+}
+@media (max-width: 680px) {
+  :root { --fc-admin-header-height: 160px; }
+  .admin-topbar { --fc-logo-width: 84px; gap: 10px; padding: 10px 14px; }
+  .admin-sidebar { height: auto; }
+}
+@media (max-width: 640px) {
+  .site-footer .footer-main,
+  .app ~ .site-footer .footer-main { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+}

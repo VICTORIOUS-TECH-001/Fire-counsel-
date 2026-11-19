@@ -12,6 +12,7 @@
 <link href="./integrations.css" rel="stylesheet"/>
 <link href="./ai-studio.css" rel="stylesheet"/>
 <link href="./ai-page.css" rel="stylesheet"/>
+<link rel="stylesheet" href="./branding.css">
 </head>
 <body class="fc-ai" data-theme="dark" data-view="home" data-presence-page="ai" data-signed-in="false" data-auth-gate="pending">
 <div class="fc-preloader" id="fc-preloader" role="status" aria-label="FIRE COUNSEL is loading">
@@ -25,7 +26,7 @@
 <script type="module" src="./auth-gate.mjs"></script>
 <div class="auth-gate" id="auth-gate" role="dialog" aria-modal="true" aria-labelledby="auth-gate-title">
   <div class="auth-gate-card">
-    <img class="auth-gate-brand" src="./assets/images/fire-counsel-brand.jpg" alt="" width="56" height="56">
+    <img class="auth-gate-brand fc-brand-emblem" src="./assets/images/fire-counsel-brand.jpg" alt="" width="96" height="64">
     <span class="auth-gate-lock" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
     <h1 id="auth-gate-title">AI studio locked</h1>
     <p id="auth-gate-message">Fire Counsel AI is private. Sign in to open it.</p>
@@ -43,7 +44,8 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
     </button>
     <button class="fc-title" id="fc-mode-switch" type="button" aria-label="Choose an AI function">
-      <span id="fc-mode-name">Fire Counsel</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5z"/></svg>
+      <img class="fc-brand-emblem" src="./assets/images/fire-counsel-brand.jpg" alt="" width="72" height="48">
+      <span class="fc-title-label"><span id="fc-mode-name">Fire Counsel</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5z"/></svg></span>
     </button>
     <div class="fc-pill">
       <button class="fc-pill-btn" id="fc-open-functions-top" type="button" aria-label="All AI functions" title="All AI functions">
@@ -58,8 +60,8 @@
   <!-- ======================= conversation area ======================= -->
   <main class="fc-main" id="ai-workspace" data-mode="chat" aria-labelledby="ai-workspace-title">
     <section class="fc-home" id="fc-home" aria-label="Welcome">
-      <div class="fc-logo" aria-hidden="true">
-        <div class="fc-fire fc-fire-big"><i class="fl fl1"></i><i class="fl fl2"></i><i class="fl fl3"></i><i class="fl fl4"></i><i class="em em1"></i><i class="em em2"></i><i class="em em3"></i></div>
+      <div class="fc-logo fc-brand-emblem" aria-hidden="true">
+        <img src="./assets/images/fire-counsel-brand.jpg" alt="" width="144" height="96">
       </div>
       <h1>Hi! I'm Fire Counsel</h1>
       <p class="fc-sub">All-in-one AI for law students: legal questions, case analysis, exam-ready notes, mnemonics and past-question practice.</p>
@@ -122,7 +124,7 @@
 <div class="fc-scrim" id="fc-scrim" hidden></div>
 <aside class="fc-drawer" id="fc-drawer" aria-label="Fire Counsel AI menu" hidden>
   <div class="fc-drawer-head">
-    <a class="fc-brand" href="./study.html"><img alt="" height="36" width="36" src="./assets/images/fire-counsel-brand.jpg"/><span><strong>FIRE COUNSEL</strong><small>AI · LEGAL STUDY</small></span></a>
+    <a class="fc-brand fc-brand-lockup" href="./study.html"><img class="fc-brand-emblem" alt="" height="64" width="96" src="./assets/images/fire-counsel-brand.jpg"/><span class="fc-brand-copy"><strong>FIRE COUNSEL</strong><small>AI · LEGAL STUDY</small></span></a>
     <button class="fc-round fc-small" id="fc-drawer-close" type="button" aria-label="Close menu">×</button>
   </div>
   <button class="fc-new" id="ai-new-conversation" type="button">＋ New conversation</button>

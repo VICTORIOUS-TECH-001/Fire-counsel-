@@ -40,6 +40,18 @@ for (const page of pages) {
   });
 }
 
+test("all six pages load shared centered branding after their page styles, including static and dynamic footers", () => {
+  for (const page of pages) {
+    const head = read(page).split("</head>")[0];
+    const styles = [...head.matchAll(/<link\b[^>]*\brel="stylesheet"[^>]*>/g)].map(match => match[0]);
+    assert.match(styles.at(-1), /href="\.\/branding\.css"/, `${page}: branding rules are loaded last`);
+    assert.match(read(page), /fc-brand-lockup/, `${page}: the shared lockup is mounted`);
+  }
+  assert.match(read("site.js"), /footer-mark fc-brand-lockup/, "published JSON/footer rendering keeps the shared lockup");
+  assert.match(read("workspace.mjs"), /setImage\("ws-top-logo", cfg\.brand\.logo\)/, "mobile and sidebar logos use the same published setting");
+  for (const server of ["backend/src/website.js", "tools/dev_server.py"]) assert.match(read(server), /"branding\.css"/, `${server} serves the shared stylesheet`);
+});
+
 test("every admin navigation item has exactly one panel, with one initially visible", () => {
   const html = read("admin.html");
   const panels = [...html.matchAll(/<section\b[^>]*id="panel-([^"]+)"[^>]*>/g)];
