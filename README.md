@@ -4,7 +4,7 @@
 
 **Local tests are not live-project approval.** Firebase and Neon are not configured in this checkout. Read [STATUS.md](STATUS.md) for the latest test results, integration limits, and remaining release gates. Render Free remains **disposable staging only**, never a place for real student data, prompts or payments.
 
-**Owner setup:** [Google-only access, admin usage and Neon steps](DEPLOYMENT.md), plus [Groq/Tavily/Brave online-search setup and diagnostics](DEPLOYMENT.md#5-groqtavily-still-show-false-after-saving-keys).
+**Owner setup:** [Google-only access, admin usage and Neon steps](DEPLOYMENT.md), plus [Multi-AI/RAG/search setup and diagnostics](DEPLOYMENT.md#5-groqtavily-still-show-false-after-saving-keys).
 
 ## Run the app safely
 
@@ -50,10 +50,11 @@ python3 tools/dev_server.py --port 8082 --api-port 4002
 
 ## AI answers and online search
 
-- **Writer:** Groq, Gemini or OpenRouter. **Retrieval:** Tavily → Brave Search → Gemini grounding by default. Groq + Tavily/Brave can answer text questions without Gemini; Groq alone is not a search engine. Each service needs its own server-side API credential and usable quota.
-- Copy `backend/.env.example` to the ignored `backend/.env` for local setup, or configure the actual deployed API service. The examples prefer Groq via `AI_WRITER_PROVIDER_ORDER=groq,gemini,openrouter`; priorities for retrieval are independently configurable. Never put these keys in a frontend file, localStorage, Git or chat.
+- **Writer:** Groq, DeepSeek, Gemini or OpenRouter. **Retrieval:** Tavily → Brave Search → SerpAPI → Gemini grounding by default. Groq/DeepSeek + Tavily/Brave/SerpAPI can answer text questions without Gemini; a text writer alone does not enable online search in this app. Each service needs its own server-side API credential and usable quota.
+- Copy `backend/.env.example` to the ignored `backend/.env` for local setup, or configure the actual deployed API service. The examples prefer Groq via `AI_WRITER_PROVIDER_ORDER=groq,deepseek,gemini,openrouter`; priorities for retrieval are independently configurable. Never put these keys in a frontend file, localStorage, Git or chat.
 - Selected online search must produce source URLs; if all retrieval fails, the request fails clearly instead of silently writing from memory. Failed jobs do not count against the student's daily allowance. Students can explicitly turn off Web search for a non-web answer. Answers show the retrieval provider/time and label optional reuse (off by default).
 - `/api/health` and KEY ADDED mean **presence**, not working authentication. The Google/admin-protected connection test reports actual provider/model/search failures and spends provider quota when selected. Source excerpts/link badges do not establish that a legal holding or quotation is correct.
+- Writer failover preserves the same library/source evidence, has total/per-provider deadlines and circuit cooldowns, and rejects unsupported files instead of dropping them. DeepSeek is usage-billed; free tiers are limited. See [the connector architecture, key list and current free-access notes](backend/AI_CONNECTORS.md).
 - See [the exact deployment checklist](DEPLOYMENT.md#5-groqtavily-still-show-false-after-saving-keys). No new AI schema migration is needed for this repair, but existing Firebase/Neon/AI tables and Premium/admin controls still apply. Automated tests use fixtures, not live provider keys or fetched legal materials.
 
 ## Repeatable checks

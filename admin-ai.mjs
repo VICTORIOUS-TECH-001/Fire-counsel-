@@ -52,18 +52,21 @@ function renderStatus(data) {
     <dt>Writing models</dt><dd>${escapeHTML(p.gemini.models.join(", "))}</dd>
     <dt>Web-search model</dt><dd>${escapeHTML(p.gemini.search_models.join(", "))}</dd>
     <dt>Groq (writer)</dt><dd>${state(Boolean(p.groq?.configured), "KEY ADDED", "NO KEY")} ${escapeHTML((p.groq?.models || []).join(", "))}${p.groq?.key_name ? ` <small>(${escapeHTML(p.groq.key_name)})</small>` : ""}${p.groq?.warning ? `<br><small class="fc-warn">⚠ ${escapeHTML(p.groq.warning)}</small>` : ""}</dd>
+    <dt>DeepSeek (writer)</dt><dd>${state(Boolean(p.deepseek?.configured), "KEY ADDED", "NO KEY")} ${escapeHTML((p.deepseek?.models || []).join(", "))}${p.deepseek?.key_name ? ` <small>(${escapeHTML(p.deepseek.key_name)})</small>` : ""}</dd>
+    <dt>SerpAPI (web search)</dt><dd>${state(Boolean(p.serpapi?.configured), "KEY ADDED", "NO KEY")}${p.serpapi?.key_name ? ` <small>(${escapeHTML(p.serpapi.key_name)})</small>` : ""}</dd>
     <dt>OpenRouter (backup)</dt><dd>${state(p.openrouter.configured, "KEY ADDED", "NO KEY")} ${escapeHTML(p.openrouter.models.join(", "))}${p.openrouter.warning ? `<br><small class="fc-warn">⚠ ${escapeHTML(p.openrouter.warning)}</small>` : ""}</dd>
     <dt>Tavily (web search)</dt><dd>${state(Boolean(p.tavily?.configured), "KEY ADDED", "NO KEY")}${p.tavily?.key_name ? ` <small>(${escapeHTML(p.tavily.key_name)})</small>` : ""}${p.tavily?.warning ? `<br><small class="fc-warn">⚠ ${escapeHTML(p.tavily.warning)}</small>` : ""}</dd>
     <dt>Brave Search (web search)</dt><dd>${state(Boolean(p.brave?.configured), "KEY ADDED", "NO KEY")}${p.brave?.key_name ? ` <small>(${escapeHTML(p.brave.key_name)})</small>` : ""}</dd>
     <dt>Writer order</dt><dd>${escapeHTML((p.writer_order || []).join(" → ") || "See configured writers above")}</dd>
     <dt>Search failover order</dt><dd>${escapeHTML((p.search?.order || []).join(" → ") || "See configured search services above")}</dd>
+    <dt>Writer deadlines</dt><dd>${p.writer_timeout_ms ? `${Math.round(p.writer_timeout_ms / 1000)}s total · ${Math.round(p.writer_provider_timeout_ms / 1000)}s maximum per provider (shared fairly with fallbacks)` : "Bounded by server settings"}</dd>
     <dt>Database tables</dt><dd>${state(data.schema_ready, "READY", "NOT INSTALLED")}</dd>
   </dl>${data.schema_ready ? "" : `<p class="fc-status" data-kind="error">The AI tables are not in Neon yet. On GitHub open <b>Actions → “Neon database migration (AI, website, uploads)” → Run workflow</b>.</p>`}`;
   if (data.render_service && $("#ai-render-service")) $("#ai-render-service").textContent = data.render_service;
   $("#ai-provider-status").insertAdjacentHTML("beforeend", `<p class="fc-status">KEY ADDED means the running server sees a setting, not that the provider accepted it. Use the connection test below for authentication, quota and actual source results. Web search is separate from the answer-writing model.</p>`);
-  const independentSearch = Boolean(p.tavily?.configured || p.brave?.configured);
-  if (!independentSearch) $("#ai-provider-status").insertAdjacentHTML("beforeend", `<p class="fc-status" data-kind="error">No independent web-search key is configured. Add <code>TAVILY_API_KEY</code> or <code>BRAVE_SEARCH_API_KEY</code> (optionally both for failover). Gemini grounding can also work if this project's model/quota supports it; Groq alone does not search the web.</p>`);
-  if (!p.groq?.configured || !independentSearch) {
+  const independentSearch = Boolean(p.tavily?.configured || p.brave?.configured || p.serpapi?.configured);
+  if (!independentSearch) $("#ai-provider-status").insertAdjacentHTML("beforeend", `<p class="fc-status" data-kind="error">No independent web-search key is configured. Add <code>TAVILY_API_KEY</code>, <code>BRAVE_SEARCH_API_KEY</code> or <code>SERPAPI_API_KEY</code> (multiple keys enable failover). Gemini grounding can also work if this project's model/quota supports it; a Groq or DeepSeek writer alone does not enable web retrieval in this app.</p>`);
+  if (!p.configured || !independentSearch) {
     $("#ai-provider-status").insertAdjacentHTML("beforeend", `<p class="fc-status">Configure the keys on the API service <b>${escapeHTML(data.render_service || "fire-counsel-2")}</b>, not just a local file or GitHub Actions. In Render use <b>Environment → Save and deploy</b>. Link any environment group to this exact service and check for blank/stale service-level overrides. Confirm the deployment becomes <b>Live</b>, then inspect <a href="/api/health" target="_blank" rel="noopener">/api/health</a> for canonical <b>missing / empty / present</b> states and the deployed commit.</p>`);
   }
   const today = data.today || {};
@@ -149,7 +152,7 @@ function testErrorText(error) {
   return error.message;
 }
 
-const PROVIDER_NAMES = { gemini: "Google Gemini", groq: "Groq", openrouter: "OpenRouter", tavily: "Tavily", brave: "Brave Search" };
+const PROVIDER_NAMES = { gemini: "Google Gemini", groq: "Groq", deepseek: "DeepSeek", serpapi: "SerpAPI", openrouter: "OpenRouter", tavily: "Tavily", brave: "Brave Search" };
 
 // One row per model/service: healthy or not, how fast, and why it failed.
 function renderHealth(models) {

@@ -452,14 +452,16 @@ test("admin sections navigate correctly and a student cannot unlock database con
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test("admin AI panel distinguishes key presence from health for Groq, Tavily and Brave", async ({ page }) => {
+test("admin AI panel distinguishes key presence from health for all writer/search connectors", async ({ page }) => {
   await stubAuth(page, { user: admin });
   let gatewayTimeout = false;
   let delayedTest = null;
   let releaseTest;
   const testRequests = [];
   const providers = {
-    configured: true, writer_order: ["groq", "gemini", "openrouter"], search: { configured: true, order: ["tavily", "brave", "gemini"] },
+    configured: true, writer_timeout_ms: 240000, writer_provider_timeout_ms: 60000, writer_order: ["groq", "deepseek", "gemini", "openrouter"], search: { configured: true, order: ["tavily", "brave", "serpapi", "gemini"] },
+    deepseek: { configured: true, key_name: "DEEPSEEK_API_KEY", models: ["deepseek-flash"] },
+    serpapi: { configured: true, key_name: "SERPAPI_API_KEY" },
     brave: { configured: true, key_name: "BRAVE_SEARCH_API_KEY" },
     gemini: { configured: true, models: ["gemini-3.8-flash"], search_models: ["gemini-2.5-flash-lite"] },
     groq: { configured: true, key_name: "GROQ_API_KEY", warning: null, models: ["openai/gpt-oss-120b", "openai/gpt-oss-20b"] },
@@ -471,7 +473,9 @@ test("admin AI panel distinguishes key presence from health for Groq, Tavily and
     { provider: "groq", model: "openai/gpt-oss-120b", role: "fast backup", ok: true, ms: 420, reply: "FIRE COUNSEL AI is connected.", sources: 0 },
     { provider: "openrouter", model: "free-model", role: "backup", ok: true, ms: 2100, reply: "FIRE COUNSEL AI is connected.", sources: 0 },
     { provider: "tavily", model: "tavily", role: "web search", ok: true, ms: 800, reply: "3 pages", sources: 3 },
-    { provider: "brave", model: "brave", role: "web search", ok: false, ms: 700, code: "PROVIDER_AUTH", error: "Brave rejected the API key." }
+    { provider: "brave", model: "brave", role: "web search", ok: false, ms: 700, code: "PROVIDER_AUTH", error: "Brave rejected the API key." },
+    { provider: "deepseek", model: "deepseek-flash", role: "writer", ok: true, ms: 900, reply: "FIRE COUNSEL AI is connected.", sources: 0 },
+    { provider: "serpapi", model: "serpapi", role: "web search", ok: true, ms: 1100, sources: 3 }
   ];
   await page.route("**/api/**", async route => {
     const path = new URL(route.request().url()).pathname;
@@ -494,6 +498,9 @@ test("admin AI panel distinguishes key presence from health for Groq, Tavily and
   await expect(status).toContainText("Tavily (web search)");
   await expect(status).toContainText("TRIVILY_API_KEY");
   await expect(status).toContainText("Brave Search (web search)");
+  await expect(status).toContainText("DeepSeek (writer)");
+  await expect(status).toContainText("SerpAPI (web search)");
+  await expect(status).toContainText("240s total");
   await expect(status).toContainText("not that the provider accepted it");
   await expect(page.locator("#ai-test-models tbody tr")).toHaveCount(0);
   await expect(page.locator("#ai-test-search")).toBeChecked();
@@ -503,7 +510,9 @@ test("admin AI panel distinguishes key presence from health for Groq, Tavily and
   await expect(page.locator("#ai-test-result")).toContainText("Working: Groq (openai/gpt-oss-120b)");
   await expect(page.locator("#ai-test-result")).toContainText("Web search works via Tavily (3 sources)");
   const rows = page.locator("#ai-test-models tbody tr");
-  await expect(rows).toHaveCount(5);
+  await expect(rows).toHaveCount(7);
+  await expect(rows.nth(5)).toContainText("DeepSeek");
+  await expect(rows.nth(6)).toContainText("SerpAPI");
   expect(testRequests[0]).toEqual({ search: true });
   await expect(rows.nth(4)).toContainText("Brave Search");
   await expect(rows.nth(4)).toContainText("AUTH");

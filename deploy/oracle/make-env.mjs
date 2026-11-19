@@ -7,8 +7,8 @@
 import { readFileSync, writeFileSync, existsSync, renameSync, chmodSync } from "node:fs";
 
 const REQUIRED = ["DATABASE_URL", "ADMIN_EMAILS"];
-const WRITER_KEYS = ["GROQ_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY"];
-const OPTIONAL = [...WRITER_KEYS, "TAVILY_API_KEY", "BRAVE_SEARCH_API_KEY", "BRAVE_API_KEY", "FC_DOMAIN", "GEMINI_MODELS", "GEMINI_SEARCH_MODELS", "GROQ_MODELS", "OPENROUTER_MODELS", "GROQ_TOKENS_PER_MINUTE", "TAVILY_SEARCH_DEPTH", "TAVILY_MAX_RESULTS", "BRAVE_MAX_RESULTS", "AI_WRITER_PROVIDER_ORDER", "WEB_SEARCH_PROVIDER_ORDER", "WEB_SEARCH_TIMEOUT_MS", "WEB_SEARCH_PROVIDER_TIMEOUT_MS", "AI_RESEARCH_CACHE_MINUTES", "AI_TIMEZONE", "AI_MAX_CONCURRENT_JOBS"];
+const WRITER_KEYS = ["GROQ_API_KEY", "DEEPSEEK_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY"];
+const OPTIONAL = [...WRITER_KEYS, "TAVILY_API_KEY", "SERPAPI_API_KEY", "SERPAPI_KEY", "DEEPSEEK_KEY", "BRAVE_SEARCH_API_KEY", "BRAVE_API_KEY", "FC_DOMAIN", "GEMINI_MODELS", "GEMINI_SEARCH_MODELS", "GROQ_MODELS", "DEEPSEEK_MODELS", "OPENROUTER_MODELS", "GROQ_TOKENS_PER_MINUTE", "TAVILY_SEARCH_DEPTH", "TAVILY_MAX_RESULTS", "BRAVE_MAX_RESULTS", "SERPAPI_MAX_RESULTS", "AI_TIMEOUT_MS", "AI_WRITER_PROVIDER_TIMEOUT_MS", "AI_WRITER_PROVIDER_ORDER", "WEB_SEARCH_PROVIDER_ORDER", "WEB_SEARCH_TIMEOUT_MS", "WEB_SEARCH_PROVIDER_TIMEOUT_MS", "AI_RESEARCH_CACHE_MINUTES", "AI_TIMEZONE", "AI_MAX_CONCURRENT_JOBS"];
 const ALLOWED = new Set([...REQUIRED, ...OPTIONAL, "FIREBASE_SERVICE_ACCOUNT_JSON"]);
 
 export function cleanValue(key, raw) {
@@ -98,7 +98,7 @@ export function buildEnv({ secrets = {}, firebase = "", previous = {}, host }) {
   const serviceAccount = firebase || secrets.FIREBASE_SERVICE_ACCOUNT_JSON || previous.FIREBASE_SERVICE_ACCOUNT_JSON || "";
   if (serviceAccount) settings.FIREBASE_SERVICE_ACCOUNT_JSON = serviceAccount;
   const missing = REQUIRED.filter((key) => !settings[key]);
-  if (!WRITER_KEYS.some((key) => settings[key])) missing.push("AI writer key (GROQ_API_KEY, GEMINI_API_KEY or OPENROUTER_API_KEY)");
+  if (![...WRITER_KEYS, "DEEPSEEK_KEY"].some((key) => settings[key])) missing.push("AI writer key (GROQ_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY or OPENROUTER_API_KEY)");
   if (!settings.FIREBASE_SERVICE_ACCOUNT_JSON) missing.push("FIREBASE key file");
   const text = "# FIRE COUNSEL private settings. Written by deploy/oracle/setup.sh — keep secret.\n" +
     Object.entries(settings).map(([key, value]) => `${key}='${value}'`).join("\n") + "\n";

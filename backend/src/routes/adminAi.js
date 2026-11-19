@@ -57,7 +57,7 @@ export function createAdminAiRouter({
   router.post("/test", async (req, res) => {
     try {
       const config = aiConfig(env);
-      if (!config.configured && !(req.body?.search === true && config.search.configured)) throw new AiError(503, "No requested AI/search provider is configured. Add a writer key (GROQ_API_KEY or GEMINI_API_KEY) and a search key (TAVILY_API_KEY or BRAVE_SEARCH_API_KEY) on this API service, then redeploy.", "AI_NOT_CONFIGURED");
+      if (!config.configured && !(req.body?.search === true && config.search.configured)) throw new AiError(503, "No requested AI/search provider is configured. Add a writer key (GROQ_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY or OPENROUTER_API_KEY) and a search key (TAVILY_API_KEY, BRAVE_SEARCH_API_KEY or SERPAPI_API_KEY) on this API service, then redeploy.", "AI_NOT_CONFIGURED");
       const models = await testModels({ env, fetchImpl, search: req.body?.search === true });
       const first = config.writerOrder.map((name) => models.find((item) => item.provider === name && item.ok && !/search/.test(item.role))).find(Boolean);
       const searchRows = models.filter((item) => /search/.test(item.role));

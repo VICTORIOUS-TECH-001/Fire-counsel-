@@ -527,7 +527,7 @@ test("documents: footnotes, links and verification table make it into the PDF an
 
 // ---------------- reliability: model health, time limits, progress, deadlines ----------------
 
-test("a missing or hanging model is skipped for the next request, but never refused outright", async () => {
+test("missing or hanging models respect cooldowns, including when every writer is down", async () => {
   const { resetProviderHealth, providerHealth } = await import("../src/services/ai/providers.js");
   resetProviderHealth();
   const seen = [];
@@ -545,10 +545,10 @@ test("a missing or hanging model is skipped for the next request, but never refu
   seen.length = 0;
   await generate({ messages: [{ role: "user", text: "Q" }], timeoutMs: 50 }, { env, fetchImpl });
   assert.deepEqual(seen, ["m3"], "known-bad models are skipped");
-  // When every model is marked bad they are still all tried.
+  // When every model is cooled down, fail clearly without hammering them.
   seen.length = 0;
   await assert.rejects(generate({ messages: [{ role: "user", text: "Q" }], timeoutMs: 50 }, { env: { GEMINI_API_KEY: "g", GEMINI_MODELS: "m1,slow" }, fetchImpl }), { code: "PROVIDER_TIMEOUT" });
-  assert.deepEqual(seen, ["m1", "slow"]);
+  assert.deepEqual(seen, [], "do not bypass the circuit breaker when all models are unavailable");
   resetProviderHealth();
 });
 
@@ -1192,4 +1192,77 @@ test("search-only admin diagnostics work without Neon or a writer and remain Goo
   assert.deepEqual(body.data.search, { ok: true, provider: "brave", model: "brave", sources: 1 });
   assert.equal(calls, 1);
   assert.doesNotMatch(JSON.stringify(body), /brave-private-synthetic/);
+});
+
+test("queued RAG job retrieves from SerpAPI once, fails over DeepSeek to Groq and preserves sources/ownership", async t => {
+  const { resetProviderHealth } = await import("../src/services/ai/providers.js");
+  resetProviderHealth(); t.after(resetProviderHealth);
+  await pool.query("INSERT INTO ai_user_limits (firebase_uid, premium) VALUES ('user-a', true)");
+  const env = { DEEPSEEK_API_KEY: "sk-synthetic-private-deepseek", GROQ_API_KEY: "gsk_synthetic", SERPAPI_API_KEY: "synthetic-private-serpapi", AI_WRITER_PROVIDER_ORDER: "deepseek,groq" };
+  const calls = [];
+  const studioFactory = options => createStudio({ ...options, researchCache: false, verify: async sources => sources.map(source => ({ ...source, status: "reachable" })), fetchImpl: async (url, init) => {
+    calls.push(new URL(url).hostname);
+    if (String(url).includes("serpapi")) return jsonResponse(200, { search_metadata: { status: "Success" }, organic_results: [{ link: "https://example.org/report", title: "Supplied report", snippet: "Synthetic retrieved evidence" }] });
+    assert.match(JSON.parse(init.body).messages.at(-1).content, /Synthetic retrieved evidence/);
+    if (String(url).includes("deepseek")) return jsonResponse(402, { error: { message: `No credit ${env.DEEPSEEK_API_KEY}` } });
+    return jsonResponse(200, { model: "synthetic-backup", choices: [{ message: { content: "See [supplied report](https://example.org/report)." } }] });
+  } });
+  const request = await serve(t, app => app.use("/api/v1/ai", createAiRouter({ poolProvider: () => pool, verifyToken: stubVerify, env, studioFactory, configured: () => true })));
+  const me = (await (await request("/api/v1/ai/me")).json()).data;
+  assert.equal(me.configured, true);
+  assert.deepEqual(me.search_providers, ["serpapi"]);
+  const response = await request("/api/v1/ai/messages", { method: "POST", body: { mode: "chat", text: "Explain the supplied report", options: { webSearch: true } } });
+  assert.equal(response.status, 202);
+  const sent = await response.json();
+  const done = await waitForMessage(request, sent.data.conversation.id);
+  assert.equal(done.status, "done", done.content);
+  assert.equal(done.provider, "groq");
+  assert.equal(done.meta.fallback, true);
+  assert.deepEqual(done.meta.writer_attempts.map(item => [item.provider, item.status]), [["deepseek", "failed"], ["groq", "completed"]]);
+  assert.deepEqual(done.meta.search_providers, ["serpapi"]);
+  assert.equal(done.sources[0].origin, "serpapi");
+  assert.equal((await getAllowance(pool, "user-a")).features.chat.used, 1);
+  assert.equal((await request(`/api/v1/ai/conversations/${sent.data.conversation.id}`, { token: "user-b" })).status, 404);
+  assert.doesNotMatch(JSON.stringify(done), /synthetic-private|No credit/);
+  assert.deepEqual(calls, ["serpapi.com", "api.deepseek.com", "api.groq.com"]);
+});
+
+test("an exhausted DeepSeek-only writer fails the queued job, refunds usage and never stores reasoning", async t => {
+  const { resetProviderHealth } = await import("../src/services/ai/providers.js");
+  resetProviderHealth(); t.after(resetProviderHealth);
+  await pool.query("INSERT INTO ai_user_limits (firebase_uid, premium) VALUES ('user-a', true)");
+  const env = { DEEPSEEK_API_KEY: "sk-synthetic-private-deepseek" };
+  const studioFactory = options => createStudio({ ...options, fetchImpl: async () => jsonResponse(200, { choices: [{ finish_reason: "length", message: { content: "", reasoning_content: "PRIVATE REASONING" } }] }) });
+  const request = await serve(t, app => app.use("/api/v1/ai", createAiRouter({ poolProvider: () => pool, verifyToken: stubVerify, env, studioFactory, configured: () => true })));
+  const sent = await (await request("/api/v1/ai/messages", { method: "POST", body: { mode: "chat", text: "Supplied question", options: { webSearch: false } } })).json();
+  const done = await waitForMessage(request, sent.data.conversation.id);
+  assert.equal(done.status, "failed");
+  assert.equal(done.meta.code, "PROVIDER_OUTPUT_LIMIT");
+  assert.match(done.content, /not counted/);
+  assert.doesNotMatch(JSON.stringify(done), /PRIVATE REASONING|synthetic-private/);
+  assert.equal((await getAllowance(pool, "user-a")).features.chat.used, 0);
+});
+
+test("protected admin diagnostics support DeepSeek/SerpAPI without Neon and only search when selected", async t => {
+  const { resetProviderHealth } = await import("../src/services/ai/providers.js");
+  resetProviderHealth(); t.after(resetProviderHealth);
+  const calls = [];
+  const env = { DEEPSEEK_API_KEY: "sk-synthetic-private-deepseek", SERPAPI_API_KEY: "synthetic-private-serpapi" };
+  const request = await serve(t, app => app.use("/api/v1/admin/ai", createAdminAiRouter({ verifyToken: stubVerify, env, configured: () => false,
+    fetchImpl: async url => { calls.push(new URL(url).hostname); return String(url).includes("serpapi")
+      ? jsonResponse(200, { search_metadata: { status: "Success" }, organic_results: [{ link: "https://example.org/report", title: "Supplied report", snippet: "Synthetic evidence" }] })
+      : jsonResponse(200, { choices: [{ message: { content: "FIRE COUNSEL AI is connected." } }] }); }
+  })));
+  assert.equal((await request("/api/v1/admin/ai/test", { token: "missing", method: "POST", body: { search: true } })).status, 401);
+  assert.equal((await request("/api/v1/admin/ai/test", { token: "user-a", method: "POST", body: { search: true } })).status, 403);
+  assert.deepEqual(calls, []);
+  const writers = (await (await request("/api/v1/admin/ai/test", { token: "admin", method: "POST", body: { search: false } })).json()).data;
+  assert.equal(writers.provider, "deepseek");
+  assert.equal(writers.search, null);
+  assert.deepEqual(calls, ["api.deepseek.com"]);
+  const all = (await (await request("/api/v1/admin/ai/test", { token: "admin", method: "POST", body: { search: true } })).json()).data;
+  assert.equal(all.ok, true);
+  assert.equal(all.search.provider, "serpapi");
+  assert.equal(all.search.sources, 1);
+  assert.doesNotMatch(JSON.stringify(all), /synthetic-private/);
 });

@@ -14,14 +14,19 @@ ADMIN_EMAILS=
 DATABASE_URL=
 # At least one writer key. Groq can work without Gemini for text answers.
 GROQ_API_KEY=
+DEEPSEEK_API_KEY=
 GEMINI_API_KEY=
 OPENROUTER_API_KEY=
-# At least one independent search key is recommended; both enable failover.
+# At least one independent search key is recommended; multiple keys enable failover.
 TAVILY_API_KEY=
 BRAVE_SEARCH_API_KEY=
+SERPAPI_API_KEY=
+DEEPSEEK_MODELS=deepseek-flash
+AI_TIMEOUT_MS=240000
+AI_WRITER_PROVIDER_TIMEOUT_MS=60000
 # Optional priorities; keys/active API access are still required.
-AI_WRITER_PROVIDER_ORDER=groq,gemini,openrouter
-WEB_SEARCH_PROVIDER_ORDER=tavily,brave,gemini
+AI_WRITER_PROVIDER_ORDER=groq,deepseek,gemini,openrouter
+WEB_SEARCH_PROVIDER_ORDER=tavily,brave,serpapi,gemini
 AI_RESEARCH_CACHE_MINUTES=0
 # -------------------------------------------------------------------------
 FIRE_COUNSEL_SETTINGS
