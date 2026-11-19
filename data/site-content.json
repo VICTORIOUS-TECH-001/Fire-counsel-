@@ -2,8 +2,8 @@
   "brand": {
     "name": "FIRE COUNSEL",
     "tagline": "Ignite your legal intelligence",
-    "markImage": "./assets/images/fire-counsel-brand.jpg",
-    "markAlt": "FIRE COUNSEL flaming gavel brand artwork"
+    "markImage": "./assets/images/fire-counsel-flame.png",
+    "markAlt": "FIRE COUNSEL flame logo"
   },
   "navigation": [
     {"label": "Home", "href": "#home"},
