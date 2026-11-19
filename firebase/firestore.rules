@@ -46,23 +46,25 @@ service cloud.firestore {
     function validNavItem(item) {
       return item is map
         && item.keys().hasOnly(["label", "href"])
-        && item.label is string && item.label.size() >= 1 && item.label.size() <= 60
+        && item.label.matches('(?s)^.{1,60}$')
         && isSafeLink(item.href);
     }
 
     function validSlide(slide, allowedKeys) {
+      // matches() is String-only: these dot-all bounds check both the type
+      // and character count, including multiline text, in one operation.
       return slide is map
         && slide.keys().hasOnly(allowedKeys)
-        && isBoundedText(slide.eyebrow, 120)
-        && slide.title is string && slide.title.size() >= 1 && slide.title.size() <= 120
-        && isBoundedText(slide.accent, 120)
-        && isBoundedText(slide.body, 600)
+        && slide.eyebrow.matches('(?s)^.{0,120}$')
+        && slide.title.matches('(?s)^.{1,120}$')
+        && slide.accent.matches('(?s)^.{0,120}$')
+        && slide.body.matches('(?s)^.{0,600}$')
         && isSafeImage(slide.image)
-        && isBoundedText(slide.imageAlt, 200)
-        && isBoundedText(slide.imageCredit, 200)
-        && isBoundedText(slide.primaryLabel, 60)
+        && slide.imageAlt.matches('(?s)^.{0,200}$')
+        && slide.imageCredit.matches('(?s)^.{0,200}$')
+        && slide.primaryLabel.matches('(?s)^.{0,60}$')
         && isSafeLink(slide.primaryHref)
-        && isBoundedText(slide.secondaryLabel, 60)
+        && slide.secondaryLabel.matches('(?s)^.{0,60}$')
         && isSafeLink(slide.secondaryHref);
     }
 

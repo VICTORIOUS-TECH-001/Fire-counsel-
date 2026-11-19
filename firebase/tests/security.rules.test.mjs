@@ -192,6 +192,72 @@ test("Firestore accepts optional workspace maps only on valid Google-admin site 
   await assertFails(setDoc(siteRef(adminDb), { ...content, navigation: [{ label: "Home", href: "#home", extra: true }] }));
 });
 
+test("Firestore slide and navigation text keeps its required types and character bounds", async () => {
+  const adminDb = googleContext("test-admin", { admin: true }).firestore();
+  const siteRef = doc(adminDb, "siteContent", "public");
+  const limits = { eyebrow: 120, title: 120, accent: 120, body: 600, imageAlt: 200, imageCredit: 200, primaryLabel: 60, secondaryLabel: 60 };
+  const maximum = validSiteContent("test-admin");
+  for (const [key, limit] of Object.entries(limits)) maximum.hero.slides[0][key] = "é".repeat(limit - 1) + "\n";
+  maximum.navigation = Array.from({ length: 8 }, () => ({ label: "n".repeat(60), href: "#home" }));
+  maximum.hero.slides = Array.from({ length: 12 }, () => ({ ...maximum.hero.slides[0] }));
+  await assertSucceeds(setDoc(siteRef, maximum));
+  for (const [key, limit] of Object.entries(limits)) {
+    for (const invalid of [null, false, 1, [], {}, "a".repeat(limit + 1)]) {
+      const content = validSiteContent("test-admin");
+      content.hero.slides[0][key] = invalid;
+      await assertFails(setDoc(siteRef, content));
+    }
+  }
+  for (const invalid of [null, false, 1, [], {}, "", "n".repeat(61)]) {
+    const content = validSiteContent("test-admin");
+    content.navigation[0].label = invalid;
+    await assertFails(setDoc(siteRef, content));
+  }
+  const missingTitle = validSiteContent("test-admin");
+  missingTitle.hero.slides[0].title = "";
+  await assertFails(setDoc(siteRef, missingTitle));
+});
+
+test("Firestore text-bound optimization agrees with string size for Unicode and multiline text", async () => {
+  // This separate demo project compares the old predicate to the optimized
+  // one. It never replaces the real rules under test, or uses a live project.
+  const boundsEnv = await initializeTestEnvironment({
+    projectId: `${PROJECT_ID}-bounds`,
+    firestore: {
+      host: "127.0.0.1", port: 8080,
+      rules: `rules_version = '2';
+        service cloud.firestore {
+          match /databases/{database}/documents {
+            function same(value, min, max, pattern) {
+              return value.matches(pattern) == (value is string && value.size() >= min && value.size() <= max);
+            }
+            match /checks/{id} {
+              allow create, update: if same(request.resource.data.text, 0, 60, '(?s)^.{0,60}$')
+                && same(request.resource.data.text, 1, 60, '(?s)^.{1,60}$')
+                && same(request.resource.data.text, 0, 120, '(?s)^.{0,120}$')
+                && same(request.resource.data.text, 1, 120, '(?s)^.{1,120}$')
+                && same(request.resource.data.text, 0, 200, '(?s)^.{0,200}$')
+                && same(request.resource.data.text, 0, 600, '(?s)^.{0,600}$');
+            }
+          }
+        }`
+    }
+  });
+  try {
+    const checkRef = doc(boundsEnv.unauthenticatedContext().firestore(), "checks", "bounds");
+    for (const [label, char] of Object.entries({ ascii: "a", newline: "\n", unicode: "é", astral: "😀", combining: "e\u0301", nullByte: "\0" })) {
+      for (const count of [0, 1, 59, 60, 61, 119, 120, 121, 199, 200, 201, 599, 600, 601]) {
+        await assert.doesNotReject(
+          () => assertSucceeds(setDoc(checkRef, { text: char.repeat(count) })),
+          `${label}, repeated ${count}: regex and size must agree`
+        );
+      }
+    }
+  } finally {
+    await boundsEnv.cleanup();
+  }
+});
+
 test("Firestore student pages are owned, validated and publish-gated", async () => {
   const ownerDb = googleContext("test-student").firestore();
   const otherDb = googleContext("other-student").firestore();
