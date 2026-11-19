@@ -45,27 +45,35 @@ service cloud.firestore {
 
     function validNavItem(item) {
       return item is map
-        && item.keys().hasOnly(["label", "href"])
-        && item.label.matches('(?s)^.{1,60}$')
-        && isSafeLink(item.href);
+        && [
+          item.keys().hasOnly(["label", "href"]),
+          item.label is string, item.label.size() >= 1, item.label.size() <= 60,
+          isSafeLink(item.href)
+        ].hasOnly([true]);
     }
 
     function validSlide(slide, allowedKeys) {
-      // matches() is String-only: these dot-all bounds check both the type
-      // and character count, including multiline text, in one operation.
+      // A flat list of boolean checks avoids a deep AND expression tree.
+      // Any false check or evaluation error denies the whole write. Keep
+      // size() for UTF-16 limits; regex character counts differ for emoji.
       return slide is map
-        && slide.keys().hasOnly(allowedKeys)
-        && slide.eyebrow.matches('(?s)^.{0,120}$')
-        && slide.title.matches('(?s)^.{1,120}$')
-        && slide.accent.matches('(?s)^.{0,120}$')
-        && slide.body.matches('(?s)^.{0,600}$')
-        && isSafeImage(slide.image)
-        && slide.imageAlt.matches('(?s)^.{0,200}$')
-        && slide.imageCredit.matches('(?s)^.{0,200}$')
-        && slide.primaryLabel.matches('(?s)^.{0,60}$')
-        && isSafeLink(slide.primaryHref)
-        && slide.secondaryLabel.matches('(?s)^.{0,60}$')
-        && isSafeLink(slide.secondaryHref);
+        && [
+          slide.keys().hasOnly(allowedKeys),
+          slide.eyebrow is string, slide.eyebrow.size() <= 120,
+          slide.title is string, slide.title.size() >= 1, slide.title.size() <= 120,
+          slide.accent is string, slide.accent.size() <= 120,
+          slide.body is string, slide.body.size() <= 600,
+          slide.image.size() <= 2048,
+          slide.image.matches('(?i)^((\\.?/)?assets/[A-Za-z0-9_./-]+\\.(png|jpe?g|webp)|/media/[0-9a-f-]{36}\\.(png|jpg|webp)|https://firebasestorage\\.googleapis\\.com/v0/b/fire-counsel\\.firebasestorage\\.app/o/site%2Fslides%2F[A-Za-z0-9_.%-]+\\.(png|jpe?g|webp)(\\?alt=media(&token=[A-Za-z0-9_-]+)?)?)$'),
+          slide.imageAlt is string, slide.imageAlt.size() <= 200,
+          slide.imageCredit is string, slide.imageCredit.size() <= 200,
+          slide.primaryLabel is string, slide.primaryLabel.size() <= 60,
+          slide.primaryHref.size() <= 300,
+          slide.primaryHref.matches('^(\\./|/|#)[^\\s"<>]*$|^https://[^\\s"<>]+$'),
+          slide.secondaryLabel is string, slide.secondaryLabel.size() <= 60,
+          slide.secondaryHref.size() <= 300,
+          slide.secondaryHref.matches('^(\\./|/|#)[^\\s"<>]*$|^https://[^\\s"<>]+$')
+        ].hasOnly([true]);
     }
 
     // Required fields are all dereferenced/type-checked below; a missing field
@@ -74,14 +82,16 @@ service cloud.firestore {
     function validNavigation(items) {
       let count = items.size();
       return items is list && count >= 1 && count <= 8
-        && validNavItem(items[0])
-        && (count < 2 || validNavItem(items[1]))
-        && (count < 3 || validNavItem(items[2]))
-        && (count < 4 || validNavItem(items[3]))
-        && (count < 5 || validNavItem(items[4]))
-        && (count < 6 || validNavItem(items[5]))
-        && (count < 7 || validNavItem(items[6]))
-        && (count < 8 || validNavItem(items[7]));
+        && [
+          validNavItem(items[0]),
+          (count < 2 || validNavItem(items[1])),
+          (count < 3 || validNavItem(items[2])),
+          (count < 4 || validNavItem(items[3])),
+          (count < 5 || validNavItem(items[4])),
+          (count < 6 || validNavItem(items[5])),
+          (count < 7 || validNavItem(items[6])),
+          (count < 8 || validNavItem(items[7]))
+        ].hasOnly([true]);
     }
 
     // 1..12 slides, every one validated (no list iteration in rules).
@@ -89,18 +99,20 @@ service cloud.firestore {
       let count = slides.size();
       let fields = ["eyebrow", "title", "accent", "body", "image", "imageAlt", "imageCredit", "primaryLabel", "primaryHref", "secondaryLabel", "secondaryHref"];
       return slides is list && count >= 1 && count <= 12
-        && validSlide(slides[0], fields)
-        && (count < 2 || validSlide(slides[1], fields))
-        && (count < 3 || validSlide(slides[2], fields))
-        && (count < 4 || validSlide(slides[3], fields))
-        && (count < 5 || validSlide(slides[4], fields))
-        && (count < 6 || validSlide(slides[5], fields))
-        && (count < 7 || validSlide(slides[6], fields))
-        && (count < 8 || validSlide(slides[7], fields))
-        && (count < 9 || validSlide(slides[8], fields))
-        && (count < 10 || validSlide(slides[9], fields))
-        && (count < 11 || validSlide(slides[10], fields))
-        && (count < 12 || validSlide(slides[11], fields));
+        && [
+          validSlide(slides[0], fields),
+          (count < 2 || validSlide(slides[1], fields)),
+          (count < 3 || validSlide(slides[2], fields)),
+          (count < 4 || validSlide(slides[3], fields)),
+          (count < 5 || validSlide(slides[4], fields)),
+          (count < 6 || validSlide(slides[5], fields)),
+          (count < 7 || validSlide(slides[6], fields)),
+          (count < 8 || validSlide(slides[7], fields)),
+          (count < 9 || validSlide(slides[8], fields)),
+          (count < 10 || validSlide(slides[9], fields)),
+          (count < 11 || validSlide(slides[10], fields)),
+          (count < 12 || validSlide(slides[11], fields))
+        ].hasOnly([true]);
     }
 
     // The whole homepage document. The write must carry server-owned metadata
@@ -108,28 +120,30 @@ service cloud.firestore {
     // so the public page can trust who published and when.
     function validSiteContent() {
       let data = request.resource.data;
-      return data.keys().hasOnly(["brand", "navigation", "hero", "quickFacts", "learning", "caseNotes", "articles", "resources", "footer", "workspace", "updatedAt", "updatedBy"])
-        && data.updatedAt == request.time
-        && data.updatedBy is string && data.updatedBy == request.auth.uid
-        && data.brand is map
-        && data.brand.keys().hasOnly(["name", "tagline", "markImage", "markAlt"])
-        && data.brand.name is string && data.brand.name.size() >= 1 && data.brand.name.size() <= 80
-        && isBoundedText(data.brand.tagline, 200)
-        && isSafeImage(data.brand.markImage)
-        && isBoundedText(data.brand.markAlt, 200)
-        && validNavigation(data.navigation)
-        && data.hero is map
-        && data.hero.keys().hasOnly(["autoplayMs", "slides"])
-        && (!data.hero.keys().hasAny(["autoplayMs"]) || (data.hero.autoplayMs is number && data.hero.autoplayMs >= 4000 && data.hero.autoplayMs <= 15000))
-        && validSlides(data.hero.slides)
-        && data.quickFacts is list && data.quickFacts.size() <= 40
-        && data.learning is map
-        && data.caseNotes is map
-        && data.articles is map
-        && data.resources is map
-        && data.footer is map
+      return [
+        data.keys().hasOnly(["brand", "navigation", "hero", "quickFacts", "learning", "caseNotes", "articles", "resources", "footer", "workspace", "updatedAt", "updatedBy"]),
+        data.updatedAt == request.time,
+        data.updatedBy is string, data.updatedBy == request.auth.uid,
+        data.brand is map,
+        data.brand.keys().hasOnly(["name", "tagline", "markImage", "markAlt"]),
+        data.brand.name is string, data.brand.name.size() >= 1, data.brand.name.size() <= 80,
+        isBoundedText(data.brand.tagline, 200),
+        isSafeImage(data.brand.markImage),
+        isBoundedText(data.brand.markAlt, 200),
+        validNavigation(data.navigation),
+        data.hero is map,
+        data.hero.keys().hasOnly(["autoplayMs", "slides"]),
+        (!data.hero.keys().hasAny(["autoplayMs"]) || (data.hero.autoplayMs is number && data.hero.autoplayMs >= 4000 && data.hero.autoplayMs <= 15000)),
+        validSlides(data.hero.slides),
+        data.quickFacts is list, data.quickFacts.size() <= 40,
+        data.learning is map,
+        data.caseNotes is map,
+        data.articles is map,
+        data.resources is map,
+        data.footer is map,
         // The dashboard editor publishes this optional section with the page.
-        && (!data.keys().hasAny(["workspace"]) || data.workspace is map);
+        (!data.keys().hasAny(["workspace"]) || data.workspace is map)
+      ].hasOnly([true]);
     }
 
     // Public homepage content, including the hero slides. Visitors read it

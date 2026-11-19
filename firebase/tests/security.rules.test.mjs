@@ -138,6 +138,22 @@ test("Firestore allows public site-content reads and verified admin publishing o
   await assertFails(deleteDoc(doc(adminDb, "siteContent", "public")));
 });
 
+async function assertFullSitePublish(reference, content, label) {
+  try {
+    return await assertSucceeds(setDoc(reference, content));
+  } catch (error) {
+    error.message = `${label}: ${error.message}`;
+    if (/1000 expressions/.test(error.message)) {
+      try {
+        const response = await fetch(`http://127.0.0.1:8080/emulator/v1/projects/${PROJECT_ID}:ruleCoverage`);
+        const report = await response.json();
+        error.message += `\nEmulator coverage (diagnostic, not the expression-limit counter): ${JSON.stringify(report).slice(0, 2500)}`;
+      } catch { /* Keep the original permission-denial failure if diagnostics fail. */ }
+    }
+    throw error;
+  }
+}
+
 test("Firestore accepts optional workspace maps only on valid Google-admin site publishes", async () => {
   const adminDb = googleContext("test-admin", { admin: true }).firestore();
   const studentDb = googleContext("test-student").firestore();
@@ -152,11 +168,11 @@ test("Firestore accepts optional workspace maps only on valid Google-admin site 
   atLimits.workspace = content.workspace;
   atLimits.navigation = Array.from({ length: 8 }, () => ({ label: "Home", href: "#home" }));
   atLimits.hero.slides = Array.from({ length: 12 }, () => ({ ...content.hero.slides[0] }));
-  await assertSucceeds(setDoc(siteRef(adminDb), atLimits));
+  await assertFullSitePublish(siteRef(adminDb), atLimits, "12 slides / 8 links with bundled images");
   const storageImage = "https://firebasestorage.googleapis.com/v0/b/fire-counsel.firebasestorage.app/o/site%2Fslides%2Fslide-1.jpg?alt=media&token=ab12-CD_34";
   atLimits.brand.markImage = storageImage;
   atLimits.hero.slides = atLimits.hero.slides.map(slide => ({ ...slide, image: storageImage }));
-  await assertSucceeds(setDoc(siteRef(adminDb), atLimits));
+  await assertFullSitePublish(siteRef(adminDb), atLimits, "12 slides / 8 links with Storage images");
   // Missing keys still fail closed after eliminating redundant hasAll checks.
   for (const key of Object.keys(validSiteContent("test-admin"))) {
     const missing = validSiteContent("test-admin");
@@ -200,7 +216,7 @@ test("Firestore slide and navigation text keeps its required types and character
   for (const [key, limit] of Object.entries(limits)) maximum.hero.slides[0][key] = "é".repeat(limit - 1) + "\n";
   maximum.navigation = Array.from({ length: 8 }, () => ({ label: "n".repeat(60), href: "#home" }));
   maximum.hero.slides = Array.from({ length: 12 }, () => ({ ...maximum.hero.slides[0] }));
-  await assertSucceeds(setDoc(siteRef, maximum));
+  await assertFullSitePublish(siteRef, maximum, "12 slides / 8 links with maximum-length multiline text");
   for (const [key, limit] of Object.entries(limits)) {
     for (const invalid of [null, false, 1, [], {}, "a".repeat(limit + 1)]) {
       const content = validSiteContent("test-admin");
@@ -218,44 +234,26 @@ test("Firestore slide and navigation text keeps its required types and character
   await assertFails(setDoc(siteRef, missingTitle));
 });
 
-test("Firestore text-bound optimization agrees with string size for Unicode and multiline text", async () => {
-  // This separate demo project compares the old predicate to the optimized
-  // one. It never replaces the real rules under test, or uses a live project.
-  const boundsEnv = await initializeTestEnvironment({
-    projectId: `${PROJECT_ID}-bounds`,
-    firestore: {
-      host: "127.0.0.1", port: 8080,
-      rules: `rules_version = '2';
-        service cloud.firestore {
-          match /databases/{database}/documents {
-            function same(value, min, max, pattern) {
-              return value.matches(pattern) == (value is string && value.size() >= min && value.size() <= max);
-            }
-            match /checks/{id} {
-              allow create, update: if same(request.resource.data.text, 0, 60, '(?s)^.{0,60}$')
-                && same(request.resource.data.text, 1, 60, '(?s)^.{1,60}$')
-                && same(request.resource.data.text, 0, 120, '(?s)^.{0,120}$')
-                && same(request.resource.data.text, 1, 120, '(?s)^.{1,120}$')
-                && same(request.resource.data.text, 0, 200, '(?s)^.{0,200}$')
-                && same(request.resource.data.text, 0, 600, '(?s)^.{0,600}$');
-            }
-          }
-        }`
+test("Firestore keeps UTF-16 text limits for emoji, combining marks and multiline content", async () => {
+  const adminDb = googleContext("test-admin", { admin: true }).firestore();
+  const siteRef = doc(adminDb, "siteContent", "public");
+  const limits = { eyebrow: 120, title: 120, accent: 120, body: 600, imageAlt: 200, imageCredit: 200, primaryLabel: 60, secondaryLabel: 60 };
+  for (const [key, limit] of Object.entries(limits)) {
+    for (const [label, char] of Object.entries({ newline: "\n", unicode: "é", astral: "😀", combining: "e\u0301", nullByte: "\0" })) {
+      const atLimit = validSiteContent("test-admin");
+      atLimit.hero.slides[0][key] = char.repeat(limit / char.length);
+      assert.equal(atLimit.hero.slides[0][key].length, limit);
+      await assert.doesNotReject(() => assertSucceeds(setDoc(siteRef, atLimit)), `${key}: ${label} at its bound`);
+      const oversized = validSiteContent("test-admin");
+      oversized.hero.slides[0][key] = atLimit.hero.slides[0][key] + char;
+      await assertFails(setDoc(siteRef, oversized));
     }
-  });
-  try {
-    const checkRef = doc(boundsEnv.unauthenticatedContext().firestore(), "checks", "bounds");
-    for (const [label, char] of Object.entries({ ascii: "a", newline: "\n", unicode: "é", astral: "😀", combining: "e\u0301", nullByte: "\0" })) {
-      for (const count of [0, 1, 59, 60, 61, 119, 120, 121, 199, 200, 201, 599, 600, 601]) {
-        await assert.doesNotReject(
-          () => assertSucceeds(setDoc(checkRef, { text: char.repeat(count) })),
-          `${label}, repeated ${count}: regex and size must agree`
-        );
-      }
-    }
-  } finally {
-    await boundsEnv.cleanup();
   }
+  const atLimit = validSiteContent("test-admin");
+  atLimit.navigation[0].label = "😀".repeat(30);
+  await assertSucceeds(setDoc(siteRef, atLimit));
+  atLimit.navigation[0].label += "😀";
+  await assertFails(setDoc(siteRef, atLimit));
 });
 
 test("Firestore student pages are owned, validated and publish-gated", async () => {
