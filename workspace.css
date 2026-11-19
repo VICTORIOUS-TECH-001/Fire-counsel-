@@ -168,7 +168,7 @@ body.ws .ws-privacy{margin:0;text-align:center;font-size:13px;color:var(--ws-mut
 
 /* AI card */
 body.ws .ws-ai-card{padding:18px;border-radius:18px;border:1.5px solid rgba(96,165,250,.75);background:linear-gradient(160deg,#0c245e 0%,#091b47 55%,#06132f 100%);box-shadow:0 0 0 1px rgba(147,197,253,.12) inset,0 0 28px rgba(59,130,246,.35)}
-body.ws .ws-ai-head{display:flex;align-items:center;gap:12px}
+body.ws .ws-ai-head{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}
 body.ws .ws-ai-head h2{margin:0;font:800 20px/1.1 var(--ws-serif);letter-spacing:.02em;color:#fff}
 body.ws .ws-ai-head p{margin:4px 0 0;font-size:14.5px;color:#cfe0ff}
 body.ws .ws-ai-bubble{display:flex;gap:10px;margin:16px 0 14px;padding:14px;border-radius:14px;border:1px solid rgba(96,165,250,.38);background:rgba(37,99,235,.14)}
@@ -281,10 +281,10 @@ body.ws .site-footer .brand-copy small{color:var(--ws-sky)}
   body.ws .ws-grid{grid-template-columns:minmax(0,1fr) 300px}
   body.ws .ws-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}
   body.ws .ws-tile-wide{grid-column:span 1;grid-template-columns:1fr;justify-items:center;text-align:center;padding:18px 40px 16px;min-height:132px}
-  body.ws .ws-bottom{grid-template-columns:1fr}
+  body.ws .ws-bottom{grid-template-columns:minmax(0,1fr)}
 }
 @media (max-width:1060px){
-  body.ws .ws-grid{grid-template-columns:1fr}
+  body.ws .ws-grid{grid-template-columns:minmax(0,1fr)}
   body.ws .ws-center,body.ws .ws-side{display:contents}
   body.ws .ws-hero{order:1}body.ws .ws-ai-card{order:2}body.ws .ws-tiles{order:3}body.ws .ws-bottom{order:4}body.ws .ws-quote{order:5;min-height:340px}body.ws .ws-courses{order:6}body.ws .ws-privacy{order:7}
   body.ws .ws-bottom{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -297,7 +297,7 @@ body.ws .site-footer .brand-copy small{color:var(--ws-sky)}
   body.ws[data-theme] .sidebar{width:280px}
 }
 @media (max-width:720px){
-  body.ws .ws-bottom{grid-template-columns:1fr}
+  body.ws .ws-bottom{grid-template-columns:minmax(0,1fr)}
   body.ws .ws-tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
   body.ws .ws-tile{min-height:122px;padding:14px 10px 14px;gap:8px}
   body.ws .ws-tile-wide{padding:14px 10px 14px;min-height:122px}
@@ -315,6 +315,10 @@ body.ws .site-footer .brand-copy small{color:var(--ws-sky)}
   body.ws .ws-search{display:block!important;order:3;flex:1 0 100%;max-width:none}
   body.ws[data-theme] .ws-search input{height:44px}
   body.ws .ws-search input{font-size:15px}
+  /* A course selector must wrap inside the card, not widen the dashboard
+     (and make an otherwise centered masthead look offset on small phones). */
+  body.ws .ws-course-select{flex-wrap:wrap;max-width:100%}
+  body.ws[data-theme] .ws-course-select select{min-width:0;max-width:100%}
   body.ws .ws-planner-form{grid-template-columns:1fr}
   body.ws .ws-planner-list .ws-deadline{grid-template-columns:48px minmax(0,1fr) auto}
   body.ws .ws-planner-list .ws-task-tools{grid-column:2/-1;justify-content:flex-end}

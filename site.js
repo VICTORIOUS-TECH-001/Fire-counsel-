@@ -181,7 +181,7 @@
     const footer = data.footer || {};
     const brand = data.brand || {};
     const inner = $("#footer-main");
-    inner.innerHTML = `<div class="footer-brand"><a class="site-brand footer-mark" href="#home"><span class="brand-image-wrap"><img src="${photo(brand.markImage)}" alt="" width="52" height="52" loading="lazy"></span><span class="brand-copy"><strong>${esc(brand.name || "FIRE COUNSEL")}</strong><small>${esc(brand.tagline || "")}</small></span></a><p>${esc(footer.summary || "")}</p></div>${(footer.columns || []).map(column => `<div class="footer-column"><h3>${esc(column.title)}</h3>${(column.items || []).map(link => `<a href="${href(link.href)}">${esc(link.label)}</a>`).join("")}</div>`).join("")}`;
+    inner.innerHTML = `<div class="footer-brand"><a class="site-brand footer-mark fc-brand-lockup" href="#home"><span class="brand-image-wrap fc-brand-emblem"><img src="${photo(brand.markImage)}" alt="" width="96" height="64" loading="lazy"></span><span class="brand-copy fc-brand-copy"><strong>${esc(brand.name || "FIRE COUNSEL")}</strong><small>${esc(brand.tagline || "")}</small></span></a><p>${esc(footer.summary || "")}</p></div>${(footer.columns || []).map(column => `<div class="footer-column"><h3>${esc(column.title)}</h3>${(column.items || []).map(link => `<a href="${href(link.href)}">${esc(link.label)}</a>`).join("")}</div>`).join("")}`;
     $("#footer-disclaimer").textContent = footer.disclaimer || "";
     $("#copyright-text").textContent = footer.copyright || "";
   }
@@ -199,6 +199,12 @@
   }
   function initNavigation() {
     const button = $("#nav-toggle"), nav = $("#primary-nav");
+    // Keep anchor targets clear of the centered masthead, including when a
+    // published name/tagline wraps or a mobile viewport changes its height.
+    const header = $(".site-header");
+    const measureHeader = () => document.documentElement.style.setProperty("--site-header-height", `${Math.ceil(header.getBoundingClientRect().height)}px`);
+    measureHeader();
+    if ("ResizeObserver" in window) new ResizeObserver(measureHeader).observe(header);
     const close = () => { nav.classList.remove("is-open"); button.setAttribute("aria-expanded", "false"); button.setAttribute("aria-label", "Open navigation"); };
     button.addEventListener("click", () => {
       const open = !nav.classList.contains("is-open"); nav.classList.toggle("is-open", open);

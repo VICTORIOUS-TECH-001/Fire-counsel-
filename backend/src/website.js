@@ -9,7 +9,7 @@ export const DEFAULT_WEBSITE_ROOT = path.resolve(path.dirname(fileURLToPath(impo
 // metadata, package files, tests and rules are never served.
 export const PUBLIC_FILES = new Set([
   "index.html", "study.html", "admin.html", "auth.html", "ai.html", "student.html",
-  "site.css", "styles.css", "admin.css", "auth.css", "integrations.css",
+  "site.css", "styles.css", "admin.css", "auth.css", "integrations.css", "branding.css",
   "site.js", "app.js", "admin.js", "sw.js", "manifest.webmanifest",
   "auth-page.mjs", "admin-auth.mjs", "admin-database.mjs",
   "study-materials.mjs", "research-search.mjs", "request-scope.mjs",
