@@ -147,7 +147,20 @@ async function assertFullSitePublish(reference, content, label) {
       try {
         const response = await fetch(`http://127.0.0.1:8080/emulator/v1/projects/${PROJECT_ID}:ruleCoverage`);
         const report = await response.json();
-        error.message += `\nEmulator coverage (diagnostic, not the expression-limit counter): ${JSON.stringify(report).slice(0, 2500)}`;
+        const observations = [];
+        const visit = node => {
+          if (!node || typeof node !== "object") return;
+          if (node.sourcePosition && Array.isArray(node.values)) {
+            observations.push({
+              position: node.sourcePosition,
+              observations: node.values.reduce((sum, value) => sum + (Number(value.count) || 0), 0)
+            });
+          }
+          for (const value of Object.values(node)) visit(value);
+        };
+        visit(report.report);
+        observations.sort((a, b) => b.observations - a.observations);
+        error.message += `\nEmulator coverage (diagnostic, not the expression-limit counter): ${JSON.stringify(observations.length ? observations.slice(0, 12) : { ...report, rules: undefined }).slice(0, 2500)}`;
       } catch { /* Keep the original permission-denial failure if diagnostics fail. */ }
     }
     throw error;
@@ -178,20 +191,28 @@ test("Firestore accepts optional workspace maps only on valid Google-admin site 
     const missing = validSiteContent("test-admin");
     delete missing[key];
     await assertFails(setDoc(siteRef(adminDb), missing));
+    missing.unexpected = true;
+    await assertFails(setDoc(siteRef(adminDb), missing));
   }
   for (const key of Object.keys(content.brand)) {
     const missing = validSiteContent("test-admin");
     delete missing.brand[key];
+    await assertFails(setDoc(siteRef(adminDb), missing));
+    missing.brand.unexpected = true;
     await assertFails(setDoc(siteRef(adminDb), missing));
   }
   for (const key of Object.keys(content.hero.slides[0])) {
     const missing = validSiteContent("test-admin");
     delete missing.hero.slides[0][key];
     await assertFails(setDoc(siteRef(adminDb), missing));
+    missing.hero.slides[0].unexpected = true;
+    await assertFails(setDoc(siteRef(adminDb), missing));
   }
   for (const key of ["label", "href"]) {
     const missing = validSiteContent("test-admin");
     delete missing.navigation[0][key];
+    await assertFails(setDoc(siteRef(adminDb), missing));
+    missing.navigation[0].unexpected = true;
     await assertFails(setDoc(siteRef(adminDb), missing));
   }
   for (const workspace of [null, [], "not a map"]) {
@@ -206,6 +227,9 @@ test("Firestore accepts optional workspace maps only on valid Google-admin site 
   await assertFails(setDoc(siteRef(adminDb), { ...content, brand: { ...content.brand, extra: true } }));
   await assertFails(setDoc(siteRef(adminDb), { ...content, hero: { ...content.hero, extra: true } }));
   await assertFails(setDoc(siteRef(adminDb), { ...content, navigation: [{ label: "Home", href: "#home", extra: true }] }));
+  const extraSlide = validSiteContent("test-admin");
+  extraSlide.hero.slides[0].extra = true;
+  await assertFails(setDoc(siteRef(adminDb), extraSlide));
 });
 
 test("Firestore slide and navigation text keeps its required types and character bounds", async () => {
@@ -219,6 +243,13 @@ test("Firestore slide and navigation text keeps its required types and character
   await assertFullSitePublish(siteRef, maximum, "12 slides / 8 links with maximum-length multiline text");
   for (const [key, limit] of Object.entries(limits)) {
     for (const invalid of [null, false, 1, [], {}, "a".repeat(limit + 1)]) {
+      const content = validSiteContent("test-admin");
+      content.hero.slides[0][key] = invalid;
+      await assertFails(setDoc(siteRef, content));
+    }
+  }
+  for (const key of ["image", "primaryHref", "secondaryHref"]) {
+    for (const invalid of [null, false, 1, [], {}]) {
       const content = validSiteContent("test-admin");
       content.hero.slides[0][key] = invalid;
       await assertFails(setDoc(siteRef, content));
