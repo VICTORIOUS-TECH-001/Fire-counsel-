@@ -1,13 +1,12 @@
-// Firestore browser client for the two collections written directly from this
-// site (see firebase/schema.md and firebase/firestore.rules):
-//   siteContent/public  — admin publishes homepage content incl. slides
+// Firestore reads and student-owned writes (see firebase/schema.md):
+//   siteContent/public  — public reads; validated admin API publishes the page
 //   studentPages/{uid}  — a signed-in student edits their own public page
 //
 // Firestore Lite keeps the public homepage light (no realtime cache). The
-// Auth SDK is imported lazily inside write helpers so a first-time visitor
-// reading the homepage never pays for it. Every write is independently
-// enforced by the deployed security rules — validation here only gives
-// early, plain-language feedback.
+// Auth SDK is imported lazily so public readers never pay for it. Student
+// writes are enforced by security rules. Homepage publishing instead uses
+// the Google/admin-protected API and the same full validator on the server;
+// all direct browser homepage writes are denied by the deployed rules.
 import { doc, getDoc, getFirestore, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-lite.js";
 import { firebaseApp, firebaseSetupError } from "./client.mjs";
 import { cleanStudentPage, siteContentFromDocument, validateSiteContent, validateStudentPage } from "./content-schema.mjs";
@@ -31,7 +30,7 @@ async function requireUser({ admin = false } = {}) {
     if (auth.currentUser !== user) throw new Error("Your session changed. Sign in again, then retry with the current account.");
   };
   // A recently granted admin claim may not be on the cached token yet. Force
-  // one refresh before publishing; rules still independently check the token.
+  // one refresh before publishing; the API independently verifies this token.
   const { claims } = await user.getIdTokenResult(admin);
   assertSession();
   if (claims.firebase?.sign_in_provider !== "google.com") throw new Error("Sign in with Google again before saving to Firebase.");
@@ -70,23 +69,26 @@ export async function loadPublicSiteContent() {
   }
 }
 
-// Admin publish: writes the reviewed document directly with the caller's
-// admin claim. The rules require updatedAt == request.time (the server
-// timestamp sentinel) and updatedBy == the caller's uid.
+// The API re-verifies the Google/admin token, validates the entire document
+// and owns updatedAt/updatedBy. This avoids the 1000-expression rules limit
+// without weakening the 12-slide schema or permitting browser writes.
 export async function publishSiteContent(content) {
   const check = validateSiteContent(content);
   if (!check.ok) throw new Error(`This content cannot be published: ${check.errors[0]}`);
-  const { db, user, assertSession } = await requireUser({ admin: true });
+  const { assertSession } = await requireUser({ admin: true });
+  const { apiRequest } = await import("./auth-client.mjs");
+  assertSession();
+  const response = await apiRequest("/api/v1/admin/site/firebase", {
+    method: "POST", body: JSON.stringify({ content, projectId: firebaseApp.options.projectId })
+  });
+  let body = {};
   try {
-    assertSession();
-    await setDoc(doc(db, SITE_CONTENT_DOC.collection, SITE_CONTENT_DOC.id), {
-      ...content,
-      updatedAt: serverTimestamp(),
-      updatedBy: user.uid
-    });
-  } catch (error) {
-    throw new Error(firestoreErrorText(error));
-  }
+    const parsed = await response.json();
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) body = parsed;
+  } catch { /* require a confirmed publish below */ }
+  assertSession();
+  if (!response.ok) throw new Error(typeof body.error === "string" ? body.error : `Firebase publishing was not confirmed (API ${response.status}). Deploy the matching API and check administrator access.`);
+  if (body.data?.published !== true) throw new Error("The API did not confirm Firebase publishing. Deploy the matching API, then reload the live content before trying again.");
 }
 
 // ---------------------------------------------------------------------------

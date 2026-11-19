@@ -2,8 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() {
-      // Check this session, not linked identities; legacy password/custom
-      // sessions cannot write or read private data, even with an admin claim.
+      // Check this session, not linked identities, including for admins.
       return request.auth != null
         && request.auth.token.firebase.sign_in_provider == 'google.com';
     }
@@ -16,155 +15,19 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
-    // ------------------------------------------------------------------
-    // Shared field checks. firebase/content-schema.mjs mirrors these exact
-    // limits in JavaScript for pre-write validation; keep them in sync.
-    // Rules cannot iterate lists, so list entries are checked per index up
-    // to the same maximum the client validator enforces.
-
     function isBoundedText(value, max) {
-      // Rules string concatenation is strict (unlike JavaScript): a non-string
-      // operand fails. The empty prefix preserves the exact UTF-16 length.
-      return ('' + value).size() <= max;
+      return value is string && value.size() <= max;
     }
 
-    // Links the homepage/student pages may point at: site-relative paths,
-    // in-page anchors, or https URLs. Never javascript: or data:.
-    function isSafeLink(value) {
-      return value is string
-        && value.size() <= 300
-        && value.matches('^(\\./|/|#)[^\\s"<>]*$|^https://[^\\s"<>]+$');
-    }
-
-    // Images the homepage may draw: bundled assets, Neon /media uploads, or
-    // the reviewed site/slides folder of the fire-counsel Storage bucket
-    // (object names are URL-encoded: site/slides/x.jpg -> site%2Fslides%2Fx.jpg).
-    function isSafeImage(value) {
-      return value is string
-        && value.size() <= 2048
-        && value.matches('(?i)^((\\.?/)?assets/[A-Za-z0-9_./-]+\\.(png|jpe?g|webp)|/media/[0-9a-f-]{36}\\.(png|jpg|webp)|https://firebasestorage\\.googleapis\\.com/v0/b/fire-counsel\\.firebasestorage\\.app/o/site%2Fslides%2F[A-Za-z0-9_.%-]+\\.(png|jpe?g|webp)(\\?alt=media(&token=[A-Za-z0-9_-]+)?)?)$');
-    }
-
-    function validNavItem(item) {
-      return item is map
-        && [
-          item.size() == 2,
-          item.label != "", ('' + item.label).size() <= 60,
-          isSafeLink(item.href)
-        ].hasOnly([true]);
-    }
-
-    function validSlide(slide) {
-      // A flat list of boolean checks avoids a deep AND expression tree.
-      // Any false check or evaluation error denies the whole write. Keep
-      // size() for UTF-16 limits; regex character counts differ for emoji.
-      return slide is map
-        && [
-          slide.size() == 11,
-          ('' + slide.eyebrow).size() <= 120,
-          slide.title != "", ('' + slide.title).size() <= 120,
-          ('' + slide.accent).size() <= 120,
-          ('' + slide.body).size() <= 600,
-          slide.image.size() <= 2048,
-          slide.image.matches('(?i)^((\\.?/)?assets/[A-Za-z0-9_./-]+\\.(png|jpe?g|webp)|/media/[0-9a-f-]{36}\\.(png|jpg|webp)|https://firebasestorage\\.googleapis\\.com/v0/b/fire-counsel\\.firebasestorage\\.app/o/site%2Fslides%2F[A-Za-z0-9_.%-]+\\.(png|jpe?g|webp)(\\?alt=media(&token=[A-Za-z0-9_-]+)?)?)$'),
-          ('' + slide.imageAlt).size() <= 200,
-          ('' + slide.imageCredit).size() <= 200,
-          ('' + slide.primaryLabel).size() <= 60,
-          slide.primaryHref.size() <= 300,
-          slide.primaryHref.matches('^(\\./|/|#)[^\\s"<>]*$|^https://[^\\s"<>]+$'),
-          ('' + slide.secondaryLabel).size() <= 60,
-          slide.secondaryHref.size() <= 300,
-          slide.secondaryHref.matches('^(\\./|/|#)[^\\s"<>]*$|^https://[^\\s"<>]+$')
-        ].hasOnly([true]);
-    }
-
-    // Every required key is dereferenced/type-checked. Those required keys
-    // plus an exact map size also exclude every unknown key, without repeatedly
-    // constructing field-name lists. Missing fields always fail closed.
-    function validNavigation(items) {
-      let count = items.size();
-      return items is list && count >= 1 && count <= 8
-        && [
-          validNavItem(items[0]),
-          (count < 2 || validNavItem(items[1])),
-          (count < 3 || validNavItem(items[2])),
-          (count < 4 || validNavItem(items[3])),
-          (count < 5 || validNavItem(items[4])),
-          (count < 6 || validNavItem(items[5])),
-          (count < 7 || validNavItem(items[6])),
-          (count < 8 || validNavItem(items[7]))
-        ].hasOnly([true]);
-    }
-
-    // 1..12 slides, every one validated (no list iteration in rules).
-    function validSlides(slides) {
-      let count = slides.size();
-      return slides is list && count >= 1 && count <= 12
-        && [
-          validSlide(slides[0]),
-          (count < 2 || validSlide(slides[1])),
-          (count < 3 || validSlide(slides[2])),
-          (count < 4 || validSlide(slides[3])),
-          (count < 5 || validSlide(slides[4])),
-          (count < 6 || validSlide(slides[5])),
-          (count < 7 || validSlide(slides[6])),
-          (count < 8 || validSlide(slides[7])),
-          (count < 9 || validSlide(slides[8])),
-          (count < 10 || validSlide(slides[9])),
-          (count < 11 || validSlide(slides[10])),
-          (count < 12 || validSlide(slides[11]))
-        ].hasOnly([true]);
-    }
-
-    // The whole homepage document. The write must carry server-owned metadata
-    // (updatedAt is the server timestamp sentinel, updatedBy the caller's uid)
-    // so the public page can trust who published and when.
-    function validSiteContent() {
-      let data = request.resource.data;
-      let hasWorkspace = "workspace" in data;
-      return [
-        data.size() == (hasWorkspace ? 12 : 11),
-        data.updatedAt == request.time,
-        data.updatedBy is string, data.updatedBy == request.auth.uid,
-        data.brand is map,
-        data.brand.size() == 4,
-        data.brand.name != "", ('' + data.brand.name).size() <= 80,
-        isBoundedText(data.brand.tagline, 200),
-        isSafeImage(data.brand.markImage),
-        isBoundedText(data.brand.markAlt, 200),
-        validNavigation(data.navigation),
-        data.hero is map,
-        data.hero.keys().hasOnly(["autoplayMs", "slides"]),
-        (!data.hero.keys().hasAny(["autoplayMs"]) || (data.hero.autoplayMs is number && data.hero.autoplayMs >= 4000 && data.hero.autoplayMs <= 15000)),
-        validSlides(data.hero.slides),
-        data.quickFacts is list, data.quickFacts.size() <= 40,
-        data.learning is map,
-        data.caseNotes is map,
-        data.articles is map,
-        data.resources is map,
-        data.footer is map,
-        // The dashboard editor publishes this optional section with the page.
-        (!hasWorkspace || data.workspace is map)
-      ].hasOnly([true]);
-    }
-
-    // Public homepage content, including the hero slides. Visitors read it
-    // live; only a server-issued admin: true claim may publish from the
-    // browser (validated above). Secrets and private account data never
-    // belong here. Deletion stays server-only so the homepage cannot be
-    // removed by a client.
+    // Public homepage/workspace content. All client writes are denied, even
+    // with an admin claim. The Google/admin-protected API validates the full
+    // schema and owns updatedAt/updatedBy before writing via the Admin SDK.
+    // This avoids the 1000-expression rule limit at 12 slides / 8 links.
+    // Admin SDK access is controlled by IAM, not these browser rules.
     match /siteContent/{documentId} {
       allow read: if true;
-      allow create, update: if isAdmin() && validSiteContent();
-      allow delete: if false;
+      allow write: if false;
     }
-
-    // ------------------------------------------------------------------
-    // Student public pages. A signed-in student owns studentPages/{their uid}
-    // and edits it directly from the study page; visitors can fetch a page
-    // only when the owner published it. Listing the collection is admin-only
-    // so the pages cannot be scraped en masse. The private account profile
-    // stays in Neon behind the API; nothing here replaces it.
 
     function validPageLink(value) {
       return value is string
@@ -205,6 +68,9 @@ service cloud.firestore {
           : data.createdAt == resource.data.createdAt);
     }
 
+    // Students edit only their own public page; Google admins may moderate.
+    // Only a published page is publicly fetchable. Collection listing is
+    // admin-only. Private account profiles remain behind the Neon API.
     match /studentPages/{uid} {
       allow get: if isAdmin()
         || isOwner(uid)
@@ -214,9 +80,7 @@ service cloud.firestore {
       allow delete: if isAdmin() || isOwner(uid);
     }
 
-    // ------------------------------------------------------------------
     // Account, quota, entitlement and usage changes are server-only.
-    // The backend must return each student only their own safe account summary.
     match /accounts/{uid} {
       allow read: if isAdmin();
       allow create, update, delete: if false;
@@ -242,8 +106,7 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
-    // Provider API keys are not Firestore documents. This deny-all fallback also
-    // blocks client access to any collection not intentionally listed above.
+    // Provider API keys are never public Firestore documents.
     match /{document=**} {
       allow read, write: if false;
     }

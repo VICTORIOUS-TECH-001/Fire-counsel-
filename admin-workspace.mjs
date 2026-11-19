@@ -1,7 +1,8 @@
 // Admin Studio → Student workspace. A form editor for everything on the
 // students' dashboard (study.html). "Publish to all students" updates the same
-// primary Firestore content as Pages & JSON, then archives it in Neon. Both
-// independently check the Google admin claim. "Preview" is local to this browser.
+// primary Firestore content as Pages & JSON through the protected publishing
+// API, then archives it in Neon. Every API write checks Google/admin separately.
+// "Preview" is local to this browser.
 import { DEFAULT_WORKSPACE, DESTINATIONS, ICON_NAMES, PROGRESS_KEYS, icon, mergeWorkspace, escapeHTML } from "./workspace-config.mjs";
 
 const $ = (selector) => document.querySelector(selector);
@@ -39,6 +40,16 @@ async function api(path, options = {}) {
     throw error;
   }
   return body;
+}
+
+// An unavailable archive must not hide the primary Firestore document or
+// cause an unknown unpublished draft to be overwritten.
+async function archivedSite() {
+  try {
+    const { data } = await api("/api/v1/admin/site");
+    if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("The Neon archive reply could not be read.");
+    return { data, error: null };
+  } catch (error) { return { data: {}, error }; }
 }
 
 function setEnabled(on) {
@@ -207,8 +218,8 @@ function cleaned() {
 async function loadWorkspace(mySession = session) {
   setStatus("Loading the student workspace settings…");
   try {
-    const [{ data }, live] = await Promise.all([
-      api("/api/v1/admin/site"),
+    const [{ data, error: archiveError }, live] = await Promise.all([
+      archivedSite(),
       firestoreClient?.loadPublicSiteContent() || null
     ]);
     if (mySession !== session) return;
@@ -223,7 +234,8 @@ async function loadWorkspace(mySession = session) {
     dirty = false;
     render();
     setEnabled(true);
-    setStatus(workspace ? "The live student workspace is loaded. Edit it, press Preview, then Publish to all students." : "Students currently see the original design. Edit it below, press Preview, then Publish to all students.", "ok");
+    const loaded = workspace ? "The live student workspace is loaded. Edit it, press Preview, then Publish to all students." : "Students currently see the original design. Edit it below, press Preview, then Publish to all students.";
+    setStatus(archiveError ? `${loaded} Neon drafts/history are unavailable: ${archiveError.message}` : loaded, archiveError ? "error" : "ok");
   } catch (error) {
     if (mySession !== session) return;
     render();
@@ -248,8 +260,8 @@ async function publish(button) {
   try {
     if (!firestoreClient) throw new Error("The Firebase publish client could not load. Reload this page online before publishing.");
     // Start from the primary live document, not a possibly stale Neon archive.
-    const [{ data }, live] = await Promise.all([
-      api("/api/v1/admin/site"), firestoreClient.loadPublicSiteContent()
+    const [{ data, error: archiveReadError }, live] = await Promise.all([
+      archivedSite(), firestoreClient.loadPublicSiteContent()
     ]);
     let base = live || data.published?.content;
     if (!base) base = await (await fetch("./data/site-content.json", { cache: "no-cache" })).json();
@@ -259,8 +271,8 @@ async function publish(button) {
     const draftIsNewer = draftSlot && (!data.published || new Date(draftSlot.updated_at) > new Date(data.published.updated_at));
     await firestoreClient.publishSiteContent(content);
     if (mySession !== session) return;
-    let archiveError = null;
-    try {
+    let archiveError = archiveReadError;
+    if (!archiveReadError) try {
       await api("/api/v1/admin/site/publish", { method: "POST", body: JSON.stringify({ content, note: "Student workspace updated" }) });
       if (mySession !== session) return;
       // Preserve unpublished Pages & JSON edits when updating the workspace.
@@ -275,7 +287,7 @@ async function publish(button) {
       ? `Live on Firebase, but the Neon archive/draft could not be saved: ${archiveError.message}`
       : "Published on Firebase and archived in Neon. Students see the new workspace on their next refresh.", archiveError ? "error" : "ok");
   } catch (error) {
-    if (mySession === session) setStatus(`Firebase publish failed; nothing went live: ${error.message}`, "error");
+    if (mySession === session) setStatus(`Firebase publishing was not confirmed; the Neon archive was not changed: ${error.message}`, "error");
   } finally {
     for (const id of ["ws-admin-publish", "ws-admin-publish-2"]) { const node = document.getElementById(id); if (node) node.disabled = !verified; }
   }

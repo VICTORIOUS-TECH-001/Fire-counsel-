@@ -772,6 +772,7 @@ test("admin previews a website draft, publishes to Firebase before Neon and rest
       return json(route, { data: { draft: { content: draft, updated_at: "2026-11-02T10:00:00Z" }, published: { content: base, updated_at: "2026-11-01T10:00:00Z" }, versions: [{ id: rowId, note: "First", published_by: "admin@example.invalid", created_at: "2026-11-01T10:00:00Z" }, { id: "323e4567-e89b-42d3-a456-426614174000", note: "Older", published_by: "admin@example.invalid", created_at: "2026-10-01T10:00:00Z" }] } });
     }
     if (path.startsWith("/api/v1/admin/site/versions/")) return json(route, { data: { content: base, created_at: "2026-11-01T10:00:00Z" } });
+    if (path === "/api/v1/admin/site/firebase") return route.fallback();
     if (path.startsWith("/api/v1/admin/site") || path.startsWith("/api/v1/admin/documents")) {
       calls.push({ method: request.method(), path, type: request.headers()["content-type"], body: request.postData(), firebaseWrites: path.endsWith("/publish") ? await page.evaluate(() => window.__firestore.writes.length) : null });
       if (path.endsWith("/usage")) return json(route, { data: { used_bytes: 1048576, budget_bytes: 367001600, files: 1, max_file_bytes: 26214400, ocr: { ai: true, ocr_space: false } } });

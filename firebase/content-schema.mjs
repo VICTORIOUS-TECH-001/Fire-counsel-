@@ -1,12 +1,11 @@
-// Shared, dependency-free validation for the two Firestore collections the
-// browser writes directly:
-//   siteContent/public  — homepage content incl. hero slides (admin claim only)
-//   studentPages/{uid}  — a student's own public page (owner or admin)
+// Shared, dependency-free validation for public Firestore content:
+//   siteContent/public  — browser preflight AND enforced admin API validation
+//   studentPages/{uid}  — student-owned writes, independently checked by rules
 //
-// firebase/firestore.rules mirrors these exact limits and field lists. When a
-// limit or field changes here, the rule must change in the same commit — the
-// emulator suite in firebase/tests/security.rules.test.mjs checks the rules,
-// and firebase/tests/content-schema.test.mjs checks this module.
+// Homepage browser writes are denied: full 12-slide validation exceeds the
+// Firestore rule expression budget. The protected API uses this same module,
+// owns metadata and writes with the Admin SDK. Keep student-page limits in
+// sync with firebase/firestore.rules; schema, API and emulator tests cover both.
 
 export const SITE_CONTENT_LIMITS = Object.freeze({
   MAX_SLIDES: 12,
@@ -17,8 +16,8 @@ export const SITE_CONTENT_LIMITS = Object.freeze({
   ALT_TEXT: 200,        // image alt text and credits
   LINK: 300,
   IMAGE: 2048,
-  // Generic deep caps for the sections the rules check only shallowly
-  // (learning, caseNotes, articles, resources, footer, quickFacts).
+  // Generic deep caps enforced by both browser preflight and the API
+  // (learning, caseNotes, articles, resources, footer, quickFacts, workspace).
   DEEP_STRING: 2000,
   DEEP_LIST: 40,
   DEEP_DEPTH: 8,

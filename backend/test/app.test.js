@@ -91,7 +91,7 @@ test("unimplemented uploads, account changes and payment routes stay absent", as
 
 test("AI, presence and admin AI routes require a Firebase sign-in", async t => {
   const base = await serve(t);
-  for (const [method, path] of [["POST", "/api/v1/ai/messages"], ["GET", "/api/v1/ai/me"], ["POST", "/api/v1/presence"], ["GET", "/api/v1/admin/ai/status"], ["POST", "/api/v1/admin/claim"]]) {
+  for (const [method, path] of [["POST", "/api/v1/ai/messages"], ["GET", "/api/v1/ai/me"], ["POST", "/api/v1/presence"], ["GET", "/api/v1/admin/ai/status"], ["POST", "/api/v1/admin/claim"], ["POST", "/api/v1/admin/site/firebase"]]) {
     const response = await fetch(`${base}${path}`, { method });
     assert.equal(response.status, 401, path);
   }

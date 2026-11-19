@@ -67,7 +67,7 @@ test("the optional workspace section can publish with homepage content and is bo
   }
 });
 
-test("nested field whitelists and required text match the Firestore write schema", () => {
+test("nested field whitelists and required text match the shared homepage publishing schema", () => {
   for (const change of [
     c => { c.brand.extra = true; },
     c => { delete c.brand.markAlt; },

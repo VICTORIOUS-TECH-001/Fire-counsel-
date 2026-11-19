@@ -15,7 +15,8 @@ import {
   getDoc,
   getDocs,
   serverTimestamp,
-  setDoc
+  setDoc,
+  updateDoc
 } from "firebase/firestore";
 import {
   deleteObject,
@@ -35,8 +36,8 @@ function googleContext(uid, claims = {}) {
   return testEnv.authenticatedContext(uid, { ...claims, firebase: { sign_in_provider: "google.com" } });
 }
 
-// A minimal document that satisfies every siteContent rule. Mirrors the
-// bundled data/site-content.json shape checked by firebase/content-schema.mjs.
+// Canonical public-page fixture. Only the protected API may persist it;
+// browser writes are denied independently of payload shape or admin claims.
 function validSiteContent(uid) {
   return {
     brand: { name: "FIRE COUNSEL", tagline: "Ignite your legal intelligence", markImage: "./assets/images/fire-counsel-brand.jpg", markAlt: "Brand" },
@@ -103,196 +104,46 @@ beforeEach(async () => {
   });
 });
 
-test("Firestore allows public site-content reads and verified admin publishing only", async () => {
-  const anonymousDb = testEnv.unauthenticatedContext().firestore();
-  const studentDb = googleContext("test-student").firestore();
-  const adminDb = googleContext("test-admin", { admin: true }).firestore();
-
-  const publicContent = await assertSucceeds(getDoc(doc(anonymousDb, "siteContent", "public")));
-  assert.equal(publicContent.exists(), true);
-
-  // The admin studio publishes directly from the browser, with the full shape
-  // and server-owned metadata enforced by the rules.
-  await assertSucceeds(setDoc(doc(adminDb, "siteContent", "public"), validSiteContent("test-admin")));
-
-  // Students and visitors can never publish, even with a valid document.
-  await assertFails(setDoc(doc(studentDb, "siteContent", "public"), validSiteContent("test-student")));
-  await assertFails(setDoc(doc(anonymousDb, "siteContent", "public"), validSiteContent("anon")));
-
-  // An admin write with a broken shape, a forged author, or a forged
-  // timestamp is refused.
-  const noSlides = { ...validSiteContent("test-admin"), hero: { slides: [] } };
-  await assertFails(setDoc(doc(adminDb, "siteContent", "public"), noSlides));
-  const badImage = validSiteContent("test-admin");
-  badImage.hero.slides[0].image = "https://evil.example/photo.png";
-  await assertFails(setDoc(doc(adminDb, "siteContent", "public"), badImage));
-  const badLink = validSiteContent("test-admin");
-  badLink.hero.slides[0].primaryHref = "javascript:alert(1)";
-  await assertFails(setDoc(doc(adminDb, "siteContent", "public"), badLink));
-  const forgedMeta = { ...validSiteContent("test-admin"), updatedBy: "someone-else", updatedAt: Timestamp.fromMillis(1000) };
-  await assertFails(setDoc(doc(adminDb, "siteContent", "public"), forgedMeta));
-  const extraSection = { ...validSiteContent("test-admin"), secrets: {} };
-  await assertFails(setDoc(doc(adminDb, "siteContent", "public"), extraSection));
-
-  // Deletion stays server-only so the homepage cannot be removed by a client.
-  await assertFails(deleteDoc(doc(adminDb, "siteContent", "public")));
+test("Firestore allows public content reads but denies every browser homepage write", async () => {
+  const contexts = [testEnv.unauthenticatedContext(), googleContext("test-student"), googleContext("test-admin", { admin: true })];
+  for (const context of contexts) {
+    const db = context.firestore();
+    const reference = doc(db, "siteContent", "public");
+    const content = await assertSucceeds(getDoc(reference));
+    assert.deepEqual(content.data(), { title: "Emulator fixture" });
+    // Even a valid Google admin must use the validated API. Both creates and
+    // replacements/patches/deletes are closed; a manipulated UI cannot bypass it.
+    await assertFails(setDoc(reference, validSiteContent("test-admin")));
+    await assertFails(setDoc(doc(db, "siteContent", "new-page"), validSiteContent("test-admin")));
+    await assertFails(updateDoc(reference, { title: "Forged", updatedBy: "test-admin", updatedAt: serverTimestamp() }));
+    await assertFails(deleteDoc(reference));
+    assert.deepEqual((await assertSucceeds(getDoc(reference))).data(), { title: "Emulator fixture" });
+  }
 });
 
-async function assertFullSitePublish(reference, content, label) {
-  const coverage = async () => {
-    const response = await fetch(`http://127.0.0.1:8080/emulator/v1/projects/${PROJECT_ID}:ruleCoverage`);
-    const report = await response.json();
-    const observations = new Map();
-    const visit = node => {
-      if (!node || typeof node !== "object") return;
-      if (node.sourcePosition && Array.isArray(node.values)) {
-        observations.set(JSON.stringify(node.sourcePosition), {
-          line: node.sourcePosition.line,
-          count: node.values.reduce((sum, value) => sum + (Number(value.count) || 0), 0)
-        });
-      }
-      for (const value of Object.values(node)) visit(value);
-    };
-    visit(report.report);
-    return observations;
-  };
-  const before = await coverage().catch(() => new Map());
-  try {
-    return await assertSucceeds(setDoc(reference, content));
-  } catch (error) {
-    error.message = `${label}: ${error.message}`;
-    if (/1000 expressions/.test(error.message)) {
-      try {
-        const lineVisits = {};
-        for (const [position, value] of await coverage()) {
-          const delta = value.count - (before.get(position)?.count || 0);
-          if (delta > 0) lineVisits[value.line] = Math.max(lineVisits[value.line] || 0, delta);
-        }
-        error.message += `\nEmulator per-line observation deltas (diagnostic, not the expression-limit counter): ${JSON.stringify(lineVisits)}`;
-      } catch { /* Keep the original permission-denial failure if diagnostics fail. */ }
-    }
-    throw error;
-  }
-}
-
-test("Firestore accepts optional workspace maps only on valid Google-admin site publishes", async () => {
-  const adminDb = googleContext("test-admin", { admin: true }).firestore();
-  const studentDb = googleContext("test-student").firestore();
-  const content = { ...validSiteContent("test-admin"), workspace: { welcome: { title: "Hello class" }, notices: ["New term"] } };
-  const siteRef = db => doc(db, "siteContent", "public");
-  await assertSucceeds(setDoc(siteRef(adminDb), content));
-  const stored = await assertSucceeds(getDoc(siteRef(testEnv.unauthenticatedContext().firestore())));
-  assert.equal(stored.data().workspace.welcome.title, "Hello class");
-  const bundled = JSON.parse(readFileSync(new URL("../../data/site-content.json", import.meta.url), "utf8"));
-  await assertSucceeds(setDoc(siteRef(adminDb), { ...bundled, workspace: content.workspace, updatedAt: serverTimestamp(), updatedBy: "test-admin" }));
-  const atLimits = validSiteContent("test-admin");
-  atLimits.workspace = content.workspace;
-  atLimits.navigation = Array.from({ length: 8 }, () => ({ label: "Home", href: "#home" }));
-  atLimits.hero.slides = Array.from({ length: 12 }, () => ({ ...content.hero.slides[0] }));
-  await assertFullSitePublish(siteRef(adminDb), atLimits, "12 slides / 8 links with bundled images");
-  const storageImage = "https://firebasestorage.googleapis.com/v0/b/fire-counsel.firebasestorage.app/o/site%2Fslides%2Fslide-1.jpg?alt=media&token=ab12-CD_34";
-  atLimits.brand.markImage = storageImage;
-  atLimits.hero.slides = atLimits.hero.slides.map(slide => ({ ...slide, image: storageImage }));
-  await assertFullSitePublish(siteRef(adminDb), atLimits, "12 slides / 8 links with Storage images");
-  // Missing keys still fail closed after eliminating redundant hasAll checks.
-  for (const key of Object.keys(validSiteContent("test-admin"))) {
-    const missing = validSiteContent("test-admin");
-    delete missing[key];
-    await assertFails(setDoc(siteRef(adminDb), missing));
-    missing.unexpected = true;
-    await assertFails(setDoc(siteRef(adminDb), missing));
-  }
-  for (const key of Object.keys(content.brand)) {
-    const missing = validSiteContent("test-admin");
-    delete missing.brand[key];
-    await assertFails(setDoc(siteRef(adminDb), missing));
-    missing.brand.unexpected = true;
-    await assertFails(setDoc(siteRef(adminDb), missing));
-  }
-  for (const key of Object.keys(content.hero.slides[0])) {
-    const missing = validSiteContent("test-admin");
-    delete missing.hero.slides[0][key];
-    await assertFails(setDoc(siteRef(adminDb), missing));
-    missing.hero.slides[0].unexpected = true;
-    await assertFails(setDoc(siteRef(adminDb), missing));
-  }
-  for (const key of ["label", "href"]) {
-    const missing = validSiteContent("test-admin");
-    delete missing.navigation[0][key];
-    await assertFails(setDoc(siteRef(adminDb), missing));
-    missing.navigation[0].unexpected = true;
-    await assertFails(setDoc(siteRef(adminDb), missing));
-  }
-  for (const workspace of [null, [], "not a map"]) {
-    await assertFails(setDoc(siteRef(adminDb), { ...content, workspace }));
-  }
-  await assertFails(setDoc(siteRef(studentDb), { ...content, updatedBy: "test-student" }));
-  await assertFails(setDoc(siteRef(adminDb), { ...content, unexpected: {} }));
-  const passwordAdmin = testEnv.authenticatedContext("test-admin", { admin: true, firebase: { sign_in_provider: "password" } }).firestore();
-  await assertFails(setDoc(siteRef(passwordAdmin), content));
-  // Browser validation catches these before the network; rules remain the
-  // independent authority if an altered client skips that validation.
-  await assertFails(setDoc(siteRef(adminDb), { ...content, brand: { ...content.brand, extra: true } }));
-  await assertFails(setDoc(siteRef(adminDb), { ...content, hero: { ...content.hero, extra: true } }));
-  await assertFails(setDoc(siteRef(adminDb), { ...content, navigation: [{ label: "Home", href: "#home", extra: true }] }));
-  const extraSlide = validSiteContent("test-admin");
-  extraSlide.hero.slides[0].extra = true;
-  await assertFails(setDoc(siteRef(adminDb), extraSlide));
-});
-
-test("Firestore slide and navigation text keeps its required types and character bounds", async () => {
-  const adminDb = googleContext("test-admin", { admin: true }).firestore();
-  const siteRef = doc(adminDb, "siteContent", "public");
-  const limits = { eyebrow: 120, title: 120, accent: 120, body: 600, imageAlt: 200, imageCredit: 200, primaryLabel: 60, secondaryLabel: 60 };
-  const maximum = validSiteContent("test-admin");
-  for (const [key, limit] of Object.entries(limits)) maximum.hero.slides[0][key] = "é".repeat(limit - 1) + "\n";
-  maximum.navigation = Array.from({ length: 8 }, () => ({ label: "n".repeat(60), href: "#home" }));
-  maximum.hero.slides = Array.from({ length: 12 }, () => ({ ...maximum.hero.slides[0] }));
-  for (const [key, limit] of Object.entries(limits)) {
-    for (const invalid of [null, false, 1, [], {}, "a".repeat(limit + 1)]) {
-      const content = validSiteContent("test-admin");
-      content.hero.slides[0][key] = invalid;
-      await assertFails(setDoc(siteRef, content));
-    }
-  }
-  for (const key of ["image", "primaryHref", "secondaryHref"]) {
-    for (const invalid of [null, false, 1, [], {}]) {
-      const content = validSiteContent("test-admin");
-      content.hero.slides[0][key] = invalid;
-      await assertFails(setDoc(siteRef, content));
-    }
-  }
-  for (const invalid of [null, false, 1, [], {}, "", "n".repeat(61)]) {
-    const content = validSiteContent("test-admin");
-    content.navigation[0].label = invalid;
-    await assertFails(setDoc(siteRef, content));
-  }
-  const missingTitle = validSiteContent("test-admin");
-  missingTitle.hero.slides[0].title = "";
-  await assertFails(setDoc(siteRef, missingTitle));
-  await assertFullSitePublish(siteRef, maximum, "12 slides / 8 links with maximum-length multiline text");
-});
-
-test("Firestore keeps UTF-16 text limits for emoji, combining marks and multiline content", async () => {
-  const adminDb = googleContext("test-admin", { admin: true }).firestore();
-  const siteRef = doc(adminDb, "siteContent", "public");
-  const limits = { eyebrow: 120, title: 120, accent: 120, body: 600, imageAlt: 200, imageCredit: 200, primaryLabel: 60, secondaryLabel: 60 };
-  for (const [key, limit] of Object.entries(limits)) {
-    for (const [label, char] of Object.entries({ newline: "\n", unicode: "é", astral: "😀", combining: "e\u0301", nullByte: "\0" })) {
-      const atLimit = validSiteContent("test-admin");
-      atLimit.hero.slides[0][key] = char.repeat(limit / char.length);
-      assert.equal(atLimit.hero.slides[0][key].length, limit);
-      await assert.doesNotReject(() => assertSucceeds(setDoc(siteRef, atLimit)), `${key}: ${label} at its bound`);
-      const oversized = validSiteContent("test-admin");
-      oversized.hero.slides[0][key] = atLimit.hero.slides[0][key] + char;
-      await assertFails(setDoc(siteRef, oversized));
-    }
-  }
-  const atLimit = validSiteContent("test-admin");
-  atLimit.navigation[0].label = "😀".repeat(30);
-  await assertSucceeds(setDoc(siteRef, atLimit));
-  atLimit.navigation[0].label += "😀";
-  await assertFails(setDoc(siteRef, atLimit));
+test("Firestore keeps server-published 12-slide workspace content public and immutable to browser admins", async () => {
+  const content = validSiteContent("test-admin");
+  content.workspace = { welcome: { title: "Server published workspace" } };
+  content.navigation = Array.from({ length: 8 }, () => ({ label: "Home", href: "#home" }));
+  content.hero.slides = Array.from({ length: 12 }, () => ({ ...content.hero.slides[0] }));
+  content.updatedAt = Timestamp.fromMillis(5000);
+  // This trusted emulator seed is not a live Admin SDK credential test. The
+  // API suite separately checks verified tokens, schema and server metadata.
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(), "siteContent", "public"), content);
+  });
+  const publicRef = doc(testEnv.unauthenticatedContext().firestore(), "siteContent", "public");
+  const published = (await assertSucceeds(getDoc(publicRef))).data();
+  assert.equal(published.workspace.welcome.title, "Server published workspace");
+  assert.equal(published.hero.slides.length, 12);
+  assert.equal(published.navigation.length, 8);
+  assert.equal(published.updatedBy, "test-admin");
+  assert.equal(published.updatedAt.toMillis(), 5000);
+  const adminRef = doc(googleContext("test-admin", { admin: true }).firestore(), "siteContent", "public");
+  await assertFails(setDoc(adminRef, { ...content, updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(adminRef, { "workspace.welcome.title": "Browser override" }));
+  await assertFails(deleteDoc(adminRef));
+  assert.deepEqual((await assertSucceeds(getDoc(publicRef))).data(), published);
 });
 
 test("Firestore student pages are owned, validated and publish-gated", async () => {
@@ -302,17 +153,36 @@ test("Firestore student pages are owned, validated and publish-gated", async () 
   const anonymousDb = testEnv.unauthenticatedContext().firestore();
   const pageRef = db => doc(db, "studentPages", "test-student");
 
-  // The owner creates their page; nobody else can create or edit it.
+  // The owner creates their page; preserve createdAt on EVERY later check,
+  // otherwise an immutable-timestamp denial could mask a broken field rule.
   await assertSucceeds(setDoc(pageRef(ownerDb), validStudentPage()));
-  await assertFails(setDoc(pageRef(otherDb), validStudentPage()));
-  await assertFails(setDoc(pageRef(anonymousDb), validStudentPage()));
+  const createdAt = (await assertSucceeds(getDoc(pageRef(ownerDb)))).data().createdAt;
+  const validUpdate = () => ({ ...validStudentPage(), createdAt });
+  await assertFails(setDoc(pageRef(otherDb), validUpdate()));
+  await assertFails(setDoc(pageRef(anonymousDb), validUpdate()));
+  await assertFails(deleteDoc(pageRef(otherDb)));
+  await assertFails(deleteDoc(pageRef(anonymousDb)));
 
-  // Field shape is enforced: no extra keys, bounded text, https links only.
-  await assertFails(setDoc(pageRef(ownerDb), { ...validStudentPage(), role: "admin" }));
-  await assertFails(setDoc(pageRef(ownerDb), { ...validStudentPage(), bio: "x".repeat(2001) }));
-  await assertFails(setDoc(pageRef(ownerDb), { ...validStudentPage(), links: ["http://insecure.example"] }));
-  await assertFails(setDoc(pageRef(ownerDb), { ...validStudentPage(), links: ["https://a.example", "https://b.example", "https://c.example", "https://d.example", "https://e.example", "https://f.example"] }));
-  await assertFails(setDoc(pageRef(ownerDb), { ...validStudentPage(), displayName: "" }));
+  // A fully populated page at every advertised bound stays editable.
+  const maximum = { ...validUpdate(), displayName: "x".repeat(120), headline: "x".repeat(160), bio: "x".repeat(2000),
+    links: Array(5).fill("https://example.org/" + "x".repeat(280)), focusAreas: Array(8).fill("x".repeat(40)) };
+  await assertSucceeds(setDoc(pageRef(ownerDb), maximum));
+  await assertSucceeds(setDoc(pageRef(adminDb), validUpdate()));
+
+  // Field shape is enforced independently of ownership and timestamps.
+  for (const change of [{ role: "admin" }, { bio: "x".repeat(2001) }, { headline: "x".repeat(161) }, { published: "true" },
+    { links: ["http://insecure.example"] }, { links: Array(6).fill("https://example.org") },
+    { focusAreas: Array(9).fill("Law") }, { focusAreas: ["x".repeat(41)] }, { displayName: "" }]) {
+    await assertFails(setDoc(pageRef(ownerDb), { ...validUpdate(), ...change }));
+    await assertFails(setDoc(pageRef(adminDb), { ...validUpdate(), ...change }));
+  }
+  for (const key of Object.keys(validUpdate())) {
+    const incomplete = validUpdate();
+    delete incomplete[key];
+    await assertFails(setDoc(pageRef(ownerDb), incomplete));
+  }
+  await assertFails(setDoc(pageRef(ownerDb), { ...validUpdate(), updatedAt: Timestamp.fromMillis(1) }));
+  await assertSucceeds(setDoc(pageRef(ownerDb), validUpdate()));
 
   // Unpublished pages are visible only to the owner and admins.
   await assertSucceeds(getDoc(pageRef(ownerDb)));
@@ -329,29 +199,38 @@ test("Firestore student pages are owned, validated and publish-gated", async () 
   });
   await assertSucceeds(getDoc(pageRef(anonymousDb)));
 
-  await assertFails(setDoc(pageRef(ownerDb), { ...validStudentPage(), published: true, createdAt: Timestamp.fromMillis(9999), updatedAt: serverTimestamp() }));
-  await assertSucceeds(setDoc(pageRef(ownerDb), { ...validStudentPage(), published: true, createdAt: seedCreatedAt, updatedAt: serverTimestamp() }));
+  for (const db of [ownerDb, adminDb]) {
+    await assertFails(setDoc(pageRef(db), { ...validStudentPage(), published: true, createdAt: Timestamp.fromMillis(9999), updatedAt: serverTimestamp() }));
+    await assertSucceeds(setDoc(pageRef(db), { ...validStudentPage(), published: true, createdAt: seedCreatedAt, updatedAt: serverTimestamp() }));
+  }
 
   // The collection cannot be listed by students or visitors.
   await assertFails(getDocs(collection(anonymousDb, "studentPages")));
   await assertFails(getDocs(collection(ownerDb, "studentPages")));
   await assertSucceeds(getDocs(collection(adminDb, "studentPages")));
+  await assertSucceeds(deleteDoc(pageRef(ownerDb)));
+  await assertSucceeds(setDoc(pageRef(adminDb), validStudentPage()));
+  await assertSucceeds(deleteDoc(pageRef(adminDb)));
 });
 
 test("Firestore restricts account and quota reads to the admin claim and denies client writes", async () => {
   const studentDb = googleContext("test-student").firestore();
+  const anonymousDb = testEnv.unauthenticatedContext().firestore();
   const adminDb = googleContext("test-admin", { admin: true }).firestore();
-
-  await assertFails(getDoc(doc(studentDb, "accounts", "test-student")));
-  await assertSucceeds(getDoc(doc(adminDb, "accounts", "test-student")));
-  await assertSucceeds(getDoc(doc(adminDb, "aiQuotaPolicies", "default")));
-  await assertSucceeds(getDoc(doc(adminDb, "aiEntitlements", "test-student")));
-  await assertSucceeds(getDoc(doc(adminDb, "aiUsage", "test-student_test-period")));
-  await assertSucceeds(getDoc(doc(adminDb, "adminAudit", "test-event")));
-
-  await assertFails(setDoc(doc(adminDb, "accounts", "test-student"), { plan: "paid" }));
-  await assertFails(setDoc(doc(adminDb, "aiQuotaPolicies", "default"), { active: true }));
-  await assertFails(setDoc(doc(studentDb, "aiUsage", "test-student_test-period"), { count: 999 }));
+  const paths = [["accounts", "test-student"], ["aiQuotaPolicies", "default"], ["aiEntitlements", "test-student"],
+    ["aiUsage", "test-student_test-period"], ["adminAudit", "test-event"]];
+  for (const path of paths) {
+    for (const db of [studentDb, anonymousDb, adminDb]) {
+      const reference = doc(db, ...path);
+      if (db === adminDb) await assertSucceeds(getDoc(reference));
+      else await assertFails(getDoc(reference));
+      await assertFails(setDoc(reference, { forged: true }));
+      await assertFails(setDoc(doc(db, path[0], "new-document"), { forged: true }));
+      await assertFails(updateDoc(reference, { forged: true }));
+      await assertFails(deleteDoc(reference));
+    }
+    await assertSucceeds(getDoc(doc(adminDb, ...path)));
+  }
 });
 
 test("Firestore denies unlisted collections to students and admins", async () => {

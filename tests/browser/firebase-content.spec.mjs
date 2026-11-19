@@ -4,17 +4,20 @@ import { DEFAULT_WORKSPACE } from "../../workspace-config.mjs";
 
 const bundled = JSON.parse(readFileSync(new URL("../../data/site-content.json", import.meta.url), "utf8"));
 
-async function adminApi(page, { published = bundled, draft = null, archiveStatus = 200 } = {}) {
+async function adminApi(page, { published = bundled, draft = null, archiveStatus = 200, archiveReadStatus = 200 } = {}) {
   const writes = [];
   await page.route("**/api/**", async route => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
+    if (path === "/api/v1/admin/site/firebase") return route.fallback();
     if (path === "/api/health") return json(route, { database: "connected" });
     if (path.endsWith("/database/catalog")) return json(route, { data: catalog });
-    if (path === "/api/v1/admin/site" && request.method() === "GET") return json(route, { data: {
-      published: { content: published, updated_at: "2026-11-01T10:00:00Z" },
-      draft: draft && { content: draft, updated_at: "2026-11-02T10:00:00Z" }, versions: []
-    } });
+    if (path === "/api/v1/admin/site" && request.method() === "GET") return archiveReadStatus !== 200
+      ? json(route, { error: "Synthetic Neon archive-read outage", code: "SITE_SCHEMA_NOT_READY" }, archiveReadStatus)
+      : json(route, { data: {
+        published: { content: published, updated_at: "2026-11-01T10:00:00Z" },
+        draft: draft && { content: draft, updated_at: "2026-11-02T10:00:00Z" }, versions: []
+      } });
     if (path === "/api/v1/admin/site/publish" || path === "/api/v1/admin/site/draft") {
       writes.push({ path, body: request.postDataJSON(), firebaseWrites: await page.evaluate(() => window.__firestore.writes.length) });
       return path.endsWith("/publish") && archiveStatus !== 200
@@ -35,7 +38,7 @@ test("the homepage renders a Firestore publish with required metadata instead of
   expect(await page.evaluate(() => window.__firestore.document.updatedBy)).toBe("synthetic-admin");
 });
 
-test("admin claim/rule failures never publish to Neon, and an archive failure never reports a live publish as rolled back", async ({ page }) => {
+test("admin claim/server publish failures never reach Neon, and archive failure never reports a live publish as rolled back", async ({ page }) => {
   await stubAuth(page, { user: admin });
   await stubFirestore(page, { content: bundled });
   const writes = await adminApi(page, { archiveStatus: 503 });
@@ -68,6 +71,33 @@ test("admin claim/rule failures never publish to Neon, and an archive failure ne
   expect(await page.evaluate(() => window.__firestore.document.brand.name)).toBe(content.brand.name);
 });
 
+test("an unconfirmed API reply never claims rollback or archives uncertain homepage/workspace writes", async ({ page }) => {
+  await stubAuth(page, { user: admin });
+  await stubFirestore(page, { content: { ...bundled, workspace: structuredClone(DEFAULT_WORKSPACE) } });
+  const archives = await adminApi(page);
+  page.on("dialog", dialog => dialog.accept());
+  await page.goto("/admin.html");
+  await expect(page.locator("#admin-auth-status")).toHaveAttribute("data-state", "verified");
+  await page.locator("[data-panel=content]").click();
+  await expect(page.locator("#editor-status")).toContainText("Live content loaded from Firebase");
+  await page.evaluate(() => { window.__firestore.unconfirmedReply = true; });
+  await page.locator("#json-editor").fill(JSON.stringify({ ...bundled, brand: { ...bundled.brand, name: "Committed but not acknowledged" } }));
+  await page.locator("#publish-site").click();
+  await expect(page.locator("#editor-status")).toContainText("publishing was not confirmed");
+  await expect(page.locator("#editor-status")).not.toContainText("nothing went live");
+  expect(await page.evaluate(() => window.__firestore.document.brand.name)).toBe("Committed but not acknowledged");
+  expect(archives).toEqual([]);
+
+  await page.locator("[data-panel=workspace]").click();
+  await expect(page.locator("#ws-admin-status")).toContainText("live student workspace is loaded");
+  await page.locator('[data-path="welcome.title"]').fill("Workspace with uncertain acknowledgement");
+  await page.locator("#ws-admin-publish").click();
+  await expect(page.locator("#ws-admin-status")).toContainText("publishing was not confirmed");
+  await expect(page.locator("#ws-admin-status")).not.toContainText("nothing went live");
+  expect(await page.evaluate(() => window.__firestore.document.workspace.welcome.title)).toBe("Workspace with uncertain acknowledgement");
+  expect(archives).toEqual([]);
+});
+
 test("workspace publishing preserves the primary homepage and unpublished JSON draft, and students read that same Firebase content", async ({ page, context }) => {
   const live = { ...bundled, brand: { ...bundled.brand, name: "Newer Firebase homepage" }, workspace: structuredClone(DEFAULT_WORKSPACE) };
   const draft = { ...bundled, brand: { ...bundled.brand, name: "Unpublished homepage work" } };
@@ -96,6 +126,29 @@ test("workspace publishing preserves the primary homepage and unpublished JSON d
   await studentPage.goto("/study.html");
   await expect(studentPage.locator("#ws-welcome-title")).toHaveText("Welcome to the new term");
   await studentPage.close();
+});
+
+test("an unavailable Neon archive cannot hide Firebase content or overwrite an unknown draft on workspace publish", async ({ page }) => {
+  const live = { ...bundled, brand: { ...bundled.brand, name: "Primary without Neon" }, workspace: structuredClone(DEFAULT_WORKSPACE) };
+  await stubAuth(page, { user: admin });
+  await stubFirestore(page, { content: live });
+  const writes = await adminApi(page, { archiveReadStatus: 503 });
+  await page.goto("/admin.html");
+  await expect(page.locator("#admin-auth-status")).toHaveAttribute("data-state", "verified");
+  await page.locator("[data-panel=content]").click();
+  await expect(page.locator("#editor-status")).toContainText("Live content loaded from Firebase");
+  await expect(page.locator("#json-editor")).toHaveValue(/Primary without Neon/);
+  await page.locator("[data-panel=workspace]").click();
+  await expect(page.locator("#ws-admin-status")).toContainText("live student workspace is loaded");
+  await page.locator('[data-path="welcome.title"]').fill("Firebase independent publish");
+  await page.locator("#ws-admin-publish").click();
+  await expect(page.locator("#ws-admin-status")).toContainText("Live on Firebase");
+  await expect(page.locator("#ws-admin-status")).toContainText("Synthetic Neon archive-read outage");
+  expect(writes).toEqual([], "never overwrite an unpublished archive draft that could not be read");
+  const saved = await page.evaluate(() => window.__firestore.document);
+  expect(saved.brand.name).toBe("Primary without Neon");
+  expect(saved.workspace.welcome.title).toBe("Firebase independent publish");
+  expect(saved.updatedBy).toBe(admin.uid);
 });
 
 test("a late pre-initialization workspace fallback cannot overwrite a newer Firebase load", async ({ page }) => {

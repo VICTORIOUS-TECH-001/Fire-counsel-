@@ -1,14 +1,14 @@
-# FIRE COUNSEL Firebase plan (not deployed)
+# FIRE COUNSEL Firebase content schema (owner deployment required)
 
-These files are a reviewed starting point for the existing Firebase project. The Firebase connector is not available in this workspace, no Firebase CLI login/project selection was made, and nothing was created or deployed remotely. Do not treat this document as proof that a Firestore database, collection, bucket or rule is active.
+These maintained files describe the application and its proposed rules for the existing Firebase project. Tests use synthetic identities and demo-project emulators; no live Firebase settings, records, claims or rules were changed by this repair. Do not treat this document as proof that the default Firestore database, bucket, IAM permissions or rules are active.
 
 ## Firestore is collections/documents, not SQL tables
 
-Firestore has no fixed table schema. A collection/document is materialized by the first successful write. `firebase/firestore.rules` protects client access, but deploying rules alone does not create collections or records. Server-owned collections should be created/populated by authenticated server routes using Firebase Admin after validating input. The two browser-written collections below are validated twice: by `firebase/content-schema.mjs` in the client (early, plain-language feedback) and again by the deployed security rules (the enforced gate).
+Firestore has no fixed table schema. A collection/document is materialized by the first successful write. `firebase/firestore.rules` protects client access, but deploying rules alone does not create collections or records. Server-owned collections should be created/populated by authenticated server routes using Firebase Admin after validating input. Homepage content is validated by `firebase/content-schema.mjs` in the browser for feedback and independently in the protected API as the enforced gate. Homepage browser writes are **always denied** by rules. Student-owned pages remain browser-written and independently validated by the deployed security rules.
 
 | Collection | Document ID | Intended metadata | Client access |
 | --- | --- | --- | --- |
-| `siteContent` | `public` | The public homepage JSON, including slide order and image URLs, plus `updatedAt`/`updatedBy` write metadata. Never provider secrets or student records. | Public read; **admin-claim browser write** (fully validated by rules); delete is server-only. |
+| `siteContent` | `public` | The public homepage JSON, including slide order and image URLs, plus `updatedAt`/`updatedBy` write metadata. Never provider secrets or student records. | Public read; **Google/admin-protected API write only** (fully validated on the server); all browser writes, including admin writes, denied. |
 | `studentPages` | Firebase Auth `uid` | A student's own public page: display name, headline, bio, links, focus areas, published flag, created/updated timestamps. | Owner (or admin) write; public can fetch only pages with `published: true`; list is admin-only. |
 | `accounts` | Firebase Auth `uid` | Minimal account metadata: institution ID, enrolled course IDs, installation hash, plan/activation state and timestamps. No study files or chat transcript. | Admin read only; server writes only. |
 | `aiQuotaPolicies` | `default` | Per-feature Free/paid allowance and reset period, active flag and update audit metadata. | Admin read only; server writes only. |
@@ -40,9 +40,9 @@ Individual overrides should be validated on the server, clamped so an effective 
 
 ## `siteContent/public` — homepage content and slides
 
-The admin studio (**Pages & JSON → Publish**, **Restore this version**, and **Student workspace → Publish**) writes this document directly from the browser with the admin's Firebase session. The homepage (`site.js`) and student workspace (`workspace.mjs`) read it first and fall back to `data/site-content.json` (Neon on the API host, otherwise bundled) when Firebase is unconfigured, unreachable, or the document fails read-side validation. Required `updatedAt`/`updatedBy` metadata is removed only on reads; it is never accepted as editor input. Neon keeps drafts and version archives; a history failure never rolls back the live Firestore publish, and a Firestore denial never silently becomes a Neon-only success.
+The admin studio (**Pages & JSON → Publish**, **Restore this version**, and **Student workspace → Publish**) calls **POST `/api/v1/admin/site/firebase`** with a freshly checked Google/admin token. The API verifies that token (including revocation), requires `admin: true`, validates the entire shared schema, checks the requested project against its configured Admin SDK project, and writes only `siteContent/public` using the Firebase Admin SDK. It owns both metadata fields and enforces a 512 KiB UTF-8 byte cap in addition to the shared 200,000-character cap. This path does not require Neon. Full 12-slide/8-link validation exceeded Firestore's 1,000-expression limit, so the fix moves enforcement to the protected server rather than lowering limits or weakening validation. The homepage (`site.js`) and student workspace (`workspace.mjs`) read it first and fall back to `data/site-content.json` (Neon on the API host, otherwise bundled) when Firebase is unconfigured, unreachable, or the document fails read-side validation. Required `updatedAt`/`updatedBy` metadata is removed only on reads; it is never accepted as editor input. Neon keeps drafts and version archives; a history failure never rolls back the live Firestore publish, and a Firestore failure never silently becomes a Neon-only success. Only a confirmed API acknowledgement triggers archiving. An ambiguous/network reply can follow a committed write, so the UI says publishing was not confirmed, not that nothing went live. If archive reads fail, live content remains editable; workspace publishing skips the archive rather than overwriting an unknown unpublished draft.
 
-Document shape (rules-enforced; limits mirrored in `firebase/content-schema.mjs`):
+Document shape (enforced by the protected API using `firebase/content-schema.mjs`, also checked by the browser):
 
 | Field | Rule |
 | --- | --- |
@@ -50,10 +50,10 @@ Document shape (rules-enforced; limits mirrored in `firebase/content-schema.mjs`
 | `navigation` | 1–8 maps of exactly `label` (1–60) and `href` (site-relative, `#anchor`, or `https://`). |
 | `hero.autoplayMs` | Optional number 4000–15000. |
 | `hero.slides` | 1–12 maps, each with exactly `eyebrow`, `title` (1–120), `accent`, `body` (≤ 600), `image`, `imageAlt`, `imageCredit` (≤ 200), `primaryLabel`, `primaryHref`, `secondaryLabel`, `secondaryHref`. |
-| `quickFacts`, `learning`, `caseNotes`, `articles`, `resources`, `footer` | Present; type-checked (list/map). Deep content caps are client-enforced. |
-| `workspace` | Optional public map from the dashboard editor. Same Google/admin requirement; deep caps are client-enforced. |
-| `updatedAt` | Must equal `request.time` — clients send `serverTimestamp()`. |
-| `updatedBy` | Must equal the caller's `uid`. |
+| `quickFacts`, `learning`, `caseNotes`, `articles`, `resources`, `footer` | Present; type-checked (list/map). Deep caps are server-enforced: text ≤ 2,000 chars, lists ≤ 40 items, nesting ≤ 8 levels. |
+| `workspace` | Optional public map from the dashboard editor. Same Google/admin API requirement and server-enforced deep caps. |
+| `updatedAt` | API-owned `FieldValue.serverTimestamp()`; editor input cannot supply it. |
+| `updatedBy` | API-owned verified caller UID; editor input cannot supply it. |
 
 Image fields accept only: bundled `./assets/...` files, Neon `/media/<uuid>.(png|jpg|webp)` uploads, or download URLs from this project's own Storage bucket under `site/slides/`. Link fields never accept `javascript:`/`data:`. Slide photos still upload through the backend into Neon; Firebase Storage uploads stay disabled (see Slide images below).
 
@@ -78,10 +78,10 @@ Ownership is the document ID: only `request.auth.uid == uid` (or an admin claim)
 
 - A trusted project owner must assign the Firebase Auth custom claim `admin: true` outside the public client. No browser control may grant itself this claim. The admin page's one-time `/api/v1/admin/claim` button only works for emails on the server's `ADMIN_EMAILS` list.
 - The API must verify Firebase ID tokens with Firebase Admin on every protected request and separately require `decodedToken.admin === true` on all admin routes. Firebase Admin SDK bypasses Firestore rules, so server-route authorization is essential.
-- Direct browser writes (`siteContent`, `studentPages`) rely on the same claim/ownership checks inside the security rules, which Firebase evaluates on every request. A forged token, a missing claim, or a stale claim (not refreshed after granting) fails there even if the UI is tricked into offering the action.
+- Direct browser writes to `studentPages` rely on Google-session/ownership/admin checks inside the security rules on every request. **All** direct browser `siteContent` writes fail, even for Google admins. Homepage publication requires the matching protected API and service-account IAM permissions; rules cannot grant the Admin SDK access.
 - Store the Google Gemini key only as a server-side secret such as `GEMINI_API_KEY` in the selected host's protected environment settings (Render was selected for staging only). Never store the raw key in Firestore, public configuration, frontend JavaScript, localStorage or the website JSON.
 - Do not send student work to Gemini Free. Confirm the paid/API terms and student-facing eligibility before connecting prompts. A Google API key does not itself prove the account is eligible for this use.
-- No AI provider route, sign-in UI, admin user search endpoint or quota-enforcement endpoint is implemented by this preview.
+- This document describes public Firestore content, not the separate Neon-backed AI, presence, account and quota routes. See [DEPLOYMENT.md](../DEPLOYMENT.md) and [STATUS.md](../STATUS.md) for those features and their live-verification limits.
 
 ## Slide images
 
@@ -91,4 +91,6 @@ The homepage renderer accepts local project images, Neon `/media/` uploads, and 
 
 ## Rule deployment boundary
 
-`firebase.json`, `firebase/firestore.rules` and `firebase/storage.rules` are local scaffolding. The emulator suite in `firebase/tests/security.rules.test.mjs` covers anonymous/student/admin access to every collection, the validated admin publish path, student-page ownership/publish gating, and slide upload type/size — it runs in the Java-enabled GitHub Actions job, not in this sandbox (no Java here). Deploying rule changes can affect an existing app, so review the active project and all existing paths first. Do not run a deploy from this workspace until the project owner has reviewed the rules, custom-claim provisioning, App Check, budget alerts and any existing Firebase rules. Until the new rules are deployed, browser publishes and student-page saves fail closed with a permission error and the site keeps serving the bundled content.
+`firebase.json`, `firebase/firestore.rules` and `firebase/storage.rules` are maintained deployment inputs, not a record of a live deployment. The nine security scenarios in `firebase/tests/security.rules.test.mjs` cover public reads, universal homepage browser-write denial, trusted full-size server-seeded content, student-page ownership/publish gating, private collections, and Storage upload/read/delete boundaries. They run in the Java 21 GitHub Actions job (Java is absent in this sandbox). The separate backend API suite exercises token verification, full-size schema validation, project/path restrictions, metadata ownership, byte caps and safe error reporting with injected Admin SDK boundaries; it does not test live IAM.
+
+Review the active project and existing paths first. **Deploy the matching frontend and API before replacing the rules**: the old browser publisher will be denied by the new rules. The backend needs the repository root available (it imports the shared schema), a matching service account with Firestore data-write access, an enabled Firestore API and an existing `(default)` database. Rules publication alone neither enables the API nor grants IAM/admin claims. See [manual deployment steps](../DEPLOYMENT.md#6-manually-publish-the-firebase-rules). No rules, claims or credentials are deployed by tests.

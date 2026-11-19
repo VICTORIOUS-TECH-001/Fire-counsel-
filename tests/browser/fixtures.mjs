@@ -88,7 +88,7 @@ export async function stubAuth(page, { user = null } = {}) {
   }));
 }
 
-// Stub only the SDK/network boundary, not firestore-client.mjs: publishing,
+// Stub only the SDK/API boundary, not firestore-client.mjs: publishing,
 // validation, metadata stripping and fresh-claim checks run the production code.
 export async function stubFirestore(page, { content = null } = {}) {
   await page.route("**/firebase/client.mjs", route => route.fulfill({ contentType: "text/javascript", body: `
@@ -96,7 +96,7 @@ export async function stubFirestore(page, { content = null } = {}) {
     export const firebaseSetupError = () => '';
   ` }));
   await page.route("https://www.gstatic.com/firebasejs/*/firebase-firestore-lite.js", route => route.fulfill({ contentType: "text/javascript", body: `
-    window.__firestore = { document: ${JSON.stringify(content && { ...content, updatedAt: { seconds: 1000 }, updatedBy: "synthetic-admin" })}, writes: [], tokenRefreshes: [], failWrites: null, adminClaim: true };
+    window.__firestore = { document: ${JSON.stringify(content && { ...content, updatedAt: { seconds: 1000 }, updatedBy: "synthetic-admin" })}, writes: [], tokenRefreshes: [], failWrites: null, unconfirmedReply: false, adminClaim: true };
     export const getFirestore = () => ({});
     export const doc = (_db, collection, id) => ({ collection, id });
     export const serverTimestamp = () => ({ seconds: 2000 });
@@ -105,8 +105,8 @@ export async function stubFirestore(page, { content = null } = {}) {
       return { exists: () => Boolean(data), data: () => structuredClone(data) };
     }
     export async function setDoc(reference, content) {
+      if (reference.collection === 'siteContent') throw Object.assign(new Error('Direct homepage writes are denied; use the admin API'), { code: 'permission-denied' });
       if (window.__firestore.failWrites) throw Object.assign(new Error('Synthetic rule denial'), { code: window.__firestore.failWrites });
-      window.__firestore.document = structuredClone(content);
       window.__firestore.writes.push({ reference, content: structuredClone(content) });
     }
   ` }));
@@ -120,6 +120,26 @@ export async function stubFirestore(page, { content = null } = {}) {
       return auth;
     }
   ` }));
+  await page.route("**/api/v1/admin/site/firebase", async route => {
+    const request = route.request();
+    if (request.method() !== "POST" || request.headers().authorization !== "Bearer synthetic-test-token") {
+      return json(route, { error: "Authenticated admin publish required" }, 401);
+    }
+    const result = await page.evaluate(body => {
+      const state = window.__firestore;
+      const user = window.__firebaseAuth?.currentUser;
+      if (!state.adminClaim || user?.uid !== "synthetic-admin" || user.signInProvider !== "google.com") {
+        return { status: 403, body: { error: "Google administrator required" } };
+      }
+      if (body.projectId !== "fire-counsel") return { status: 409, body: { error: "Firebase project mismatch" } };
+      if (state.failWrites) return { status: 503, body: { error: "Check service-account IAM and the database in the matching Firebase project.", code: "FIRESTORE_ACCESS_DENIED" } };
+      const content = { ...body.content, updatedAt: { seconds: 2000 }, updatedBy: user.uid };
+      state.document = structuredClone(content);
+      state.writes.push({ reference: { collection: "siteContent", id: "public" }, content: structuredClone(content) });
+      return { status: 200, body: state.unconfirmedReply ? {} : { data: { published: true, channel: "firestore" } } };
+    }, request.postDataJSON());
+    return json(route, result.body, result.status);
+  });
 }
 
 export function json(route, body, status = 200) {

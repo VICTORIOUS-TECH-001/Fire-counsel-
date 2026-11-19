@@ -1,9 +1,11 @@
 import { createPrivateKey } from "node:crypto";
 import { getApps, initializeApp, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 
 const APP_NAME = "fire-counsel-api";
 let firebaseAuth;
+let firebaseFirestore;
 
 // Secret-free reasons, shown on /api/health and in API errors so the owner can
 // fix the Render setting without anyone seeing the key itself.
@@ -182,4 +184,11 @@ function getFirebaseAdminApp() {
 export function getFirebaseAuth() {
   if (!firebaseAuth) firebaseAuth = getAuth(getFirebaseAdminApp());
   return firebaseAuth;
+}
+
+// Same explicit service account and checked project as token verification;
+// never select a project or document path from browser-controlled input.
+export function getFirebaseFirestore() {
+  if (!firebaseFirestore) firebaseFirestore = getFirestore(getFirebaseAdminApp());
+  return firebaseFirestore;
 }

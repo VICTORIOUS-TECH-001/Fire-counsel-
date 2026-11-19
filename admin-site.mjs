@@ -1,7 +1,7 @@
 // Admin Studio: website draft -> preview -> publish, version history and
-// homepage slide photos. Firestore is the primary live content channel; Neon
-// holds drafts, version archives and photos. Both independently enforce the
-// Firebase admin claim. The JSON editor is managed by admin.js.
+// homepage slide photos. The protected API validates and publishes the primary
+// Firestore document; Neon holds drafts, version archives and photos. Every
+// API write independently enforces Google/admin. The editor uses admin.js.
 const $ = (selector) => document.querySelector(selector);
 const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[ch]);
 const editor = $("#json-editor");
@@ -51,6 +51,16 @@ async function api(path, options = {}) {
   return body;
 }
 
+// An unavailable archive must not hide the primary Firestore document or
+// cause an unknown unpublished draft to be overwritten.
+async function archivedSite() {
+  try {
+    const { data } = await api("/api/v1/admin/site");
+    if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("The Neon archive reply could not be read.");
+    return { data, error: null };
+  } catch (error) { return { data: {}, error }; }
+}
+
 function readEditor() {
   let data;
   try { data = JSON.parse(editor.value); } catch { throw new Error("The JSON has a mistake (a missing comma or quote?). Fix it before saving."); }
@@ -89,13 +99,14 @@ function renderVersions(versions = []) {
 // after: "publish" refreshes archives without replacing the editor/message.
 async function loadSite(mySession = session, after = "") {
   try {
-    const [{ data }, live] = await Promise.all([
-      api("/api/v1/admin/site"),
+    const [{ data, error: archiveError }, live] = await Promise.all([
+      archivedSite(),
       firestoreClient?.loadPublicSiteContent() || null
     ]);
     if (mySession !== session) return;
     publishedContent = live || (after === "publish" && publishedContent) || data.published?.content || null;
-    renderVersions(data.versions);
+    if (archiveError) $("#site-versions").textContent = "Neon version history is unavailable.";
+    else renderVersions(data.versions);
     if (after === "publish") return;
     const draft = data.draft;
     const draftIsNewer = draft && (!data.published || new Date(draft.updated_at) > new Date(data.published.updated_at));
@@ -104,8 +115,10 @@ async function loadSite(mySession = session, after = "") {
       editorStatus(`Unpublished draft loaded (saved ${when(draft.updated_at)}). Preview it, then Publish.`, "ok");
     } else if (publishedContent) {
       writeEditor(publishedContent);
-      editorStatus(live ? "Live content loaded from Firebase." : `Neon fallback content loaded (archived ${when(data.published.updated_at)}).`, "ok");
-    }
+      editorStatus(archiveError
+        ? `Live content loaded from Firebase; Neon drafts/history are unavailable: ${archiveError.message}`
+        : live ? "Live content loaded from Firebase." : `Neon fallback content loaded (archived ${when(data.published.updated_at)}).`, archiveError ? "error" : "ok");
+    } else if (archiveError) throw archiveError;
   } catch (error) {
     if (mySession !== session) return;
     if (after !== "publish") editorStatus(error.message, "error");
@@ -178,7 +191,7 @@ $("#publish-site")?.addEventListener("click", async () => {
     }
     await loadSite(mySession, "publish");
   } catch (error) {
-    editorStatus(`Firebase publish failed, nothing went live: ${error.message}`, "error");
+    if (mySession === session) editorStatus(`Firebase publishing was not confirmed; the Neon archive was not changed: ${error.message}`, "error");
   } finally {
     button.disabled = !verified;
   }
@@ -282,8 +295,8 @@ document.addEventListener("fire-counsel:admin-state", (event) => onAdminState(ev
 setEnabled(false);
 try {
   authClient = await import("./firebase/auth-client.mjs");
-  // Direct Firestore publish rides on the same Firebase session; without the
-  // Web configuration there is no admin sign-in, so publishing stays disabled.
+  // The publishing API uses the same Firebase Google/admin session; without
+  // the Web configuration there is no sign-in, so publishing stays disabled.
   firestoreClient = await import("./firebase/firestore-client.mjs");
   onAdminState($("#admin-auth-status")?.dataset.state);
 } catch { /* sign-in not configured: publishing stays disabled */ }
