@@ -104,7 +104,7 @@ test("Brave-first order is explicit, validated, and independent of the writer co
   const config = providers.aiConfig(env);
   assert.equal(config.configured, false, "a search key does not masquerade as an answer-writing model");
   assert.equal(config.search.configured, true);
-  assert.deepEqual(config.search.order, ["brave", "tavily", "gemini"]);
+  assert.deepEqual(config.search.order, ["brave", "tavily", "serpapi", "gemini"]);
   const result = await providers.generate({ search: true, messages: [{ role: "user", text: "Supplied report" }] }, { env,
     fetchImpl: async (url) => { calls.push(new URL(url).hostname); return json(200, { web: { results: [page] } }); } });
   assert.equal(result.searchProvider, "brave");

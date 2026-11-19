@@ -6,7 +6,7 @@ import { extractUrls, termsFrom, verifySources as defaultVerify } from "./linkCh
 import { composeSystem, loadPrompt } from "./prompts.js";
 import { backgroundInstructions, detectIntents, loadInstructions as defaultLoadInstructions, researchGuidance } from "./instructions.js";
 
-const RESEARCHER = `You are a meticulous legal research assistant with Google Search. Search the whole web (court and law-report websites, Nigerian legal databases, university repositories, law-firm notes, blogs and other secondary sources). Run several searches with different wording (party names, citation formats such as NWLR/SC/CA/LPELR, court, year, key phrases).
+const RESEARCHER = `You are a meticulous legal research assistant using the configured web-search connector. Search the whole web (court and law-report websites, Nigerian legal databases, university repositories, law-firm notes, blogs and other secondary sources). Run several searches with different wording (party names, citation formats such as NWLR/SC/CA/LPELR, court, year, key phrases).
 Return concise research notes:
 1. Identity: correct name, full citation(s), court, date, judges if found.
 2. Facts, procedural history, issues, decision/holding, ratio, exceptions, later treatment — only what the sources support.
@@ -398,7 +398,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       content: quizMarkdown(parsed),
       sources: [],
       provider: answer.provider, model: answer.model,
-      meta: { task: "mock", quiz: parsed, library_passages: library.length, fallback: Boolean(answer.fallback) }
+      meta: { task: "mock", quiz: parsed, library_passages: library.length, fallback: Boolean(answer.fallback), writer_attempts: answer.attempts || [] }
     };
   }
 
@@ -437,7 +437,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       content: answer.text + lengthNote(answer),
       sources: await finalSources(answer.text, checked, terms),
       provider: answer.provider, model: answer.model,
-      meta: { task: task ? options.task : null, instructions: Object.keys(saved).length ? routing.intents : [], ...searchMeta([researchResult]), library_passages: library.length, fallback: Boolean(answer.fallback) }
+      meta: { task: task ? options.task : null, instructions: Object.keys(saved).length ? routing.intents : [], ...searchMeta([researchResult]), library_passages: library.length, fallback: Boolean(answer.fallback), writer_attempts: answer.attempts || [] }
     };
   }
 
@@ -508,7 +508,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       content: answer.text + lengthNote(answer),
       sources: await finalSources(answer.text, checked, terms),
       provider: answer.provider, model: answer.model,
-      meta: { instructions: Object.keys(saved).length ? routing.intents : [], cases: selected.map((item) => item.name), pending_cases: remaining.map((item) => item.name), database_matches: records.length, library_passages: library.length + judgments.length, ...searchMeta(researched.map(({ research: r }) => r)), fallback: Boolean(answer.fallback) }
+      meta: { instructions: Object.keys(saved).length ? routing.intents : [], cases: selected.map((item) => item.name), pending_cases: remaining.map((item) => item.name), database_matches: records.length, library_passages: library.length + judgments.length, ...searchMeta(researched.map(({ research: r }) => r)), fallback: Boolean(answer.fallback), writer_attempts: answer.attempts || [] }
     };
   }
 
@@ -550,7 +550,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       content: answer.text + lengthNote(answer),
       sources: checked.length || extractUrls(answer.text).length ? await finalSources(answer.text, checked, terms) : [],
       provider: answer.provider, model: answer.model,
-      meta: { instructions: Object.keys(saved).length ? routing.intents : [], course: course ? { id: course.id, label: courseLabel(course) } : null, past_questions: questions.length, research: Boolean(researchResult?.ok), ...searchMeta([researchResult]), library_passages: library.length, fallback: Boolean(answer.fallback) }
+      meta: { instructions: Object.keys(saved).length ? routing.intents : [], course: course ? { id: course.id, label: courseLabel(course) } : null, past_questions: questions.length, research: Boolean(researchResult?.ok), ...searchMeta([researchResult]), library_passages: library.length, fallback: Boolean(answer.fallback), writer_attempts: answer.attempts || [] }
     };
   }
 
@@ -601,7 +601,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       content: answer.text + lengthNote(answer),
       sources: [],
       provider: answer.provider, model: answer.model,
-      meta: { instructions: Object.keys(saved).length ? routing.intents : [], course: course ? { id: course.id, label: courseLabel(course) } : null, detection, past_questions: questions.length, library_passages: library.length, fallback: Boolean(answer.fallback) }
+      meta: { instructions: Object.keys(saved).length ? routing.intents : [], course: course ? { id: course.id, label: courseLabel(course) } : null, detection, past_questions: questions.length, library_passages: library.length, fallback: Boolean(answer.fallback), writer_attempts: answer.attempts || [] }
     };
   }
 

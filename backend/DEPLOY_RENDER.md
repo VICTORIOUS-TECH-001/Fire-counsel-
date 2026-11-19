@@ -24,11 +24,11 @@ migration is applied. Staging only — not for real student data yet.
 ## Enable AI answers and reliable online retrieval
 
 This is not required to serve the static shell. On the **actual API service**,
-privately configure a writer key (`GROQ_API_KEY`, `GEMINI_API_KEY` or
-`OPENROUTER_API_KEY`) and search (`TAVILY_API_KEY` and/or
-`BRAVE_SEARCH_API_KEY`). Groq + Tavily/Brave works for text without Gemini;
-Groq alone does not search online. The Blueprint prefers Groq and independent
-Tavily → Brave → Gemini retrieval. Unused providers may remain blank.
+privately configure a writer key (`GROQ_API_KEY`, `DEEPSEEK_API_KEY`, `GEMINI_API_KEY` or
+`OPENROUTER_API_KEY`) and search (`TAVILY_API_KEY`, `BRAVE_SEARCH_API_KEY`
+and/or `SERPAPI_API_KEY`). Groq/DeepSeek + a search connector works for text without Gemini;
+a text writer alone does not enable online retrieval in this app. The Blueprint prefers Groq and independent
+Tavily → Brave → SerpAPI → Gemini retrieval. Unused providers may remain blank.
 
 Use **Save and deploy**, confirm the successful **Live** commit, then inspect
 `/api/health` diagnostic version **2**. Presence flags do not validate keys.
@@ -40,3 +40,5 @@ tables and Premium/admin authorization remain required for student jobs.
 
 For exact variables, group/override troubleshooting, error codes and the
 limits of synthetic tests, follow [DEPLOYMENT.md section 5](../DEPLOYMENT.md#5-groqtavily-still-show-false-after-saving-keys).
+
+DeepSeek uses `DEEPSEEK_MODELS=deepseek-flash` by default and is a usage-billed text connector here. Total writer time is `AI_TIMEOUT_MS=240000`; `AI_WRITER_PROVIDER_TIMEOUT_MS=60000` caps each provider, with fair shares for fallbacks. Free plans have limits; any configured fallback may spend credit. See [the connector guide](AI_CONNECTORS.md) before activation.

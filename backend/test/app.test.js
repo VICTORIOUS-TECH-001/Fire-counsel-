@@ -145,7 +145,7 @@ test("pasted database URLs are cleaned and failures get a secret-free reason", a
   assert.equal(response.status, 503);
   assert.equal(body.database, "unavailable");
   assert.equal(body.database_error, "wrong_password_or_user");
-  assert.deepEqual(body.setup, { website: true, firebase_admin_key: false, gemini_key: true, openrouter_key: false, groq_key: false, tavily_key: false, brave_search_key: false, ai_writer_key: true, web_search_key: true, admin_emails: false });
+  assert.deepEqual(body.setup, { website: true, firebase_admin_key: false, gemini_key: true, openrouter_key: false, groq_key: false, deepseek_key: false, serpapi_key: false, tavily_key: false, brave_search_key: false, ai_writer_key: true, web_search_key: true, admin_emails: false });
   assert.equal(body.firebase_admin_error, "web_config_not_admin_key");
   assert.doesNotMatch(JSON.stringify(body), /neondb_owner|secret-detail|AIza-hidden/);
 });
@@ -169,7 +169,9 @@ test("health diagnostics distinguish absent/blank runtime settings from credenti
     kind: "presence_only",
     groq: { name: "GROQ_API_KEY", state: "missing" },
     tavily: { name: "TAVILY_API_KEY", state: "missing" },
-    brave: { name: "BRAVE_SEARCH_API_KEY", state: "missing" }
+    brave: { name: "BRAVE_SEARCH_API_KEY", state: "missing" },
+    deepseek: { name: "DEEPSEEK_API_KEY", state: "missing" },
+    serpapi: { name: "SERPAPI_API_KEY", state: "missing" }
   });
   env.GROQ_API_KEY = " \"\" ";
   env.TAVILY_API_KEY = "\u200B  ";
@@ -222,4 +224,18 @@ test("health separates Brave/search presence from writer presence without probin
   assert.equal(response.ai_key_check.brave.state, "missing", "canonical name is separate from a supported alias");
   assert.deepEqual(response.web_search, { check: "presence_only", configured: true, provider_order: ["brave"] });
   assert.doesNotMatch(JSON.stringify(response), /synthetic-private-brave|synthetic-db/);
+});
+
+test("DeepSeek/SerpAPI health is presence-only, alias-aware and never includes credentials", async t => {
+  const env = { DATABASE_URL: "synthetic-db", DEEPSEEK_KEY: "sk-synthetic-private-deepseek", SERPAPI_KEY: "synthetic-private-serpapi" };
+  const base = await serve(t, { env, databaseCheck: async () => true });
+  const body = await (await fetch(`${base}/api/health`)).json();
+  assert.equal(body.setup.deepseek_key, true);
+  assert.equal(body.setup.serpapi_key, true);
+  assert.equal(body.setup.ai_writer_key, true);
+  assert.equal(body.setup.web_search_key, true);
+  assert.equal(body.ai_key_check.deepseek.state, "missing");
+  assert.equal(body.ai_key_check.serpapi.state, "missing");
+  assert.deepEqual(body.web_search.provider_order, ["serpapi"]);
+  assert.doesNotMatch(JSON.stringify(body), /synthetic-private|synthetic-db/);
 });

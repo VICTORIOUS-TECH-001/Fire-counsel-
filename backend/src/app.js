@@ -134,8 +134,8 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
     const firebaseAdmin = firebaseAdminStatus(env);
     const firebaseKeyPasted = Boolean(String(env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim());
     const aiKeys = describeProviders(env);
-    const aiKeyNotes = [["groq", aiKeys.groq], ["tavily", aiKeys.tavily], ["brave", aiKeys.brave]]
-      .filter(([, info]) => info.key_name && (info.warning || !/^(GROQ_API_KEY|TAVILY_API_KEY|BRAVE_SEARCH_API_KEY)$/.test(info.key_name)))
+    const aiKeyNotes = [["groq", aiKeys.groq], ["deepseek", aiKeys.deepseek], ["tavily", aiKeys.tavily], ["brave", aiKeys.brave], ["serpapi", aiKeys.serpapi]]
+      .filter(([, info]) => info.key_name && (info.warning || !/^(GROQ_API_KEY|DEEPSEEK_API_KEY|TAVILY_API_KEY|BRAVE_SEARCH_API_KEY|SERPAPI_API_KEY)$/.test(info.key_name)))
       .map(([provider, info]) => ({ provider, setting_name: info.key_name, ...(info.warning ? { problem: info.warning } : {}) }));
     return res.status(healthy ? 200 : 503).json({
       service: "FIRE COUNSEL API",
@@ -156,6 +156,8 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
         gemini_key: Boolean(String(env.GEMINI_API_KEY || "").trim()),
         openrouter_key: Boolean(String(env.OPENROUTER_API_KEY || "").trim()),
         groq_key: aiKeys.groq.configured,
+        deepseek_key: aiKeys.deepseek.configured,
+        serpapi_key: aiKeys.serpapi.configured,
         tavily_key: aiKeys.tavily.configured,
         brave_search_key: aiKeys.brave.configured,
         ai_writer_key: aiKeys.configured,
@@ -171,7 +173,9 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
         kind: "presence_only",
         groq: aiKeys.groq.runtime_setting,
         tavily: aiKeys.tavily.runtime_setting,
-        brave: aiKeys.brave.runtime_setting
+        brave: aiKeys.brave.runtime_setting,
+        deepseek: aiKeys.deepseek.runtime_setting,
+        serpapi: aiKeys.serpapi.runtime_setting
       },
       // Which Render setting name was found and, if the key looks wrong, why
       // (names and hints only — never the key itself).

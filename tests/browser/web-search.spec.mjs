@@ -3,11 +3,11 @@ import { test, expect, stubAuth, admin, expectNoHorizontalOverflow } from "./fix
 const conversation = { id: "723e4567-e89b-42d3-a456-426614174000", mode: "chat", title: "Supplied synthetic report" };
 const json = (route, body, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 
-async function setup(page, { online = true, post, poll } = {}) {
+async function setup(page, { online = true, searchProviders = ["tavily", "brave"], post, poll } = {}) {
   await stubAuth(page, { user: admin });
   await page.route("**/api/**", route => {
     const path = new URL(route.request().url()).pathname;
-    if (path === "/api/v1/ai/me") return json(route, { data: { configured: true, web_search: online, search_providers: online ? ["tavily", "brave"] : [], email_verified: true, admin: true, allowance: null } });
+    if (path === "/api/v1/ai/me") return json(route, { data: { configured: true, web_search: online, search_providers: online ? searchProviders : [], email_verified: true, admin: true, allowance: null } });
     if (path === "/api/v1/ai/messages") return post(route);
     if (path === `/api/v1/ai/conversations/${conversation.id}`) return poll(route);
     if (path === "/api/v1/presence") return route.fulfill({ status: 204 });
@@ -83,4 +83,39 @@ test("reused online research shows its provider and original retrieval time, and
   await page.evaluate(() => window.__auth.setUser(null));
   await expect(page.locator("#ai-thread")).toBeEmpty();
   await expect(page.locator("#ai-search-status")).toBeHidden();
+});
+
+test("DeepSeek fallback answers keep SerpAPI source provenance and disclose the writer", async ({ page }) => {
+  const answer = { id: "2", role: "assistant", status: "done", provider: "deepseek", model: "deepseek-flash", content: "Answer from the supplied report.",
+    sources: [{ url: "https://example.org/report", title: "Supplied report", status: "reachable", origin: "serpapi" }],
+    meta: { fallback: true, web_search: true, search_providers: ["serpapi"], searched_at: "2026-11-19T10:00:00.000Z", search_cached: false } };
+  await setup(page, { searchProviders: ["serpapi"], post: route => json(route, { data: { conversation, messages: [answer] } }, 202), poll: route => json(route, { data: { conversation, messages: [answer] } }) });
+  await page.goto("/ai.html");
+  await expect(page.locator("#ai-status")).toContainText("Ready");
+  await expect(page.locator("#ai-search-status")).toContainText("SerpAPI");
+  await expect(page.locator(".fc-privacy")).toContainText("DeepSeek");
+  await expect(page.locator(".fc-privacy")).toContainText("SerpAPI");
+  await page.locator("#ai-input").fill("Explain the supplied report");
+  await page.locator("#ai-send").click();
+  await expect(page.locator(".ai-meta")).toContainText("Writer: DeepSeek");
+  await expect(page.locator(".ai-meta")).toContainText("Answered by a backup writer");
+  await expect(page.locator(".ai-meta")).toContainText("Online search completed · SerpAPI");
+  await expect(page.locator(".ai-sources a")).toHaveAttribute("href", "https://example.org/report");
+  await page.setViewportSize({ width: 320, height: 740 });
+  await expectNoHorizontalOverflow(page);
+});
+
+test("all writers unavailable replaces partial text with a retryable error, not an unsourced success", async ({ page }) => {
+  const pending = { id: "2", role: "assistant", status: "pending", content: "Partial text from a failed writer", meta: { stage: "writing" } };
+  const failed = { ...pending, status: "failed", content: "All configured AI writers are unavailable. Please try again shortly. This request was not counted.", meta: { code: "PROVIDERS_UNAVAILABLE" } };
+  await setup(page, { post: route => json(route, { data: { conversation, messages: [pending] } }, 202), poll: route => json(route, { data: { conversation, messages: [failed] } }) });
+  await page.goto("/ai.html");
+  await expect(page.locator("#ai-status")).toContainText("Ready");
+  await page.locator("#ai-input").fill("Explain the supplied report");
+  await page.locator("#ai-send").click();
+  await expect(page.locator(".ai-failed")).toContainText("writers are unavailable", { timeout: 12_000 });
+  await expect(page.locator("#ai-thread")).not.toContainText("Partial text from a failed writer");
+  await expect(page.locator("#ai-status")).toHaveAttribute("data-state", "error");
+  await expect(page.locator(".ai-failed button")).toHaveText(/Try again/);
+  await expect(page.locator("#ai-send")).toBeEnabled();
 });

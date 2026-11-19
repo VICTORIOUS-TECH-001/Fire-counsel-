@@ -29,7 +29,8 @@ function initStudio() {
     notes: { eyebrow: "EXAM-READY NOTES", title: "Exam-ready notes", help: "Upload or paste your lecture notes or textbook pages. The notes use only your material unless you allow outside research. Download as Word or PDF.", placeholder: "Paste your notes here, or upload them below…", feature: "notes" },
     questions: { eyebrow: "QUESTION SETTER · YOUR COURSE'S STYLE", title: "Set exam questions", help: "Give the notes or topic to set questions on. FIRE COUNSEL finds your course and copies its past-question format: number of questions, marks, time and style.", placeholder: "Paste the notes or topics to be examined…", feature: "questions" }
   };
-  const SEARCH_NAMES = { tavily: "Tavily", brave: "Brave Search", gemini: "Google Search (Gemini)" };
+  const WRITER_NAMES = { gemini: "Gemini", groq: "Groq", deepseek: "DeepSeek", openrouter: "OpenRouter" };
+  const SEARCH_NAMES = { tavily: "Tavily", brave: "Brave Search", serpapi: "SerpAPI", gemini: "Google Search (Gemini)" };
   const MODE_NAMES = { chat: "Fire Counsel", case: "Case analysis", notes: "Exam notes", questions: "Question setter" };
   // Quick study tools: they use the chat allowance with a special instruction.
   const TASKS = {
@@ -148,7 +149,7 @@ function initStudio() {
     node.hidden = !user || premiumBlocked;
     node.dataset.state = requested && !config.web_search ? "error" : "";
     if (!requested) node.textContent = "Web search is off. This answer will not be checked against online search results.";
-    else if (!config.web_search) node.textContent = "Web search is selected but not configured on the server. Ask the administrator to configure Tavily or Brave Search; it will not silently switch to a non-web answer.";
+    else if (!config.web_search) node.textContent = "Web search is selected but not configured on the server. Ask the administrator to configure Tavily, Brave Search or SerpAPI; it will not silently switch to a non-web answer.";
     else {
       const names = (config.search_providers || []).map((name) => SEARCH_NAMES[name]).filter(Boolean);
       node.textContent = `Web search selected${names.length ? ": " + names.join(" → ") : ""}. Provider availability is checked when you send; search results are not legal verification.`;
@@ -217,6 +218,7 @@ function initStudio() {
     }
     const meta = message.meta || {};
     const notes = [];
+    if (WRITER_NAMES[message.provider]) notes.push(`Writer: ${WRITER_NAMES[message.provider]}`);
     if (meta.fallback) notes.push("Answered by a backup writer model");
     if (meta.web_search) {
       const names = (Array.isArray(meta.search_providers) ? meta.search_providers : []).map((name) => SEARCH_NAMES[name]).filter(Boolean);
