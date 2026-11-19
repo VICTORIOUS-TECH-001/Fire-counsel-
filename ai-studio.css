@@ -79,6 +79,8 @@ body[data-theme="dark"] .ai-sources{background:#262034;border-color:#3e3351}
 .fc-admin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:16px 0}
 .fc-admin-card{padding:18px;border:1px solid #e5e7ef;border-radius:16px;background:#fff;box-shadow:0 8px 24px rgba(16,18,27,.05)}
 .fc-admin-card h2{margin:4px 0 8px;font-size:18px}.fc-admin-card p{margin:6px 0;color:#5c6070;font-size:13px;line-height:1.55}
+/* Long server-setting examples must wrap on phones, not widen the document. */
+.fc-admin-card code{overflow-wrap:anywhere}
 .fc-state{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.03em;background:#eceef3;color:#4a4f5c}
 .fc-state[data-ok="true"]{background:#dcf3e8;color:#11694e}.fc-state[data-ok="false"]{background:#fde1e5;color:#9b1c31}
 .fc-kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:10px 0;font-size:13px}.fc-kv dt{color:#6b7080}.fc-kv dd{margin:0;overflow-wrap:anywhere}

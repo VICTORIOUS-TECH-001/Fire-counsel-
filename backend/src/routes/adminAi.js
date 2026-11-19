@@ -53,19 +53,21 @@ export function createAdminAiRouter({
     }
   });
 
-  // Tests every model one by one so the admin can see exactly which one works.
+  // Bounded parallel diagnostics. Search probes run only when explicitly selected.
   router.post("/test", async (req, res) => {
     try {
-      if (!aiConfig(env).configured) throw new AiError(503, "No AI key is set in Render. Add GEMINI_API_KEY (and optionally GROQ_API_KEY, OPENROUTER_API_KEY), then redeploy.", "AI_NOT_CONFIGURED");
+      const config = aiConfig(env);
+      if (!config.configured && !(req.body?.search === true && config.search.configured)) throw new AiError(503, "No requested AI/search provider is configured. Add a writer key (GROQ_API_KEY or GEMINI_API_KEY) and a search key (TAVILY_API_KEY or BRAVE_SEARCH_API_KEY) on this API service, then redeploy.", "AI_NOT_CONFIGURED");
       const models = await testModels({ env, fetchImpl, search: req.body?.search === true });
-      const first = models.find((item) => item.ok && !/search/.test(item.role));
-      const searchResult = models.find((item) => item.role === "web search" && item.ok) || models.find((item) => item.role === "backup web search" && item.ok) || models.find((item) => /search/.test(item.role));
+      const first = config.writerOrder.map((name) => models.find((item) => item.provider === name && item.ok && !/search/.test(item.role))).find(Boolean);
+      const searchRows = models.filter((item) => /search/.test(item.role));
+      const searchResult = config.search.order.map((name) => searchRows.find((item) => item.provider === name && item.ok)).find(Boolean) || searchRows[0];
       res.json({ data: {
         ok: Boolean(first),
         provider: first?.provider || null,
         model: first?.model || null,
         reply: first?.reply || "",
-        fallback: Boolean(first) && first.provider !== "gemini",
+        fallback: Boolean(first) && first.provider !== config.writerOrder.find((name) => config[name].configured),
         search: searchResult ? (searchResult.ok ? { ok: true, provider: searchResult.provider, model: searchResult.model, sources: searchResult.sources } : { ok: false, provider: searchResult.provider, error: searchResult.error }) : null,
         models
       } });

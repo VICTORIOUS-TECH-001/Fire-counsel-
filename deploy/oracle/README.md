@@ -7,8 +7,8 @@ Cost: **$0**. Oracle needs a real debit/credit card only to check who you are.
 ## Before you start (have these ready)
 
 1. Your **Neon connection string** (Neon → your project → **Connect** → copy).
-2. Your **Gemini key**: https://aistudio.google.com/apikey
-3. *(Optional)* your **OpenRouter key**: https://openrouter.ai/keys
+2. At least one **writer key**: [Groq](https://console.groq.com/keys) (preferred for text), [Gemini](https://aistudio.google.com/apikey) or [OpenRouter](https://openrouter.ai/keys).
+3. For online retrieval: [Tavily](https://app.tavily.com) and/or [Brave Search API](https://api-dashboard.search.brave.com). Both enable independent failover. API access/quota/cost are separate from the hosting plan; Groq alone does not search the web.
 4. Your **Firebase key file**: https://console.firebase.google.com/project/fire-counsel/settings/serviceaccounts/adminsdk → **Generate new private key** (sign in with the Google account that owns `fire-counsel`).
 5. The start script: https://raw.githubusercontent.com/VICTORIOUS-TECH-001/Fire-counsel-/main/deploy/oracle/oracle-start.sh
 
@@ -26,9 +26,10 @@ Copy the start script (link 5 above) into a notes app:
 
 - After `ADMIN_EMAILS=`, type your email.
 - After `DATABASE_URL=`, paste the Neon connection string.
-- After `GEMINI_API_KEY=`, paste the Gemini key.
-- After `OPENROUTER_API_KEY=`, paste the OpenRouter key (or leave it empty).
-- Optional: add a line `GROQ_API_KEY=` with your Groq key (starts with `gsk_`) and a line `TAVILY_API_KEY=` with your Tavily key (starts with `tvly-`).
+- Fill at least one writer line: `GROQ_API_KEY=`, `GEMINI_API_KEY=` or `OPENROUTER_API_KEY=`. Leave unused providers empty. Groq keys are not xAI/Grok keys.
+- Fill `TAVILY_API_KEY=` and, for failover, `BRAVE_SEARCH_API_KEY=`. Groq + Tavily/Brave works without Gemini for text. Installing Brave's browser does not supply API access.
+- The template prefers `AI_WRITER_PROVIDER_ORDER=groq,gemini,openrouter` and `WEB_SEARCH_PROVIDER_ORDER=tavily,brave,gemini`. Orders only set priority; unset-key providers are skipped and omitted defaults are appended. Research reuse is off (`AI_RESEARCH_CACHE_MINUTES=0`).
+- `make-env.mjs` accepts/preserves these settings on reruns and reports a missing **writer key**, not a mandatory Gemini key. Optional model/timeout/token overrides are also supported; choose values permitted by the actual provider account. These Groq models cannot read photos/PDFs; OCR remains separate.
 - Replace the line `PASTE THE WHOLE FIREBASE KEY FILE HERE…` with the **whole** Firebase key file (from `{` to `}`).
 
 Do not change anything else, and never put the filled-in copy on GitHub.
@@ -62,6 +63,8 @@ Open https://cloud.oracle.com/compute/instances/create
 ## Step 6: Allow sign-in on the new address
 
 https://console.firebase.google.com/project/fire-counsel/authentication/settings → **Authorized domains → Add domain** → `129-1-2-3.sslip.io` (your own).
+
+The health response should include `config_diagnostics_version: 2` after installing this repair. `setup.groq_key`, `setup.tavily_key` and `setup.brave_search_key` only report credential **presence**. Sign in as the Google administrator → **AI studio settings → Test AI connection**, with web search selected, to check real API authentication/quota and returned sources (this spends provider quota). See [the full search deployment/error guide](../../DEPLOYMENT.md#5-groqtavily-still-show-false-after-saving-keys). This repair requires no new migration, but existing AI tables are still needed.
 
 Then: run the Neon AI tables workflow once (https://github.com/VICTORIOUS-TECH-001/Fire-counsel-/actions/workflows/neon-migrate.yml → **Run workflow**), open `https://…sslip.io/admin.html`, sign in, tap **Make this account the administrator**, and upload your prompts.
 

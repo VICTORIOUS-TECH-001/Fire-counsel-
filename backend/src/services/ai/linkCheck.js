@@ -31,7 +31,16 @@ export function isPrivateAddress(address) {
   if (version === 6) {
     const lower = address.toLowerCase();
     if (lower === "::" || lower === "::1") return true;
-    if (lower.startsWith("::ffff:")) return ipv4Private(lower.slice(7));
+    if (lower.startsWith("::ffff:")) {
+      const tail = lower.slice(7);
+      if (isIP(tail) === 4) return ipv4Private(tail);
+      // URL parsers canonicalise ::ffff:127.0.0.1 to ::ffff:7f00:1.
+      // Check both forms before fetching any externally supplied URL.
+      const parts = tail.split(":");
+      if (parts.length !== 2 || parts.some((part) => !/^[a-f0-9]{1,4}$/.test(part))) return true;
+      const [hi, lo] = parts.map((part) => parseInt(part, 16));
+      return ipv4Private(`${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`);
+    }
     return /^(fc|fd|fe8|fe9|fea|feb|ff)/.test(lower);
   }
   return true;

@@ -280,7 +280,7 @@ test("a judgment PDF creates a case record linked to its full text; a past paper
 
   // Case analysis now quotes the stored judgment text.
   let brief = "";
-  const studio = createStudio({ db: pool, env: { GEMINI_API_KEY: "k" }, generate: async (request) => { if (request.search) return { text: "notes", provider: "gemini", model: "m", sources: [] }; brief = request.messages.at(-1).text; return { text: "analysis", provider: "gemini", model: "m" }; }, verify: async () => [] });
+  const studio = createStudio({ db: pool, env: { GEMINI_API_KEY: "k" }, generate: async (request) => { if (request.search) return { text: "notes from the supplied synthetic source", provider: "gemini", model: "m", sources: [{ url: "https://example.org/synthetic-judgment", title: "Synthetic search fixture" }] }; brief = request.messages.at(-1).text; return { text: "analysis", provider: "gemini", model: "m" }; }, verify: async () => [] });
   await studio.run("case", { text: "Donoghue v Stevenson", options: {} });
   assert.match(brief, /JUDGMENT TEXT FROM THE FIRE COUNSEL LIBRARY/);
 
