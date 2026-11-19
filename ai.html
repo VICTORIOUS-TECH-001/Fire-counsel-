@@ -81,7 +81,6 @@
       <p id="ai-mode-help">Ask a legal question or upload notes, textbook photos or a PDF.</p>
     </header>
 
-    <p class="fc-status ai-connection" id="ai-status" role="status" aria-live="polite">Checking sign-in…</p>
     <div class="ai-thread fc-thread" id="ai-thread" aria-live="polite" aria-label="Conversation"></div>
   </main>
 
@@ -100,6 +99,8 @@
       <label class="ai-option" data-for="notes questions">Course <select id="ai-course-select"><option value="auto">Detect automatically</option></select></label>
       <label class="ai-option" data-for="questions">Questions <input id="ai-question-count" type="number" min="1" max="20" placeholder="Like a real paper"></label>
     </div>
+    <p class="fc-status ai-connection" id="ai-status" role="status" aria-live="polite">Checking sign-in…</p>
+    <p class="fc-status" id="ai-search-status" role="status" aria-live="polite">Checking web search setup…</p>
     <div class="ai-files" id="ai-files" aria-live="polite"></div>
     <div class="fc-inputbar">
       <label class="fc-icon-btn fc-plus" title="Add notes, photos or PDF" aria-label="Add notes, photos or PDF">
@@ -142,7 +143,7 @@
     <a href="./study.html#profile">◎ My profile</a>
     <a class="fc-signin" href="./auth.html?next=ai.html">→ Sign in / create account</a>
   </nav>
-  <p class="fc-muted fc-privacy"><strong>Before you upload:</strong> answers come from Google Gemini (with free backup models). On the free service Google may use what you send to improve its products, so do not upload personal details.</p>
+  <p class="fc-muted fc-privacy"><strong>Before you send:</strong> messages/files may go to the server-configured AI writer (Gemini, Groq or OpenRouter); web-search queries go to Tavily, Brave or Gemini grounding. AI conversations are stored in Neon. Provider privacy, API access and quota vary; do not send confidential or personal details.</p>
 </aside>
 
 <!-- ======================= all functions ("Unlock power") ======================= -->

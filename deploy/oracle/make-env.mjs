@@ -6,8 +6,9 @@
 //   node make-env.mjs --secrets FILE [--firebase FILE] [--previous FILE] --host HOST --out FILE
 import { readFileSync, writeFileSync, existsSync, renameSync, chmodSync } from "node:fs";
 
-const REQUIRED = ["DATABASE_URL", "GEMINI_API_KEY", "ADMIN_EMAILS"];
-const OPTIONAL = ["OPENROUTER_API_KEY", "FC_DOMAIN", "GEMINI_MODELS", "GEMINI_SEARCH_MODELS", "OPENROUTER_MODELS", "AI_TIMEZONE", "AI_MAX_CONCURRENT_JOBS"];
+const REQUIRED = ["DATABASE_URL", "ADMIN_EMAILS"];
+const WRITER_KEYS = ["GROQ_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY"];
+const OPTIONAL = [...WRITER_KEYS, "TAVILY_API_KEY", "BRAVE_SEARCH_API_KEY", "BRAVE_API_KEY", "FC_DOMAIN", "GEMINI_MODELS", "GEMINI_SEARCH_MODELS", "GROQ_MODELS", "OPENROUTER_MODELS", "GROQ_TOKENS_PER_MINUTE", "TAVILY_SEARCH_DEPTH", "TAVILY_MAX_RESULTS", "BRAVE_MAX_RESULTS", "AI_WRITER_PROVIDER_ORDER", "WEB_SEARCH_PROVIDER_ORDER", "WEB_SEARCH_TIMEOUT_MS", "WEB_SEARCH_PROVIDER_TIMEOUT_MS", "AI_RESEARCH_CACHE_MINUTES", "AI_TIMEZONE", "AI_MAX_CONCURRENT_JOBS"];
 const ALLOWED = new Set([...REQUIRED, ...OPTIONAL, "FIREBASE_SERVICE_ACCOUNT_JSON"]);
 
 export function cleanValue(key, raw) {
@@ -30,7 +31,7 @@ export function cleanValue(key, raw) {
     value = emails.join(",");
   }
   if (key === "FC_DOMAIN" && !/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(value)) throw new Error("FC_DOMAIN must be a plain domain name such as study.example.com.");
-  if (/^(GEMINI|OPENROUTER)_API_KEY$/.test(key) && /\s/.test(value)) throw new Error(`${key} must not contain spaces.`);
+  if (/(?:^|_)API_KEY$/.test(key) && /\s/.test(value)) throw new Error(`${key} must not contain spaces.`);
   return value;
 }
 
@@ -97,6 +98,7 @@ export function buildEnv({ secrets = {}, firebase = "", previous = {}, host }) {
   const serviceAccount = firebase || secrets.FIREBASE_SERVICE_ACCOUNT_JSON || previous.FIREBASE_SERVICE_ACCOUNT_JSON || "";
   if (serviceAccount) settings.FIREBASE_SERVICE_ACCOUNT_JSON = serviceAccount;
   const missing = REQUIRED.filter((key) => !settings[key]);
+  if (!WRITER_KEYS.some((key) => settings[key])) missing.push("AI writer key (GROQ_API_KEY, GEMINI_API_KEY or OPENROUTER_API_KEY)");
   if (!settings.FIREBASE_SERVICE_ACCOUNT_JSON) missing.push("FIREBASE key file");
   const text = "# FIRE COUNSEL private settings. Written by deploy/oracle/setup.sh — keep secret.\n" +
     Object.entries(settings).map(([key, value]) => `${key}='${value}'`).join("\n") + "\n";

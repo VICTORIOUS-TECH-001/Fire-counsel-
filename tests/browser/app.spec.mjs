@@ -134,12 +134,12 @@ test("AI studio sends a question, polls the background job and renders safe answ
     notes: { label: "Exam-ready notes", used: 0, limit: 3, remaining: 3 },
     questions: { label: "Question sets", used: 0, limit: 5, remaining: 5 } } };
   const user = { id: "1", role: "user", status: "done", content: "What is consideration?", attachments: [{ name: "notes.txt" }], sources: [], meta: {} };
-  const answer = { id: "2", role: "assistant", status: "done", content: "## Consideration\n\n**Price** for a promise.<script>window.__bad = 1</script>\n\n| Case | Point |\n|---|---|\n| Currie v Misa | definition |", meta: { web_search: true },
+  const answer = { id: "2", role: "assistant", status: "done", content: "## Consideration\n\n**Price** for a promise.<script>window.__bad = 1</script>\n\n| Case | Point |\n|---|---|\n| Currie v Misa | definition |", meta: { web_search: true, search_providers: ["brave"], search_cached: false, searched_at: "2026-11-19T10:00:00.000Z" },
     sources: [{ url: "https://example.org/currie", title: "Currie v Misa report", status: "verified" }, { url: "javascript:alert(1)", title: "bad", status: "broken" }] };
   await page.route("**/api/**", async route => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
-    if (path === "/api/v1/ai/me") return json(route, { data: { configured: true, web_search: true, email_verified: true, admin: false, allowance } });
+    if (path === "/api/v1/ai/me") return json(route, { data: { configured: true, web_search: true, search_providers: ["tavily", "brave"], email_verified: true, admin: false, allowance } });
     if (path === "/api/v1/ai/courses") return json(route, { data: [{ id: courseId, course_code: "LAW 201", title: "Law of Contract", university: "UNILAG" }] });
     if (path === "/api/v1/ai/conversations") return json(route, { data: polls ? [{ ...conversation, updated_at: "2026-11-16T10:00:00Z" }] : [] });
     if (path === `/api/v1/ai/conversations/${conversation.id}`) {
@@ -177,6 +177,9 @@ test("AI studio sends a question, polls the background job and renders safe answ
   await expect(page.locator(".ai-answer script")).toHaveCount(0);
   expect(await page.evaluate(() => window.__bad)).toBeUndefined();
   await expect(page.locator("#ai-status")).toHaveText("Answer ready.");
+  await expect(page.locator("#ai-search-status")).toContainText("Tavily → Brave Search");
+  await expect(page.locator(".ai-meta")).toContainText("Online search completed · Brave Search");
+  await expect(page.locator(".ai-meta")).toContainText("retrieved");
   await expect(page.locator(".ai-sources a")).toHaveCount(1);
   await expect(page.locator(".ai-sources summary")).toHaveText("Verification links (1)");
   await expect(page.locator(".ai-sources a")).toHaveAttribute("href", "https://example.org/currie");
@@ -449,29 +452,35 @@ test("admin sections navigate correctly and a student cannot unlock database con
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test("admin AI panel shows Groq and Tavily keys and a health row for every model", async ({ page }) => {
+test("admin AI panel distinguishes key presence from health for Groq, Tavily and Brave", async ({ page }) => {
   await stubAuth(page, { user: admin });
   let gatewayTimeout = false;
+  let delayedTest = null;
+  let releaseTest;
+  const testRequests = [];
   const providers = {
-    configured: true,
+    configured: true, writer_order: ["groq", "gemini", "openrouter"], search: { configured: true, order: ["tavily", "brave", "gemini"] },
+    brave: { configured: true, key_name: "BRAVE_SEARCH_API_KEY" },
     gemini: { configured: true, models: ["gemini-3.8-flash"], search_models: ["gemini-2.5-flash-lite"] },
     groq: { configured: true, key_name: "GROQ_API_KEY", warning: null, models: ["openai/gpt-oss-120b", "openai/gpt-oss-20b"] },
     openrouter: { configured: true, models: ["openrouter/free"], warning: "OpenRouter keys start with sk-or-v1-. What is saved does not look like a key: paste ONLY the key from openrouter.ai/keys (not the TypeScript or REST code)." },
     tavily: { configured: true, key_name: "TRIVILY_API_KEY", warning: "Tavily keys normally start with tvly-. Check that the whole key was pasted.", depth: "basic" }
   };
   const models = [
-    { provider: "gemini", model: "gemini-3.8-flash", role: "writer", ok: false, ms: 900, code: "PROVIDER_QUOTA", error: "Gemini rate limit or free quota reached." },
+    { provider: "gemini", model: "gemini-3.8-flash", role: "writer", ok: false, ms: 900, code: "PROVIDER_QUOTA", error: "Gemini rate limit or account quota reached." },
     { provider: "groq", model: "openai/gpt-oss-120b", role: "fast backup", ok: true, ms: 420, reply: "FIRE COUNSEL AI is connected.", sources: 0 },
     { provider: "openrouter", model: "free-model", role: "backup", ok: true, ms: 2100, reply: "FIRE COUNSEL AI is connected.", sources: 0 },
-    { provider: "tavily", model: "tavily", role: "backup web search", ok: true, ms: 800, reply: "3 pages", sources: 3 }
+    { provider: "tavily", model: "tavily", role: "web search", ok: true, ms: 800, reply: "3 pages", sources: 3 },
+    { provider: "brave", model: "brave", role: "web search", ok: false, ms: 700, code: "PROVIDER_AUTH", error: "Brave rejected the API key." }
   ];
-  await page.route("**/api/**", route => {
+  await page.route("**/api/**", async route => {
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/health") return json(route, { database: "connected" });
     if (path === "/api/v1/admin/me") return json(route, { user: { ...admin, role: "admin" } });
     if (path.endsWith("/catalog")) return json(route, { data: catalog });
     if (path === "/api/v1/presence") return route.fulfill({ status: 204 });
     if (path === "/api/v1/admin/ai/status") return json(route, { data: { providers, skipped_models: [], database: "configured", schema_ready: true, prompts: [], limits: null, today: {}, timezone: "Africa/Lagos" } });
+    if (path === "/api/v1/admin/ai/test") { testRequests.push(route.request().postDataJSON()); if (delayedTest) await delayedTest; }
     if (path === "/api/v1/admin/ai/test" && gatewayTimeout) return route.fulfill({ status: 524, contentType: "text/html", body: "<html>A timeout occurred</html>" });
     if (path === "/api/v1/admin/ai/test") return json(route, { data: { ok: true, provider: "groq", model: "openai/gpt-oss-120b", reply: "FIRE COUNSEL AI is connected.", fallback: true, search: { ok: true, provider: "tavily", model: "tavily", sources: 3 }, models } });
     return json(route, { data: [] });
@@ -481,30 +490,53 @@ test("admin AI panel shows Groq and Tavily keys and a health row for every model
   await expect(page.locator("#admin-auth-status")).toHaveAttribute("data-state", "verified");
   await page.locator("[data-panel=ai]").click();
   const status = page.locator("#ai-provider-status");
-  await expect(status).toContainText("Groq (fast backup)");
-  await expect(status).toContainText("Tavily (backup web search)");
+  await expect(status).toContainText("Groq (writer)");
+  await expect(status).toContainText("Tavily (web search)");
   await expect(status).toContainText("TRIVILY_API_KEY");
+  await expect(status).toContainText("Brave Search (web search)");
+  await expect(status).toContainText("not that the provider accepted it");
+  await expect(page.locator("#ai-test-models tbody tr")).toHaveCount(0);
+  await expect(page.locator("#ai-test-search")).toBeChecked();
   await expect(status.locator(".fc-warn").filter({ hasText: "tvly-" })).toHaveCount(1);
   await expect(status.locator(".fc-warn").filter({ hasText: "sk-or-v1-" })).toContainText("not the TypeScript or REST code");
   await page.locator("#ai-test-button").click();
   await expect(page.locator("#ai-test-result")).toContainText("Working: Groq (openai/gpt-oss-120b)");
   await expect(page.locator("#ai-test-result")).toContainText("Web search works via Tavily (3 sources)");
   const rows = page.locator("#ai-test-models tbody tr");
-  await expect(rows).toHaveCount(4);
+  await expect(rows).toHaveCount(5);
+  expect(testRequests[0]).toEqual({ search: true });
+  await expect(rows.nth(4)).toContainText("Brave Search");
+  await expect(rows.nth(4)).toContainText("AUTH");
   await expect(rows.nth(0)).toContainText("QUOTA");
-  await expect(rows.nth(0)).toContainText("free quota reached");
+  await expect(rows.nth(0)).toContainText("account quota reached");
   await expect(rows.nth(1)).toContainText("HEALTHY");
   await expect(rows.nth(3)).toContainText("Tavily");
   await expect(rows.nth(3)).toContainText("3 sources");
   if (process.env.SHOT_DIR) await page.locator("#panel-ai").screenshot({ path: `${process.env.SHOT_DIR}/admin-health.png` });
   // A gateway timeout is explained in plain words, not "Request failed (524)".
   gatewayTimeout = true;
+  await page.locator("#ai-test-search").uncheck();
   await page.locator("#ai-test-button").click();
   await expect(page.locator("#ai-test-result")).toContainText("took too long");
   await expect(page.locator("#ai-test-result")).toHaveAttribute("data-kind", "error");
   await expect(page.locator("#ai-test-models tbody tr")).toHaveCount(0);
   await expect(page.locator("#ai-test-button")).toBeEnabled();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(testRequests[1]).toEqual({ search: false });
+  await expectNoHorizontalOverflow(page);
+  // A response from the old administrator session must not restore diagnostics.
+  gatewayTimeout = false;
+  delayedTest = new Promise(resolve => { releaseTest = resolve; });
+  const sent = page.waitForRequest("**/api/v1/admin/ai/test");
+  await page.locator("#ai-test-button").click();
+  await sent;
+  await page.evaluate(() => window.__auth.setUser(null));
+  await expect(page.locator("#admin-auth-status")).toHaveAttribute("data-state", "signed-out");
+  const returned = page.waitForResponse("**/api/v1/admin/ai/test");
+  releaseTest();
+  await returned;
+  await expect(page.locator("#ai-test-models")).toBeEmpty();
+  await expect(page.locator("#ai-provider-status")).toBeEmpty();
+  await expect(page.locator("#ai-test-result")).toBeEmpty();
 });
 
 test("verified administrator still cannot edit when Neon is unconfigured", async ({ page }) => {

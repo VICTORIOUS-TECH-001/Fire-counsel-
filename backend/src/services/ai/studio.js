@@ -1,10 +1,6 @@
-// FIRE COUNSEL AI studio pipelines.
-//
-// Free-tier design: a "researcher" Gemini model with Google Search collects
-// real sources; the server opens every link; then a stronger "writer" model
-// produces the document in the owner's prompt format using only those checked
-// sources. If Gemini is unavailable, OpenRouter free models write the answer
-// (without live web search — links are still checked and labelled).
+// FIRE COUNSEL AI studio pipelines. Online retrieval and answer generation
+// are independent; requested web research must return real source URLs.
+// Source/link checks are not proof of a legal holding or citation's accuracy.
 import { AiError, generate as defaultGenerate, parseJsonReply } from "./providers.js";
 import { extractUrls, termsFrom, verifySources as defaultVerify } from "./linkCheck.js";
 import { composeSystem, loadPrompt } from "./prompts.js";
@@ -156,12 +152,12 @@ async function mapLimit(items, limit, fn) {
   return results;
 }
 
-// Recent web research (6 hours by default). Popular cases and questions are
-// answered from here instantly and do not use Google Search quota again.
+// Optional, explicitly labelled short-lived research reuse. Fresh online
+// retrieval is the default; failures and attachment requests are never cached.
 const RESEARCH_CACHE = new Map();
 export function clearResearchCache() { RESEARCH_CACHE.clear(); }
 
-export function createStudio({ db, env = process.env, generate = defaultGenerate, verify = defaultVerify, fetchImpl, researchCache = generate === defaultGenerate, loadInstructions = defaultLoadInstructions } = {}) {
+export function createStudio({ db, env = process.env, generate = defaultGenerate, verify = defaultVerify, fetchImpl, researchCache = generate === defaultGenerate, researchCacheScope = null, loadInstructions = defaultLoadInstructions } = {}) {
   // The owner's background instructions (Admin Studio → AI instructions).
   // A database problem must never stop an answer: fall back to built-in rules.
   async function instructions() {
@@ -171,25 +167,46 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
     return backgroundInstructions(saved, { intents: routing.intents, text });
   }
   const gen = (request) => generate(request, { env, fetchImpl });
-  const cacheMs = clampInt(env.AI_RESEARCH_CACHE_MINUTES, 0, 24 * 60, 360) * 60_000;
+  const cacheMs = clampInt(env.AI_RESEARCH_CACHE_MINUTES, 0, 24 * 60, 0) * 60_000;
   const researchParallel = clampInt(env.AI_RESEARCH_PARALLEL, 1, 6, 3);
 
   async function research(query, attachments = [], { timeoutMs, searchQuery } = {}) {
-    const key = researchCache && cacheMs && !attachments.length ? String(query).toLowerCase().replace(/\s+/g, " ").trim() : null;
-    const hit = key ? RESEARCH_CACHE.get(key) : null;
-    if (hit && hit.until > Date.now()) return { ...hit.value, cached: true };
     try {
       const guidance = researchGuidance(await instructions());
+      // Cache only explicitly opted-in, account-scoped requests. A different
+      // account or changed instructions cannot reuse another account's notes.
+      const key = researchCache && cacheMs && researchCacheScope && !attachments.length
+        ? JSON.stringify([researchCacheScope, query, searchQuery, guidance, env.WEB_SEARCH_PROVIDER_ORDER || ""]) : null;
+      const hit = key ? RESEARCH_CACHE.get(key) : null;
+      if (hit && hit.until > Date.now()) return { ...hit.value, cached: true };
       const result = await gen({ search: true, searchQuery, system: guidance ? `${RESEARCHER}\n\n${guidance}` : RESEARCHER, messages: [{ role: "user", text: query, attachments }], maxTokens: 6000, temperature: 0.2, timeoutMs });
-      const value = { ok: true, notes: result.text, sources: result.sources, queries: result.searchQueries, model: result.model };
-      if (key && value.sources.length) {
+      if (!result.sources?.length) throw new AiError(404, "Online search returned no source URLs. No web-verified answer can be produced.", "SEARCH_NO_RESULTS");
+      const value = { ok: true, notes: result.text, sources: result.sources, queries: result.searchQueries || [], model: result.model,
+        provider: result.searchProvider || result.provider, searchedAt: result.searchedAt || new Date().toISOString(), cached: false };
+      if (key) {
         if (RESEARCH_CACHE.size >= 300) RESEARCH_CACHE.delete(RESEARCH_CACHE.keys().next().value);
         RESEARCH_CACHE.set(key, { until: Date.now() + cacheMs, value });
       }
       return value;
     } catch (error) {
-      return { ok: false, notes: "", sources: [], queries: [], error: error.message };
+      return { ok: false, notes: "", sources: [], queries: [], error: error instanceof AiError ? error.message : "Online search is temporarily unavailable.", code: error?.code || "SEARCH_UNAVAILABLE", status: error instanceof AiError ? error.status : 503 };
     }
+  }
+
+  function requireResearch(result) {
+    if (!result?.ok) throw new AiError(result?.status || 503, `Online search failed: ${result?.error || "no sources were returned"} No unsourced answer was generated. Try again, or explicitly turn off web search for a non-web answer.`, result?.code || "SEARCH_UNAVAILABLE", { retryable: true });
+  }
+
+  function searchMeta(results) {
+    const requested = results.filter(Boolean);
+    const successful = requested.filter((result) => result.ok);
+    const providers = [...new Set(successful.map((result) => result.provider).filter(Boolean))];
+    return { web_search: successful.length > 0, search_providers: providers,
+      search_cached: successful.length > 0 && successful.every((result) => result.cached),
+      search_cache_partial: successful.some((result) => result.cached) && successful.some((result) => !result.cached),
+      search_partial: successful.length > 0 && successful.length < requested.length,
+      searched_at: successful.map((result) => result.searchedAt).sort()[0] || null,
+      search_queries: [...new Set(successful.flatMap((result) => result.queries))].slice(0, 30) };
   }
 
   async function finalSources(answerText, checked, terms) {
@@ -399,6 +416,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       libraryExcerpts(text || attachments.map((a) => a.name).join(" "), { courseId: options.courseId || null }),
       options.webSearch !== false ? research(`Student question${task ? ` (${task.label})` : ""}: ${text}`, attachments, { timeoutMs: CHAT_RESEARCH_MS, searchQuery: `${truncate(text || attachments.map((a) => a.name).join(" "), 300)} Nigeria law` }) : null
     ]);
+    if (options.webSearch !== false) requireResearch(webResult);
     if (webResult) {
       researchResult = webResult;
       if (researchResult.ok && researchResult.sources.length) {
@@ -407,7 +425,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       }
     }
     const context = researchResult?.ok
-      ? `\n\n---\nLIVE WEB RESEARCH NOTES (Google Search):\n${truncate(researchResult.notes, 20000)}\n\nCHECKED SOURCES (cite only these, as Markdown links):\n${sourceBlock(checked)}`
+      ? `\n\n---\nWEB RESEARCH EXCERPTS (${researchResult.provider || "search provider"}${researchResult.cached ? "; reused, originally retrieved " + researchResult.searchedAt : "; retrieved " + researchResult.searchedAt}):\n${truncate(researchResult.notes, 20000)}\n\nCHECKED SOURCES (cite only these, as Markdown links):\n${sourceBlock(checked)}`
       : options.webSearch !== false ? "\n\n---\nLive web search was unavailable for this answer. Do not include URLs; tell the student the answer is not web-verified." : "";
     const libraryContext = library.length ? `\n\n---\n${libraryBlock(library)}` : "";
     const messages = [...history.slice(-12), { role: "user", text: `${text || "(see the attached files)"}${libraryContext}${context}`, attachments }];
@@ -419,7 +437,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       content: answer.text + lengthNote(answer),
       sources: await finalSources(answer.text, checked, terms),
       provider: answer.provider, model: answer.model,
-      meta: { task: task ? options.task : null, instructions: Object.keys(saved).length ? routing.intents : [], web_search: Boolean(researchResult?.ok), search_queries: researchResult?.queries || [], library_passages: library.length, fallback: Boolean(answer.fallback) }
+      meta: { task: task ? options.task : null, instructions: Object.keys(saved).length ? routing.intents : [], ...searchMeta([researchResult]), library_passages: library.length, fallback: Boolean(answer.fallback) }
     };
   }
 
@@ -463,6 +481,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
         if (!library.some((existing) => existing.material_id === row.material_id && existing.page_number === row.page_number && existing.content === row.content)) library.push(row);
       }
     }
+    if (!researched.some(({ research: result }) => result.ok)) requireResearch(researched[0]?.research);
     const judgments = (await Promise.all(records.filter((r) => r.source_material_id).slice(0, 3)
       .map(async (row) => ({ name: row.case_name, text: await materialText(row.source_material_id, 12_000) })))).filter((j) => j.text);
     const terms = termsFrom(...selected.map((item) => item.name));
@@ -478,7 +497,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       records.length ? `FIRE COUNSEL DATABASE RECORDS (entered by administrators; respect their verification_status):\n${records.map((row) => `#### ${row.case_name}\n${caseRecordText(row)}`).join("\n\n")}` : "FIRE COUNSEL DATABASE RECORDS: none matched.",
       judgments.length ? `JUDGMENT TEXT FROM THE FIRE COUNSEL LIBRARY (uploaded by administrators; quote it with page numbers as [Library: case name, p. N]):\n${judgments.map((j) => `#### ${j.name}\n${j.text}`).join("\n\n")}` : "",
       library.length ? libraryBlock(library) : "",
-      `LIVE WEB RESEARCH NOTES PER CASE (Google Search):\n${researched.map(({ item, research: r }) => `#### ${item.name}\n${r.ok ? truncate(r.notes, 12000) : `Live web search failed (${r.error}). Mark this case UNVERIFIED and say no web source was obtained in this run.`}`).join("\n\n")}`,
+      `WEB RESEARCH EXCERPTS PER CASE (provider and original retrieval time recorded below):\n${researched.map(({ item, research: r }) => `#### ${item.name}\n${r.ok ? `Provider: ${r.provider || "search"}; retrieved ${r.searchedAt}${r.cached ? " (reused)" : ""}\n${truncate(r.notes, 12000)}` : `Live web search failed (${r.error}). Mark this case UNVERIFIED and say no web source was obtained in this run.`}`).join("\n\n")}`,
       `CHECKED SOURCE LIST (server opened each link; cite only these):\n${sourceBlock(checked)}`,
       remaining.length ? `NOT PROCESSED IN THIS RUN (daily processing limit of ${limit} cases per run): ${remaining.map((item) => item.name).join("; ")}. Keep them in the register marked "pending — run again" and tell the student to send "continue" to process them.` : ""
     ].filter(Boolean).join("\n\n");
@@ -489,7 +508,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       content: answer.text + lengthNote(answer),
       sources: await finalSources(answer.text, checked, terms),
       provider: answer.provider, model: answer.model,
-      meta: { instructions: Object.keys(saved).length ? routing.intents : [], cases: selected.map((item) => item.name), pending_cases: remaining.map((item) => item.name), database_matches: records.length, library_passages: library.length + judgments.length, web_search: researched.some(({ research: r }) => r.ok), fallback: Boolean(answer.fallback) }
+      meta: { instructions: Object.keys(saved).length ? routing.intents : [], cases: selected.map((item) => item.name), pending_cases: remaining.map((item) => item.name), database_matches: records.length, library_passages: library.length + judgments.length, ...searchMeta(researched.map(({ research: r }) => r)), fallback: Boolean(answer.fallback) }
     };
   }
 
@@ -510,7 +529,8 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
         research(`Find authoritative sources for these study notes${options.topic ? ` on ${options.topic}` : ""}: ${truncate(text, 3000)}`, attachments, { searchQuery: `${options.topic || truncate(text, 200)} Nigerian law` }),
         libraryExcerpts(options.topic || text, { courseId: course?.id || null, limit: 6, maxChars: 12_000 })
       ]);
-      if (researchResult.ok) checked = await verify(researchResult.sources, { terms, limit: 15 });
+      requireResearch(researchResult);
+      checked = await verify(researchResult.sources, { terms, limit: 15 });
     }
     const [custom, saved] = await Promise.all([loadPrompt(db, "exam_note"), instructions()]);
     const routing = detectIntents(options.topic || "", { mode: "notes", attachments });
@@ -530,7 +550,7 @@ export function createStudio({ db, env = process.env, generate = defaultGenerate
       content: answer.text + lengthNote(answer),
       sources: checked.length || extractUrls(answer.text).length ? await finalSources(answer.text, checked, terms) : [],
       provider: answer.provider, model: answer.model,
-      meta: { instructions: Object.keys(saved).length ? routing.intents : [], course: course ? { id: course.id, label: courseLabel(course) } : null, past_questions: questions.length, research: Boolean(researchResult?.ok), library_passages: library.length, fallback: Boolean(answer.fallback) }
+      meta: { instructions: Object.keys(saved).length ? routing.intents : [], course: course ? { id: course.id, label: courseLabel(course) } : null, past_questions: questions.length, research: Boolean(researchResult?.ok), ...searchMeta([researchResult]), library_passages: library.length, fallback: Boolean(answer.fallback) }
     };
   }
 

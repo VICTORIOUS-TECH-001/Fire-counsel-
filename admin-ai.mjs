@@ -48,19 +48,23 @@ function renderStatus(data) {
   const p = data.providers;
   const state = (ok, yes, no) => `<span class="fc-state" data-ok="${ok}">${ok ? yes : no}</span>`;
   $("#ai-provider-status").innerHTML = `<dl class="fc-kv">
-    <dt>Google Gemini (main)</dt><dd>${state(p.gemini.configured, "KEY ADDED", "NO KEY")}${p.gemini.warning ? `<br><small class="fc-warn">⚠ ${escapeHTML(p.gemini.warning)}</small>` : ""}</dd>
+    <dt>Google Gemini (writer)</dt><dd>${state(p.gemini.configured, "KEY ADDED", "NO KEY")}${p.gemini.warning ? `<br><small class="fc-warn">⚠ ${escapeHTML(p.gemini.warning)}</small>` : ""}</dd>
     <dt>Writing models</dt><dd>${escapeHTML(p.gemini.models.join(", "))}</dd>
     <dt>Web-search model</dt><dd>${escapeHTML(p.gemini.search_models.join(", "))}</dd>
-    <dt>Groq (fast backup)</dt><dd>${state(Boolean(p.groq?.configured), "KEY ADDED", "NO KEY")} ${escapeHTML((p.groq?.models || []).join(", "))}${p.groq?.key_name ? ` <small>(${escapeHTML(p.groq.key_name)})</small>` : ""}${p.groq?.warning ? `<br><small class="fc-warn">⚠ ${escapeHTML(p.groq.warning)}</small>` : ""}</dd>
+    <dt>Groq (writer)</dt><dd>${state(Boolean(p.groq?.configured), "KEY ADDED", "NO KEY")} ${escapeHTML((p.groq?.models || []).join(", "))}${p.groq?.key_name ? ` <small>(${escapeHTML(p.groq.key_name)})</small>` : ""}${p.groq?.warning ? `<br><small class="fc-warn">⚠ ${escapeHTML(p.groq.warning)}</small>` : ""}</dd>
     <dt>OpenRouter (backup)</dt><dd>${state(p.openrouter.configured, "KEY ADDED", "NO KEY")} ${escapeHTML(p.openrouter.models.join(", "))}${p.openrouter.warning ? `<br><small class="fc-warn">⚠ ${escapeHTML(p.openrouter.warning)}</small>` : ""}</dd>
-    <dt>Tavily (backup web search)</dt><dd>${state(Boolean(p.tavily?.configured), "KEY ADDED", "NO KEY")}${p.tavily?.key_name ? ` <small>(${escapeHTML(p.tavily.key_name)})</small>` : ""}${p.tavily?.warning ? `<br><small class="fc-warn">⚠ ${escapeHTML(p.tavily.warning)}</small>` : ""}</dd>
+    <dt>Tavily (web search)</dt><dd>${state(Boolean(p.tavily?.configured), "KEY ADDED", "NO KEY")}${p.tavily?.key_name ? ` <small>(${escapeHTML(p.tavily.key_name)})</small>` : ""}${p.tavily?.warning ? `<br><small class="fc-warn">⚠ ${escapeHTML(p.tavily.warning)}</small>` : ""}</dd>
+    <dt>Brave Search (web search)</dt><dd>${state(Boolean(p.brave?.configured), "KEY ADDED", "NO KEY")}${p.brave?.key_name ? ` <small>(${escapeHTML(p.brave.key_name)})</small>` : ""}</dd>
+    <dt>Writer order</dt><dd>${escapeHTML((p.writer_order || []).join(" → ") || "See configured writers above")}</dd>
+    <dt>Search failover order</dt><dd>${escapeHTML((p.search?.order || []).join(" → ") || "See configured search services above")}</dd>
     <dt>Database tables</dt><dd>${state(data.schema_ready, "READY", "NOT INSTALLED")}</dd>
   </dl>${data.schema_ready ? "" : `<p class="fc-status" data-kind="error">The AI tables are not in Neon yet. On GitHub open <b>Actions → “Neon database migration (AI, website, uploads)” → Run workflow</b>.</p>`}`;
   if (data.render_service && $("#ai-render-service")) $("#ai-render-service").textContent = data.render_service;
-  const missing = ["groq", "tavily"].filter((name) => p[name] && !p[name].configured && !p[name].warning);
-  if (missing.length) {
-    if (missing.includes("tavily")) $("#ai-provider-status").insertAdjacentHTML("beforeend", `<p class="fc-status" data-kind="error"><b>Web search needs Tavily.</b> Google does not allow web search with Gemini 3 models on the free Gemini plan, so without a Tavily key the AI answers without live web sources. Tavily is free (1,000 searches a month): <a href="https://app.tavily.com" target="_blank" rel="noopener">app.tavily.com</a>.</p>`);
-    $("#ai-provider-status").insertAdjacentHTML("beforeend", `<p class="fc-status" data-kind="error">The server cannot see the ${missing.map((name) => name === "groq" ? "Groq" : "Tavily").join(" and ")} key${missing.length > 1 ? "s" : ""}. In Render, open the service <b>${escapeHTML(data.render_service || "fire-counsel-2")}</b> (the one this website runs on) → <b>Environment</b> → add ${missing.map((name) => `<code>${name === "groq" ? "GROQ_API_KEY" : "TAVILY_API_KEY"}</code>`).join(" and ")} → <b>Save and deploy</b>. If the keys are in an environment group, link that group under this service&rsquo;s <b>Linked Environment Groups</b> and check for stale service-level overrides. A new group is not required. Confirm the deployment becomes <b>Live</b>, then check <a href="/api/health" target="_blank" rel="noopener">/api/health</a> for runtime presence; this is separate from testing whether a provider accepts a key.</p>`);
+  $("#ai-provider-status").insertAdjacentHTML("beforeend", `<p class="fc-status">KEY ADDED means the running server sees a setting, not that the provider accepted it. Use the connection test below for authentication, quota and actual source results. Web search is separate from the answer-writing model.</p>`);
+  const independentSearch = Boolean(p.tavily?.configured || p.brave?.configured);
+  if (!independentSearch) $("#ai-provider-status").insertAdjacentHTML("beforeend", `<p class="fc-status" data-kind="error">No independent web-search key is configured. Add <code>TAVILY_API_KEY</code> or <code>BRAVE_SEARCH_API_KEY</code> (optionally both for failover). Gemini grounding can also work if this project's model/quota supports it; Groq alone does not search the web.</p>`);
+  if (!p.groq?.configured || !independentSearch) {
+    $("#ai-provider-status").insertAdjacentHTML("beforeend", `<p class="fc-status">Configure the keys on the API service <b>${escapeHTML(data.render_service || "fire-counsel-2")}</b>, not just a local file or GitHub Actions. In Render use <b>Environment → Save and deploy</b>. Link any environment group to this exact service and check for blank/stale service-level overrides. Confirm the deployment becomes <b>Live</b>, then inspect <a href="/api/health" target="_blank" rel="noopener">/api/health</a> for canonical <b>missing / empty / present</b> states and the deployed commit.</p>`);
   }
   const today = data.today || {};
   $("#ai-today").innerHTML = `<dl class="fc-kv">${FEATURES.map(([key, label]) => `<dt>${label}</dt><dd>${today[key]?.used || 0} used${today[key]?.failed ? ` · ${today[key].failed} failed` : ""}</dd>`).join("")}</dl><p>Time zone: ${escapeHTML(data.timezone)}</p>`;
@@ -145,7 +149,7 @@ function testErrorText(error) {
   return error.message;
 }
 
-const PROVIDER_NAMES = { gemini: "Google Gemini", groq: "Groq", openrouter: "OpenRouter", tavily: "Tavily" };
+const PROVIDER_NAMES = { gemini: "Google Gemini", groq: "Groq", openrouter: "OpenRouter", tavily: "Tavily", brave: "Brave Search" };
 
 // One row per model/service: healthy or not, how fast, and why it failed.
 function renderHealth(models) {
@@ -157,22 +161,25 @@ function renderHealth(models) {
     <td>${m.ok ? `<span class="fc-state" data-ok="true">HEALTHY</span><small>${(m.ms / 1000).toFixed(1)}s${m.sources ? ` · ${m.sources} sources` : ""}</small>` : `<span class="fc-state" data-ok="false">${escapeHTML(String(m.code || "FAILED").replace(/^PROVIDER_/, "").replace(/_/g, " "))}</span><small>${escapeHTML(m.error || "")}</small>`}</td></tr>`).join("")}</tbody></table>`;
 }
 $("#ai-test-button")?.addEventListener("click", async () => {
+  if (!verified) return;
+  const mySession = session;
   const button = $("#ai-test-button");
   button.disabled = true;
   setText("#ai-test-result", "Testing every AI service at the same time… this takes up to 1 minute.", "");
   if ($("#ai-test-models")) $("#ai-test-models").innerHTML = "";
   try {
     const body = await api("/api/v1/admin/ai/test", { method: "POST", body: JSON.stringify({ search: $("#ai-test-search").checked }) });
+    if (mySession !== session || !verified) return;
     const d = body.data;
     let text = d.ok ? `Working: ${PROVIDER_NAMES[d.provider] || d.provider} (${d.model}) replied “${d.reply}”.` : "No AI model answered — see the table below.";
-    if (d.fallback) text += " Gemini did not answer, so a backup was used.";
+    if (d.fallback) text += " A backup writer was used.";
     if (d.search) text += d.search.ok ? ` Web search works via ${PROVIDER_NAMES[d.search.provider] || d.search.provider} (${d.search.sources} sources).` : ` Web search failed: ${d.search.error}`;
     setText("#ai-test-result", text, !d.ok || (d.search && !d.search.ok) ? "error" : "ok");
     renderHealth(d.models || []);
   } catch (error) {
-    setText("#ai-test-result", testErrorText(error), "error");
+    if (mySession === session && verified) setText("#ai-test-result", testErrorText(error), "error");
   } finally {
-    button.disabled = !verified;
+    if (mySession === session) button.disabled = !verified;
   }
 });
 
@@ -413,6 +420,9 @@ function onAdminState(state) {
   if (!verified) {
     users = [];
     defaults = null;
+    $("#ai-test-models")?.replaceChildren();
+    $("#ai-provider-status")?.replaceChildren();
+    setText("#ai-test-result", "", "");
     $("#student-account-rows")?.replaceChildren();
     $("#account-adjustment-form").hidden = true;
     $("#account-search").value = "";

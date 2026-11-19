@@ -29,6 +29,7 @@ function initStudio() {
     notes: { eyebrow: "EXAM-READY NOTES", title: "Exam-ready notes", help: "Upload or paste your lecture notes or textbook pages. The notes use only your material unless you allow outside research. Download as Word or PDF.", placeholder: "Paste your notes here, or upload them below…", feature: "notes" },
     questions: { eyebrow: "QUESTION SETTER · YOUR COURSE'S STYLE", title: "Set exam questions", help: "Give the notes or topic to set questions on. FIRE COUNSEL finds your course and copies its past-question format: number of questions, marks, time and style.", placeholder: "Paste the notes or topics to be examined…", feature: "questions" }
   };
+  const SEARCH_NAMES = { tavily: "Tavily", brave: "Brave Search", gemini: "Google Search (Gemini)" };
   const MODE_NAMES = { chat: "Fire Counsel", case: "Case analysis", notes: "Exam notes", questions: "Question setter" };
   // Quick study tools: they use the chat allowance with a special instruction.
   const TASKS = {
@@ -124,19 +125,37 @@ function initStudio() {
     // free-plan students see why the composer is locked instead of an error.
     premiumBlocked = !config.admin && !(config.allowance && config.allowance.premium === true);
     input.disabled = premiumBlocked;
-    setBusy(false);
+    setBusy(messages.some((message) => message.status === "pending" && !stalled.has(message.id)));
     if (premiumBlocked) {
+      renderSearchStatus();
       setStatus("Fire Counsel AI is a premium feature. Your account is on the free plan — ask the FIRE COUNSEL administrator to enable premium on it.", "error");
       return;
     }
-    const webSearch = $("#ai-web-search");
-    webSearch.disabled = !config.web_search;
-    if (!config.web_search) webSearch.checked = false;
+    // Never silently uncheck a student's online-search choice just because
+    // a key is missing. They may explicitly choose a non-web answer instead.
+    $("#ai-web-search").disabled = false;
+    renderSearchStatus();
     if (!announce && config.configured && config.email_verified) return;
-    if (!config.configured) setStatus("The AI key has not been added on the server yet. Ask the administrator to add GEMINI_API_KEY in Render.", "error");
+    if (!config.configured) setStatus("The AI key has not been added on the server yet. Ask the administrator to add GROQ_API_KEY or GEMINI_API_KEY on the API server.", "error");
     else if (!config.email_verified) setStatus("Verify your email address to use Fire Counsel AI: open the link we emailed you, then sign out and in again.", "error");
     else setStatus("Ready. Choose a tool, then type or upload your material.", "ok");
   }
+
+  function renderSearchStatus() {
+    const node = $("#ai-search-status");
+    if (!node) return;
+    const requested = mode === "case" || (mode === "chat" && task !== "mock" && $("#ai-web-search").checked) || (mode === "notes" && $("#ai-allow-research").checked);
+    node.hidden = !user || premiumBlocked;
+    node.dataset.state = requested && !config.web_search ? "error" : "";
+    if (!requested) node.textContent = "Web search is off. This answer will not be checked against online search results.";
+    else if (!config.web_search) node.textContent = "Web search is selected but not configured on the server. Ask the administrator to configure Tavily or Brave Search; it will not silently switch to a non-web answer.";
+    else {
+      const names = (config.search_providers || []).map((name) => SEARCH_NAMES[name]).filter(Boolean);
+      node.textContent = `Web search selected${names.length ? ": " + names.join(" → ") : ""}. Provider availability is checked when you send; search results are not legal verification.`;
+    }
+  }
+  $("#ai-web-search").addEventListener("change", renderSearchStatus);
+  $("#ai-allow-research").addEventListener("change", renderSearchStatus);
 
   async function loadCourses(mySession) {
     const { response, body } = await api("/api/v1/ai/courses");
@@ -198,7 +217,13 @@ function initStudio() {
     }
     const meta = message.meta || {};
     const notes = [];
-    if (meta.fallback) notes.push("Answered by a free backup model because Gemini was busy");
+    if (meta.fallback) notes.push("Answered by a backup writer model");
+    if (meta.web_search) {
+      const names = (Array.isArray(meta.search_providers) ? meta.search_providers : []).map((name) => SEARCH_NAMES[name]).filter(Boolean);
+      const time = new Date(meta.searched_at || "");
+      notes.push(`${meta.search_cached ? "Reused online research" : meta.search_cache_partial ? "Online search (some research reused)" : "Online search completed"}${names.length ? " · " + names.join(" + ") : ""}${Number.isFinite(time.getTime()) ? " · retrieved " + time.toLocaleString() : ""}`);
+      if (meta.search_partial) notes.push("Some case searches failed; see the per-case warnings");
+    }
     if (meta.web_search === false && mode === "chat") notes.push("Not web-verified");
     if (meta.course?.label) notes.push(`Course: ${meta.course.label}${meta.detection ? " (detected)" : ""}`);
     if (typeof meta.past_questions === "number" && mode === "questions") notes.push(meta.past_questions ? `${meta.past_questions} past questions used as the format` : "No past questions stored yet for this course");
@@ -309,8 +334,8 @@ function initStudio() {
           // Poll quickly while words are arriving, slower while it is still searching.
           if (pending) return schedulePoll(mySession, id, streaming ? 1500 : Math.min(delay + 1000, 6000));
           setBusy(false);
-          setStatus("Answer ready.", "ok");
           const latest = messages.at(-1);
+          setStatus(latest?.status === "failed" ? latest.content || "The request failed. Please try again." : "Answer ready.", latest?.status === "failed" ? "error" : "ok");
           if (autoRead() && latest?.role === "assistant" && latest.status === "done" && !latest.meta?.quiz) speak(latest.id);
           loadMe(mySession).catch(() => {});
           return;
@@ -572,6 +597,7 @@ function initStudio() {
     $("#fc-task").hidden = !task;
     $("#fc-task-label").textContent = task ? TASKS[task].label : "";
     input.placeholder = mode === "chat" && !task ? "Ask me anytime…" : info.placeholder;
+    renderSearchStatus();
     renderThread();
     if (user) {
       loadHistory().catch(() => {});
@@ -932,6 +958,8 @@ function initStudio() {
       resetWaiting();
       user = nextUser;
       premiumBlocked = false;
+      config = { configured: false, web_search: false };
+      renderSearchStatus();
       input.disabled = false;
       document.body.dataset.signedIn = String(Boolean(user));
       conversationId = null;
