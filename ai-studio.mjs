@@ -128,35 +128,17 @@ function initStudio() {
     input.disabled = premiumBlocked;
     setBusy(messages.some((message) => message.status === "pending" && !stalled.has(message.id)));
     if (premiumBlocked) {
-      renderSearchStatus();
       setStatus("Fire Counsel AI is a premium feature. Your account is on the free plan — ask the FIRE COUNSEL administrator to enable premium on it.", "error");
       return;
     }
     // Never silently uncheck a student's online-search choice just because
     // a key is missing. They may explicitly choose a non-web answer instead.
     $("#ai-web-search").disabled = false;
-    renderSearchStatus();
     if (!announce && config.configured && config.email_verified) return;
     if (!config.configured) setStatus("The AI key has not been added on the server yet. Ask the administrator to add GROQ_API_KEY or GEMINI_API_KEY on the API server.", "error");
     else if (!config.email_verified) setStatus("Verify your email address to use Fire Counsel AI: open the link we emailed you, then sign out and in again.", "error");
-    else setStatus("Ready. Choose a tool, then type or upload your material.", "ok");
+    else setStatus("");
   }
-
-  function renderSearchStatus() {
-    const node = $("#ai-search-status");
-    if (!node) return;
-    const requested = mode === "case" || (mode === "chat" && task !== "mock" && $("#ai-web-search").checked) || (mode === "notes" && $("#ai-allow-research").checked);
-    node.hidden = !user || premiumBlocked;
-    node.dataset.state = requested && !config.web_search ? "error" : "";
-    if (!requested) node.textContent = "Web search is off. This answer will not be checked against online search results.";
-    else if (!config.web_search) node.textContent = "Web search is selected but not configured on the server. Ask the administrator to configure Tavily, Brave Search or SerpAPI; it will not silently switch to a non-web answer.";
-    else {
-      const names = (config.search_providers || []).map((name) => SEARCH_NAMES[name]).filter(Boolean);
-      node.textContent = `Web search selected${names.length ? ": " + names.join(" → ") : ""}. Provider availability is checked when you send; search results are not legal verification.`;
-    }
-  }
-  $("#ai-web-search").addEventListener("change", renderSearchStatus);
-  $("#ai-allow-research").addEventListener("change", renderSearchStatus);
 
   async function loadCourses(mySession) {
     const { response, body } = await api("/api/v1/ai/courses");
@@ -599,7 +581,6 @@ function initStudio() {
     $("#fc-task").hidden = !task;
     $("#fc-task-label").textContent = task ? TASKS[task].label : "";
     input.placeholder = mode === "chat" && !task ? "Ask me anytime…" : info.placeholder;
-    renderSearchStatus();
     renderThread();
     if (user) {
       loadHistory().catch(() => {});
@@ -961,7 +942,6 @@ function initStudio() {
       user = nextUser;
       premiumBlocked = false;
       config = { configured: false, web_search: false };
-      renderSearchStatus();
       input.disabled = false;
       document.body.dataset.signedIn = String(Boolean(user));
       conversationId = null;

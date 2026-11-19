@@ -160,7 +160,8 @@ test("AI studio sends a question, polls the background job and renders safe answ
   });
   await page.goto("/ai.html");
   await expect(page.locator(".fc-home h1")).toHaveText("Hi! I'm Fire Counsel");
-  await expect(page.locator("#ai-status")).toContainText("Ready");
+  await expect(page.locator("#ai-status")).toBeEmpty();
+  await expect(page.locator("#ai-status")).toBeHidden();
   await expect(page.locator("#ai-allowance-list")).toContainText("19 of 20 left");
   await expect(page.locator(".fc-signin").first()).toBeHidden();
   await page.locator("#ai-input").fill("What is consideration?");
@@ -177,7 +178,7 @@ test("AI studio sends a question, polls the background job and renders safe answ
   await expect(page.locator(".ai-answer script")).toHaveCount(0);
   expect(await page.evaluate(() => window.__bad)).toBeUndefined();
   await expect(page.locator("#ai-status")).toHaveText("Answer ready.");
-  await expect(page.locator("#ai-search-status")).toContainText("Tavily → Brave Search");
+  await expect(page.locator("#ai-search-status")).toHaveCount(0);
   await expect(page.locator(".ai-meta")).toContainText("Online search completed · Brave Search");
   await expect(page.locator(".ai-meta")).toContainText("retrieved");
   await expect(page.locator(".ai-sources a")).toHaveCount(1);

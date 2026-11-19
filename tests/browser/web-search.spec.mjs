@@ -25,12 +25,13 @@ test("missing search setup never silently unchecks online search; non-web mode i
       : json(route, { data: { conversation, messages: [answer] } }, 202);
   } });
   await page.goto("/ai.html");
-  await expect(page.locator("#ai-status")).toContainText("Ready");
+  await expect(page.locator("#ai-status")).toBeEmpty();
+  await expect(page.locator("#ai-status")).toBeHidden();
   await page.locator("#ai-input").fill("Explain the supplied synthetic report");
   await expect(page.locator("#ai-web-search")).toBeVisible();
   await expect(page.locator("#ai-web-search")).toBeChecked();
   await expect(page.locator("#ai-web-search")).toBeEnabled();
-  await expect(page.locator("#ai-search-status")).toContainText("selected but not configured");
+  await expect(page.locator("#ai-search-status")).toHaveCount(0);
   await page.locator("#ai-send").click();
   await expect(page.locator("#ai-status")).toContainText("Online search is not configured");
   expect(requests[0].options.webSearch).toBe(true);
@@ -38,7 +39,7 @@ test("missing search setup never silently unchecks online search; non-web mode i
   await expect(page.locator("#ai-input")).toHaveValue("Explain the supplied synthetic report");
   await expect(page.locator("#ai-status")).toHaveAttribute("data-state", "error");
   await page.locator("#ai-web-search").uncheck();
-  await expect(page.locator("#ai-search-status")).toContainText("Web search is off");
+  await expect(page.locator("#ai-search-status")).toHaveCount(0);
   await page.locator("#ai-send").click();
   await expect.poll(() => requests.length).toBe(2);
   expect(requests[1].options.webSearch).toBe(false);
@@ -55,7 +56,8 @@ test("a failed search job is shown as an error, never as Answer ready", async ({
     poll: route => json(route, { data: { conversation, messages: [failed] } })
   });
   await page.goto("/ai.html");
-  await expect(page.locator("#ai-status")).toContainText("Ready");
+  await expect(page.locator("#ai-status")).toBeEmpty();
+  await expect(page.locator("#ai-status")).toBeHidden();
   await page.locator("#ai-input").fill("Explain the supplied report");
   await page.locator("#ai-send").click();
   await expect(page.locator(".ai-failed")).toContainText("Online search failed", { timeout: 12_000 });
@@ -72,7 +74,8 @@ test("reused online research shows its provider and original retrieval time, and
     meta: { web_search: true, search_providers: ["brave"], search_cached: true, searched_at: "2026-11-19T10:00:00.000Z" } };
   await setup(page, { post: route => json(route, { data: { conversation, messages: [answer] } }, 202), poll: route => json(route, { data: { conversation, messages: [answer] } }) });
   await page.goto("/ai.html");
-  await expect(page.locator("#ai-status")).toContainText("Ready");
+  await expect(page.locator("#ai-status")).toBeEmpty();
+  await expect(page.locator("#ai-status")).toBeHidden();
   await page.locator("#ai-input").fill("Explain the supplied report");
   await page.locator("#ai-send").click();
   await expect(page.locator(".ai-meta")).toContainText("Reused online research · Brave Search · retrieved");
@@ -82,7 +85,7 @@ test("reused online research shows its provider and original retrieval time, and
   await expectNoHorizontalOverflow(page);
   await page.evaluate(() => window.__auth.setUser(null));
   await expect(page.locator("#ai-thread")).toBeEmpty();
-  await expect(page.locator("#ai-search-status")).toBeHidden();
+  await expect(page.locator("#ai-search-status")).toHaveCount(0);
 });
 
 test("DeepSeek fallback answers keep SerpAPI source provenance and disclose the writer", async ({ page }) => {
@@ -91,8 +94,9 @@ test("DeepSeek fallback answers keep SerpAPI source provenance and disclose the 
     meta: { fallback: true, web_search: true, search_providers: ["serpapi"], searched_at: "2026-11-19T10:00:00.000Z", search_cached: false } };
   await setup(page, { searchProviders: ["serpapi"], post: route => json(route, { data: { conversation, messages: [answer] } }, 202), poll: route => json(route, { data: { conversation, messages: [answer] } }) });
   await page.goto("/ai.html");
-  await expect(page.locator("#ai-status")).toContainText("Ready");
-  await expect(page.locator("#ai-search-status")).toContainText("SerpAPI");
+  await expect(page.locator("#ai-status")).toBeEmpty();
+  await expect(page.locator("#ai-status")).toBeHidden();
+  await expect(page.locator("#ai-search-status")).toHaveCount(0);
   await expect(page.locator(".fc-privacy")).toContainText("DeepSeek");
   await expect(page.locator(".fc-privacy")).toContainText("SerpAPI");
   await page.locator("#ai-input").fill("Explain the supplied report");
@@ -110,7 +114,8 @@ test("all writers unavailable replaces partial text with a retryable error, not 
   const failed = { ...pending, status: "failed", content: "All configured AI writers are unavailable. Please try again shortly. This request was not counted.", meta: { code: "PROVIDERS_UNAVAILABLE" } };
   await setup(page, { post: route => json(route, { data: { conversation, messages: [pending] } }, 202), poll: route => json(route, { data: { conversation, messages: [failed] } }) });
   await page.goto("/ai.html");
-  await expect(page.locator("#ai-status")).toContainText("Ready");
+  await expect(page.locator("#ai-status")).toBeEmpty();
+  await expect(page.locator("#ai-status")).toBeHidden();
   await page.locator("#ai-input").fill("Explain the supplied report");
   await page.locator("#ai-send").click();
   await expect(page.locator(".ai-failed")).toContainText("writers are unavailable", { timeout: 12_000 });

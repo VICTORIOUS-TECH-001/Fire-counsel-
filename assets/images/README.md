@@ -1,6 +1,6 @@
 # FIRE COUNSEL image assets
 
-- `fire-counsel-brand.jpg` — optimized local copy of the gavel-and-flame artwork supplied by the site owner (1440 × 960, landscape 3:2). Shared page branding uses `branding.css` to show the complete image above the centered wordmark; use `object-fit: contain`, not a square crop. The source artwork and the separate square PWA icons are unchanged.
+- `fire-counsel-flame.png` — the flame-in-hexagon logo supplied by the owner on 19 November 2026 (`Screenshot_20261118-235318.png`). Only the surrounding black screenshot margin was trimmed/made transparent; the artwork itself is retained (135 × 161). All page logos, favicon and both PWA icons use this artwork; the old gavel image was removed. Use `object-fit: contain`. The AI welcome animates a masked copy of this same flame plus embers, without moving the hexagon; reduced-motion users see the still logo. Legacy bundled-logo paths in published/cached content resolve to this new asset locally, with no Firebase publication.
 - `pexels-law-judge.jpg` — photo by Katrin Bolovtsova, Pexels photo 6077294: <https://www.pexels.com/photo/a-woman-sitting-at-the-table-6077294/>. Pexels license: <https://www.pexels.com/license/>.
 - `pexels-law-student.jpg` — photo by Ludovic Delot, Pexels photo 16420237: <https://www.pexels.com/photo/a-student-sitting-in-a-library-and-with-a-laptop-and-studying-16420237/>. Pexels license: <https://www.pexels.com/license/>.
 

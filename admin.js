@@ -25,6 +25,7 @@
   }
   function validSlideSource(value) {
     const path = String(value || "");
+    if (/^(?:\.\/|\/)?assets\/images\/fire-counsel-brand\.jpg(?:[?#].*)?$/i.test(path)) return "./assets/images/fire-counsel-flame.png";
     if (/^(?:\.\/)?assets\/[a-zA-Z0-9_./-]+\.(?:png|jpe?g|webp)$/i.test(path)) return path.startsWith("./") ? path : `./${path}`;
     if (/^\/media\/[0-9a-f-]{36}\.(?:png|jpg|webp)$/i.test(path)) return path;
     try {
@@ -32,7 +33,7 @@
       const decodedPath = decodeURIComponent(url.pathname);
       if (url.protocol === "https:" && url.hostname === "firebasestorage.googleapis.com" && /^\/v0\/b\/fire-counsel\.firebasestorage\.app\/o\/site\/slides\/[^/]+\.(?:png|jpe?g|webp)$/i.test(decodedPath)) return url.href;
     } catch (_) { /* untrusted path: fall through to the local brand image */ }
-    return "./assets/images/fire-counsel-brand.jpg";
+    return "./assets/images/fire-counsel-flame.png";
   }
   function readSlides() {
     try { return JSON.parse(editor.value)?.hero?.slides || []; }
