@@ -16,7 +16,9 @@
     "test:proxy": "python3 -m unittest discover -s tools/tests -v",
     "test:browser": "playwright test",
     "test:rules": "npm --prefix firebase run test:rules",
-    "test:all": "npm test && npm run test:browser && npm run test:rules"
+    "test:all": "npm test && npm run test:browser && npm run test:rules",
+    "casebook": "python3 tools/casebook/build_casebook.py && python3 tools/casebook/split_cases.py && python3 tools/casebook/build_manifest.py",
+    "test:casebook": "node --test tests/frontend/casebook.test.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.65.1",

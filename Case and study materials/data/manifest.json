@@ -1,0 +1,279 @@
+{
+  "store": "Case and study materials",
+  "title": "OFFER — CASEBOOK AND STUDY MATERIALS",
+  "subject": "Law of Contract (Nigeria)",
+  "research_date": "2026-11-22",
+  "version": "1.0",
+  "generated": "2026-11-22T02:57:17+00:00",
+  "naming_convention": "YYYY-MM-DD_<slug>_v<version>.<ext>",
+  "folders": {
+    "source/": "the uploaded photograph, the verbatim transcription and the research brief, kept as the evidence of what was asked",
+    "cases/": "one file per authority, so a single case can be handed out on its own",
+    "data/": "the machine-readable record: cases.json, synthesis-and-questions.json, this manifest and the SQL seed",
+    "pdf/": "the compiled deliverables"
+  },
+  "authorities": [
+    {
+      "number": 1,
+      "name": "Storer v Manchester City Council",
+      "citation": "[1974] 1 WLR 1403",
+      "court": "Court of Appeal (Civil Division), England",
+      "jurisdiction": "England and Wales",
+      "confidence": "VERIFIED",
+      "textbook_page": "p 23, fn 1"
+    },
+    {
+      "number": 2,
+      "name": "Alhaji M. C. Dahiru & Anor v Alhaji Bubakare Kamale",
+      "citation": "(2005) 9 NWLR (Pt 929) 8",
+      "court": "Supreme Court of Nigeria (on appeal from the Court of Appeal, Jos Division, and the High Court of Adamawa State)",
+      "jurisdiction": "Nigeria",
+      "confidence": "PARTLY VERIFIED",
+      "textbook_page": "p 23, fn 3 and the block quotation in the text"
+    },
+    {
+      "number": 3,
+      "name": "United Bank for Africa Ltd v Tejumola & Sons Ltd",
+      "citation": "(1988) 2 NWLR (Pt 79) 662",
+      "court": "Supreme Court of Nigeria (on appeal from the Court of Appeal, Lagos Division, and the Lagos High Court)",
+      "jurisdiction": "Nigeria",
+      "confidence": "VERIFIED",
+      "textbook_page": "p 23, fn 2"
+    },
+    {
+      "number": 4,
+      "name": "Agomo (also reported as Agoma) v Guinness (Nigeria) Ltd",
+      "citation": "(1995) 2 NWLR (Pt 380) 672",
+      "court": "Supreme Court of Nigeria",
+      "jurisdiction": "Nigeria",
+      "confidence": "PARTLY VERIFIED",
+      "textbook_page": "p 23, fn 2"
+    },
+    {
+      "number": 5,
+      "name": "Sparkling Breweries Ltd & 5 Ors v Union Bank of Nigeria Ltd",
+      "citation": "(2001) 15 NWLR (Pt 737) 539",
+      "court": "Supreme Court of Nigeria",
+      "jurisdiction": "Nigeria",
+      "confidence": "PARTLY VERIFIED",
+      "textbook_page": "p 23, fn 4 (the 'also see' footnote introducing the block quotation, and almost certainly the true source of the words quoted in the text)"
+    },
+    {
+      "number": 6,
+      "name": "S. A. Adebanjo v A. A. Brown",
+      "citation": "(1990) 3 NWLR (Pt 141) 661",
+      "court": "Supreme Court of Nigeria (on appeal from the Court of Appeal and the High Court of Lagos State)",
+      "jurisdiction": "Nigeria",
+      "confidence": "PARTLY VERIFIED",
+      "textbook_page": "p 23, fn 4"
+    },
+    {
+      "number": 7,
+      "name": "Union Bank of Nigeria Ltd v Sax (Nigeria) Ltd & 2 Ors",
+      "citation": "(1994) 8 NWLR (Pt 361) 150",
+      "court": "Supreme Court of Nigeria",
+      "jurisdiction": "Nigeria",
+      "confidence": "PARTLY VERIFIED",
+      "textbook_page": "p 23, fn 4"
+    },
+    {
+      "number": 8,
+      "name": "Non-case authorities registered under Section 1 of the research prompt",
+      "citation": "Law Reform (Contracts) Law, Cap 66, Laws of Lagos State, s 5",
+      "court": "Not applicable to this authority",
+      "jurisdiction": "Nigeria",
+      "confidence": "PARTLY VERIFIED",
+      "textbook_page": "Not cited on p 23; registered for completeness because these provisions govern the writing requirement that limits any discussion of offer and acceptance in land transactions."
+    }
+  ],
+  "files": [
+    {
+      "path": "2026-11-22_Case-and-study-materials_store_v1.0.md",
+      "name": "Case-and-study-materials_store_v1.0.md",
+      "date": "2026-11-22",
+      "folder": ".",
+      "role": "store guide",
+      "kind": "text/markdown",
+      "bytes": 9209,
+      "sha256": "0aa830730fe7998a5c07078075f103227f0b22f0412a1ee44cd5d55df2ef01f5",
+      "modified": "2026-11-22T02:56:47+00:00"
+    },
+    {
+      "path": "cases/2026-11-22_01_Storer-v-Manchester-City-Council_v1.0.md",
+      "name": "01_Storer-v-Manchester-City-Council_v1.0.md",
+      "date": "2026-11-22",
+      "folder": "cases",
+      "role": "record",
+      "kind": "text/markdown",
+      "bytes": 12091,
+      "sha256": "c91ae30816c78e4fdf427043c5e58293d987317342d6fb730610636ee7b322a7",
+      "modified": "2026-11-22T02:57:17+00:00"
+    },
+    {
+      "path": "cases/2026-11-22_02_Alhaji-M-C-Dahiru-Anor-v-Alhaji-Bubakare-Kamale_v1.0.md",
+      "name": "02_Alhaji-M-C-Dahiru-Anor-v-Alhaji-Bubakare-Kamale_v1.0.md",
+      "date": "2026-11-22",
+      "folder": "cases",
+      "role": "record",
+      "kind": "text/markdown",
+      "bytes": 14371,
+      "sha256": "8fb45781cd195f7c4adcaf29ebdbdb0cc9d492208d5babea3c9610905c7db42d",
+      "modified": "2026-11-22T02:57:17+00:00"
+    },
+    {
+      "path": "cases/2026-11-22_03_United-Bank-for-Africa-Ltd-v-Tejumola-Sons-Ltd_v1.0.md",
+      "name": "03_United-Bank-for-Africa-Ltd-v-Tejumola-Sons-Ltd_v1.0.md",
+      "date": "2026-11-22",
+      "folder": "cases",
+      "role": "record",
+      "kind": "text/markdown",
+      "bytes": 12509,
+      "sha256": "9e62a15df18d51025eeb8accab15cd45b397182c50b3af76b825516f1dc05dfc",
+      "modified": "2026-11-22T02:57:17+00:00"
+    },
+    {
+      "path": "cases/2026-11-22_04_Agomo-also-reported-as-Agoma-v-Guinness-Nigeria-Ltd_v1.0.md",
+      "name": "04_Agomo-also-reported-as-Agoma-v-Guinness-Nigeria-Ltd_v1.0.md",
+      "date": "2026-11-22",
+      "folder": "cases",
+      "role": "record",
+      "kind": "text/markdown",
+      "bytes": 11115,
+      "sha256": "19b5aff8331726ee4edf29fa30d6abc17a0c3edd2d31bfff62556eab4e18b513",
+      "modified": "2026-11-22T02:57:17+00:00"
+    },
+    {
+      "path": "cases/2026-11-22_05_Sparkling-Breweries-Ltd-5-Ors-v-Union-Bank-of-Nigeria-Ltd_v1.0.md",
+      "name": "05_Sparkling-Breweries-Ltd-5-Ors-v-Union-Bank-of-Nigeria-Ltd_v1.0.md",
+      "date": "2026-11-22",
+      "folder": "cases",
+      "role": "record",
+      "kind": "text/markdown",
+      "bytes": 10672,
+      "sha256": "2113730632be1eaf8c8ab8d1280514be646b28213800b7eaa312d1fd9bc80d6c",
+      "modified": "2026-11-22T02:57:17+00:00"
+    },
+    {
+      "path": "cases/2026-11-22_06_S-A-Adebanjo-v-A-A-Brown_v1.0.md",
+      "name": "06_S-A-Adebanjo-v-A-A-Brown_v1.0.md",
+      "date": "2026-11-22",
+      "folder": "cases",
+      "role": "record",
+      "kind": "text/markdown",
+      "bytes": 12273,
+      "sha256": "fa3241453f478cc7da667d11972c052522ad9c83840f7a76f19b40ae2b454e3e",
+      "modified": "2026-11-22T02:57:17+00:00"
+    },
+    {
+      "path": "cases/2026-11-22_07_Union-Bank-of-Nigeria-Ltd-v-Sax-Nigeria-Ltd-2-Ors_v1.0.md",
+      "name": "07_Union-Bank-of-Nigeria-Ltd-v-Sax-Nigeria-Ltd-2-Ors_v1.0.md",
+      "date": "2026-11-22",
+      "folder": "cases",
+      "role": "record",
+      "kind": "text/markdown",
+      "bytes": 9789,
+      "sha256": "26f5f4db72046f8e92c97e8653df4ee451bc18c18c18b76d7b5b1f1249ba20dc",
+      "modified": "2026-11-22T02:57:17+00:00"
+    },
+    {
+      "path": "cases/2026-11-22_08_Non-case-authorities-registered-under-Section-1-of-the-research-prompt_v1.0.md",
+      "name": "08_Non-case-authorities-registered-under-Section-1-of-the-research-prompt_v1.0.md",
+      "date": "2026-11-22",
+      "folder": "cases",
+      "role": "record",
+      "kind": "text/markdown",
+      "bytes": 5674,
+      "sha256": "32aa87fee0f791eb48dc571806df8cf257f9ace5a7aad22915736f832fe334d2",
+      "modified": "2026-11-22T02:57:17+00:00"
+    },
+    {
+      "path": "data/2026-11-22_cases_v1.0.json",
+      "name": "cases_v1.0.json",
+      "date": "2026-11-22",
+      "folder": "data",
+      "role": "machine-readable record",
+      "kind": "data",
+      "bytes": 95818,
+      "sha256": "587e8ec68b2e72f8e05b45a315f21b8e3a83463ec08062260f60c0fba2054df1",
+      "modified": "2026-11-22T02:56:06+00:00"
+    },
+    {
+      "path": "data/2026-11-22_synthesis-and-questions_v1.0.json",
+      "name": "synthesis-and-questions_v1.0.json",
+      "date": "2026-11-22",
+      "folder": "data",
+      "role": "machine-readable record",
+      "kind": "data",
+      "bytes": 26964,
+      "sha256": "f9c1242a7ea4b10d6feeb8c42438c1d02b979981b0d9d43c512dcdc7ea66e8b0",
+      "modified": "2026-11-22T02:56:06+00:00"
+    },
+    {
+      "path": "data/db-seed/2026-11-22_legal_cases_seed_v1.0.sql",
+      "name": "legal_cases_seed_v1.0.sql",
+      "date": "2026-11-22",
+      "folder": "data",
+      "role": "machine-readable record",
+      "kind": "sql",
+      "bytes": 22700,
+      "sha256": "45ee63e07fa67cd8f5d3ef3f67aece11d0007b50a5f79cc656dd446be81b9444",
+      "modified": "2026-11-22T02:57:17+00:00"
+    },
+    {
+      "path": "data/db-seed/2026-11-22_materials_seed_v1.0.sql",
+      "name": "materials_seed_v1.0.sql",
+      "date": "2026-11-22",
+      "folder": "data",
+      "role": "machine-readable record",
+      "kind": "sql",
+      "bytes": 3176,
+      "sha256": "d673e3104f016392508c687c09021b804a6b70fee55f4dcc68f3fed24dcdd943",
+      "modified": "2026-11-22T02:57:17+00:00"
+    },
+    {
+      "path": "pdf/2026-11-22_OFFER-casebook_v1.0.pdf",
+      "name": "OFFER-casebook_v1.0.pdf",
+      "date": "2026-11-22",
+      "folder": "pdf",
+      "role": "deliverable",
+      "kind": "pdf",
+      "bytes": 380921,
+      "sha256": "4f1155ea81baf4444694bbfa054693249b5cad09aefff11d28e948175c14ca56",
+      "modified": "2026-11-22T02:57:17+00:00"
+    },
+    {
+      "path": "source/2026-11-22_Master-Prompt_All-Cases-Research.pdf",
+      "name": "Master-Prompt_All-Cases-Research.pdf",
+      "date": "2026-11-22",
+      "folder": "source",
+      "role": "source record",
+      "kind": "pdf",
+      "bytes": 28356,
+      "sha256": "f3ac0cd941e852a234d0722694815bd05af795e93dd7e53c92c20325e0a61df0",
+      "modified": "2026-11-22T02:54:38+00:00"
+    },
+    {
+      "path": "source/2026-11-22_Textbook-page-23_Offer_original-photo.jpg",
+      "name": "Textbook-page-23_Offer_original-photo.jpg",
+      "date": "2026-11-22",
+      "folder": "source",
+      "role": "source record",
+      "kind": "image/jpeg",
+      "bytes": 3685285,
+      "sha256": "b9eef58b70d2b9e62ee114bef903b52ae89f204e3b7594ce3efcceeedeee2053",
+      "modified": "2026-11-22T02:54:38+00:00"
+    },
+    {
+      "path": "source/2026-11-22_Textbook-page-23_Offer_verbatim.md",
+      "name": "Textbook-page-23_Offer_verbatim.md",
+      "date": "2026-11-22",
+      "folder": "source",
+      "role": "source record",
+      "kind": "text/markdown",
+      "bytes": 2908,
+      "sha256": "47f1a2767d6c4968f2f7656d2dbb203ef870cd316c9dc93fc20a1aa633c99788",
+      "modified": "2026-11-22T02:42:31+00:00"
+    }
+  ],
+  "total_bytes": 4343831
+}

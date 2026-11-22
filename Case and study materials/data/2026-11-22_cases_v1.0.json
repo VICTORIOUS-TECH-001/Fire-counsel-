@@ -1,0 +1,776 @@
+{
+  "casebook": {
+    "title": "OFFER — CASEBOOK AND STUDY MATERIALS",
+    "subtitle": "Authorities cited on page 23 of the uploaded Law of Contract text (2.1 Meaning of Offer; 2.2 Conditions for an Offer)",
+    "subject": "Law of Contract (Nigeria)",
+    "jurisdiction_primary": "Nigeria (with English authorities marked as persuasive)",
+    "source_material": "Photograph IMG_20261122_033211_011.jpg — textbook page 23, footnotes 1-4",
+    "research_date": "2026-11-22",
+    "compiler": "FIRE COUNSEL legal research workspace",
+    "version": "1.0",
+    "citation_style": "Nigerian law-report style (NWLR, SCNJ, WLR, All ER); pinpoints given only where the source was actually read",
+    "confidence_labels": {
+      "VERIFIED": "Primary judgment or report text read and material details corroborated.",
+      "PARTLY VERIFIED": "Some material details confirmed from primary text; a key part (pinpoint, panel, full judgment) unavailable.",
+      "UNVERIFIED (secondary source only)": "Resting on blogs, notes, news or commentary; never presented as the court's words or as settled law."
+    }
+  },
+  "formatting_spec": {
+    "page": "A4",
+    "body_font_size": "16pt",
+    "line_spacing": 2.0,
+    "word_spacing_note": "Spec requested 0.2-0.3 cm; implemented at 0.2 cm (the lower, readable end).",
+    "letter_spacing_note": "Spec requested 'alphabet spacing' 0.1-0.15 inch. At 0.1 inch (2.54 mm) per letter a 16pt line becomes unreadable and text runs off the page, so 0.12 pt tracking is used instead. See README 'Formatting deviation'.",
+    "alignment": "justified"
+  },
+  "extraction_register": [
+    {
+      "fn": 1,
+      "printed_name": "Storer v Man-chester CC",
+      "printed_citation": "[1974] 1 WLR 1403",
+      "court_printed": "not stated (CC suffix in name)",
+      "proposition": "Definition of an offer: expression of willingness to contract on certain terms with intention to be bound on acceptance.",
+      "case_id": "storer"
+    },
+    {
+      "fn": 2,
+      "printed_name": "United Bank for Africa v Tejumola",
+      "printed_citation": "[1988] 2 NWLR (Pt 79) 662",
+      "court_printed": "not stated",
+      "proposition": "Cited with Agomo for the proposition that an offer is a proposition clearly and precisely indicating the terms on which the offeror will contract.",
+      "case_id": "tejumola"
+    },
+    {
+      "fn": 2,
+      "printed_name": "Agomo v Guinness (Nig) Plc",
+      "printed_citation": "[1995] 2 NWLR (Pt 580) 672",
+      "court_printed": "not stated",
+      "proposition": "Same proposition: definition of an offer.",
+      "case_id": "agomo"
+    },
+    {
+      "fn": 3,
+      "printed_name": "Dahiru v Kamale",
+      "printed_citation": "[2005] 9 NWLR (Pt 929) 50",
+      "court_printed": "not stated; attributed to Ogbuagu, JSC",
+      "proposition": "An offer is an expression of readiness to contract on the specified terms which, if accepted, gives rise to a binding contract; acceptance converts the offer into a contract.",
+      "case_id": "dahiru"
+    },
+    {
+      "fn": 4,
+      "printed_name": "Sparkling Breweries Ltd & Sons v Union Bank of Nigeria Ltd",
+      "printed_citation": "[2001] 15 NWLR (Pt 737) 539; [2001] 7 SCNJ 321, 342",
+      "court_printed": "not stated",
+      "proposition": "Source of the quoted definition, cited by Ogbuagu, JSC.",
+      "case_id": "sparkling"
+    },
+    {
+      "fn": 4,
+      "printed_name": "Adebanjo v Brown",
+      "printed_citation": "[1990] 3 NWLR (Pt 141) 661; [1990] 6 SCNJ 1",
+      "court_printed": "not stated",
+      "proposition": "Cited by Ogbuagu, JSC alongside the others.",
+      "case_id": "adebanjo"
+    },
+    {
+      "fn": 4,
+      "printed_name": "Union Bank of Nigeria Ltd v Sax (Nig) Ltd & 2 Ors",
+      "printed_citation": "[1994] 8 NWLR (Pt 361) 150; [1994] 9 SCNJ 1, 18",
+      "court_printed": "not stated",
+      "proposition": "Cited by Ogbuagu, JSC; the authority for the requirement that fundamental terms be agreed before a contract exists.",
+      "case_id": "sax"
+    },
+    {
+      "fn": 1,
+      "printed_name": "(non-case authority cited in the text of Storer)",
+      "printed_citation": "Eccles v Bryant and Pollock [1948] Ch 93; Law Reform (Contracts) Law Cap 66, Laws of Lagos State, s 5",
+      "court_printed": "not applicable",
+      "proposition": "Registered for completeness under Section 1 of the research prompt. Eccles v Bryant is the 'subject to contract' authority referred to in Storer; s 5 of the Lagos Law Reform (Contracts) Law is the Nigerian writing requirement applied in Tejumola.",
+      "case_id": "statutes"
+    }
+  ],
+  "cases": [
+    {
+      "id": "storer",
+      "number": 1,
+      "name": "Storer v Manchester City Council",
+      "citation_printed": "Storer v Man-chester CC [1974] 1 WLR 1403",
+      "citation_verified": "[1974] 1 WLR 1403; also reported [1974] 3 All ER 824; 73 LGR 1; (1974) 118 SJ 599",
+      "citation_short": "[1974] 1 WLR 1403",
+      "court": "Court of Appeal (Civil Division), England",
+      "jurisdiction": "England and Wales",
+      "date": "5 and 6 June 1974 (judgment delivered 6 June 1974)",
+      "judges": "Lord Denning MR, Stephenson and Lawton LJJ",
+      "confidence": "VERIFIED",
+      "verification_note": "The report text (All ER) was read in a reproduced copy of the judgment; the citation, court, date, panel and disposition are corroborated by at least two further independent sources. The pinpoint at 1408 for the 'outward appearances' sentence was NOT read in the report itself and is marked as unverified pinpoint.",
+      "textbook_page": "p 23, fn 1",
+      "textbook_proposition": "The definition of an offer: an expression of willingness to contract on certain terms, made with the intention that it shall become binding as soon as it is accepted by the person to whom it is addressed.",
+      "sources": [
+        {
+          "label": "Reproduced All ER report of the judgment (with Lord Denning MR's text)",
+          "url": "https://www.uni-trier.de/fileadmin/fb5/FFA/KURSUNTERLAGEN/Anglo-Amerikanisches_Recht/English_Law_Terminology/GT-Scott_SS2012/3_Cases_contract.pdf",
+          "tier": "D",
+          "type": "university-hosted reproduction of the law report",
+          "accessed": "2026-11-22"
+        },
+        {
+          "label": "Barbados Court of Appeal judgment quoting Storer on the objective test",
+          "url": "https://www.barbadoslawcourts.gov.bb/judgments/davco-v-cbean-led-lighting",
+          "tier": "B",
+          "type": "primary judgment of another Commonwealth court",
+          "accessed": "2026-11-22"
+        }
+      ],
+      "facts": "In 1970 the defendant council, then Conservative-controlled, adopted a policy of selling council houses to sitting tenants. It instructed the town clerk to devise a simple form of agreement so that sales could take effect as early as possible, deliberately dispensing with the usual conveyancing formalities. The plaintiff, Desmond Harry Storer, was the tenant of 174 Charlestown Road, a council house. By a letter dated 9 March 1971 the town clerk wrote: 'I understand you wish to purchase your Council house and enclose the Agreement for Sale. If you will sign the Agreement and return it to me I will send you the Agreement signed on behalf of the Corporation in exchange.' The enclosed form had the purchaser, property, price, mortgage amount and monthly repayments filled in; only item 7 (the date the tenancy would cease and mortgage repayments begin) was left blank. The plaintiff signed the agreement and returned it. In May 1971 Labour took control of the council, reversed the policy, and informed him it would not proceed because contracts had not been formally exchanged. He sued for specific performance, alleging a binding contract. The county court judge found for him; the council appealed.",
+      "procedure": "County court (specific performance ordered; damages claim adjourned sine die) → Court of Appeal (appeal dismissed) → binding contract upheld. No further appeal was taken; the parallel case of Gibson went to the House of Lords in 1979 and was decided the other way.",
+      "issues": "Analytical summary, not a verbatim formulation: (1) whether a contract of sale had been concluded by offer and acceptance notwithstanding that the contracts had not been formally exchanged; (2) whether the council's letter and the enclosed agreement amounted to an offer capable of acceptance; and (3) whether the blank commencement item deprived the agreement of certainty.",
+      "holding": "Appeal dismissed. A binding contract for the sale of the house had been concluded by offer and acceptance when the plaintiff accepted the offer contained in the letter of 9 March by signing the agreement for sale and returning it to the council, notwithstanding that contracts had not been exchanged and the contract had not been signed on behalf of the council. The letter of 9 March was a sufficient note or memorandum. Specific performance was a proper remedy.",
+      "ratio": "Where parties have not made their arrangement 'subject to contract', the only question is whether a contract has been concluded; and whether it has been concluded is judged objectively, from what the parties said and did, not from their uncommunicated intentions. The council's scheme was expressly designed to dispense with legal formalities, and exchange of contracts was one such formality. The council therefore became contractually bound when the tenant signed and returned the agreement, the blank commencement date being a matter of administrative detail only.",
+      "exact_rule": "VERIFIED quotation from Lord Denning MR: 'When parties arrange for a sale \"subject to contract\", that means, as a rule, that there is no binding contract until the contracts of sale have been formally exchanged. That is clear from Eccles v Bryant and Pollock [1948] Ch 93. But where there is no arrangement \"subject to contract\", the only question is whether a contract has been concluded: see Bigg v Boyd Gibbins Ltd [1971] 1 WLR 26.' Paraphrase of the objective test (the familiar sentence 'In contracts you do not look into the actual intent in a man's mind. You look at what he said and did...' is very widely reproduced, but I did not verify it against page 1408 of the report, so it is given here as a reported paraphrase rather than as a verified exact quotation).",
+      "exceptions": "(1) The rule does not apply where the parties have expressly or impliedly made their dealings 'subject to contract'; in that case there is no binding contract until formal contracts are exchanged (Eccles v Bryant and Pollock [1948] Ch 93). (2) The decision turns on the particular documents and on the council's demonstrated intention to adopt a simplified procedure; it does not displace the ordinary conveyancing expectation that a sale of land is concluded on exchange. (3) An objectively evidenced intention to be bound is still required — the objective test does not convert every exchange of letters into a contract.",
+      "application": "The case is the English anchor for the first of the two limbs of the textbook's definition: willingness to contract on certain terms coupled with an intention to be bound on acceptance. It supplies the objective (outward appearance) method of ascertaining that intention, which is the test a Nigerian court applies when deciding whether a proposal is a true offer or a mere invitation to treat. It is also the standard contrast to 'subject to contract' negotiation, and therefore the natural counterpoint to Tejumola.",
+      "later_treatment": "Gibson v Manchester City Council [1979] 1 WLR 294 (HL) is the critical later authority: the House of Lords held that a council's letter saying the council 'may be prepared to sell' was not an offer, distinguished Storer on the ground that Storer's letter evinced a present intention to be bound once the tenant performed the stipulated act, and restored the objective construction of the correspondence. Lord Diplock expressly distinguished Storer. MARK: Gibson's report itself was not opened in this search; its treatment of Storer is taken from case commentary and must be treated as PARTLY VERIFIED.",
+      "exam_significance": "Cite Storer for: the definition of an offer; the objective test of intention to be bound; and the proposition that a contract of sale of land may be concluded without formal exchange where the parties have not stipulated 'subject to contract'. Do NOT cite it for the proposition that exchange of contracts is generally unnecessary in Nigerian land transactions — it is an exception resting on the council's own simplified scheme. The commonest mistake is to say that the House of Lords agreed with Storer, or that Geoffrey Lane LJ dissented in Storer. Neither is right: the Court of Appeal in Storer was unanimous, and it was in the later case of Gibson that the House of Lords reversed the Court of Appeal (Lord Denning MR dissenting in the Court of Appeal in Gibson, with Geoffrey Lane LJ in the majority).",
+      "secondary_account": [
+        {
+          "text": "Case summaries describe the same facts and add that the council argued uncertainty because the plaintiff left the date clause blank, and that the Court of Appeal held the blank to be merely administrative.",
+          "source": "IPSALOQUITUR case note",
+          "url": "https://ipsaloquitur.com/contract-law/cases/storer-v-manchester-city-council/",
+          "type": "student-facing case-note website (secondary)",
+          "accessed": "2026-11-22"
+        },
+        {
+          "text": "The frequently quoted sentence on outward appearances, attributed to 1408, appears in these notes; the pinpoint is unverified.",
+          "source": "Studocu student notes (two separate uploads)",
+          "url": "https://www.studocu.com/en-gb/document/university-of-lincoln/contract-law/storer-v-manchester-city-council/46821084",
+          "type": "student note-sharing site (secondary)",
+          "accessed": "2026-11-22"
+        }
+      ],
+      "exam_note": {
+        "citation_court": "Storer v Manchester City Council [1974] 1 WLR 1403 (CA, England).",
+        "facts": [
+          "Manchester City Council, under Conservative control, decided in 1970 to sell council houses to sitting tenants on favourable terms.",
+          "It told the town clerk to draft a simple form of agreement so that sales would not wait on the usual legal formalities.",
+          "The plaintiff Storer was a tenant; the town clerk wrote on 9 March 1971 enclosing an agreement for sale already completed except the commencement date.",
+          "The letter promised that if Storer signed and returned it, the council would send back the counterpart signed on its behalf.",
+          "Storer signed and returned the agreement; Labour then took control, cancelled the scheme, and refused to complete because contracts had not been exchanged.",
+          "Storer sued for specific performance; the county court held there was a binding contract and the council appealed unsuccessfully."
+        ],
+        "issue": "Whether a binding contract of sale had been concluded by offer and acceptance even though the formal contracts had never been exchanged.",
+        "held": "Yes. The appeal was dismissed; a binding contract existed and specific performance was ordered.",
+        "rule": "Where the parties have not made their bargain 'subject to contract', the only question is whether a contract has been concluded, and that is answered objectively from their words and conduct — so the council was bound when the tenant did exactly what its own letter told him to do.",
+        "exception": "Where the dealings are expressly or impliedly 'subject to contract', no contract arises until formal contracts are exchanged (Eccles v Bryant and Pollock [1948] Ch 93).",
+        "why": "It fixes the objective test of intention to be bound, which is the test that separates a true offer from an invitation to treat in Nigerian contract law."
+      },
+      "mnemonics": {
+        "name_cue": "STORE-er: the council had to honour what it had already STORED in the post — the tenant posted back exactly what he was asked to post.",
+        "facts_mnemonic": "SIMPLE — Scheme (sell council houses) · Instructed town clerk · Missing only the date · Posted back by tenant · Labour cancelled · Exchange held unnecessary.",
+        "rule_mnemonic": "NOT 'subject to contract' → NO formalities needed; OBJECTIVE words and conduct decide.",
+        "trigger": "Whenever a question asks whether an offer was intended to be binding, or whether a land sale needs formal exchange.",
+        "drill": "Close the book and reproduce: citation and court; the four elements of the mnemonic; the 'subject to contract' qualification; and the one fact that distinguishes Storer from Gibson."
+      }
+    },
+    {
+      "id": "dahiru",
+      "number": 2,
+      "name": "Alhaji M. C. Dahiru & Anor v Alhaji Bubakare Kamale",
+      "citation_printed": "[2005] 9 NWLR (Pt 929) 50 (attributed to Ogbuagu, JSC)",
+      "citation_verified": "[2005] 9 NWLR (Pt 929) 8 — Supreme Court, SC.316/2001, judgment delivered 15 July 2005. The Court of Appeal ruling in the same litigation is CA/J/68/97-(R), 22 November 2000 (Mukhtar, Mangaji and Nzeako JJCA). The report is also cited as (2006) All FWLR (Pt 295) 616.",
+      "citation_short": "(2005) 9 NWLR (Pt 929) 8",
+      "court": "Supreme Court of Nigeria (on appeal from the Court of Appeal, Jos Division, and the High Court of Adamawa State)",
+      "jurisdiction": "Nigeria",
+      "date": "Supreme Court: 15 July 2005. Court of Appeal ruling read: 22 November 2000.",
+      "judges": "Supreme Court: Ogbuagu JSC (whose dictum the textbook cites). Court of Appeal: Mukhtar, Mangaji and Nzeako JJCA.",
+      "confidence": "PARTLY VERIFIED",
+      "verification_note": "The case exists, the citation and the appellate chain are verified, and Ogbuagu JSC is verified as a member of the 2005 Supreme Court panel. What is NOT verified is that the quoted words are his Lordship's in THIS case: the passage the textbook attributes to Dahiru v Kamale is word-for-word the passage reported from Sparkling Breweries Ltd v Union Bank of Nigeria Ltd (2001), which the textbook's own footnote 4 cites. The full Supreme Court judgment in Dahiru was not located in full text in this search. See 'citation_conflict'.",
+      "citation_conflict": "The words 'An offer is an expression of readiness to contract on the terms specified by the offeror which if accepted by the offeree, will give rise to a binding contract. In other words, it is by acceptance that the offer is converted into a contract' are reported in Sparkling Breweries Ltd v Union Bank of Nigeria Ltd (2001) 15 NWLR (Pt 737) 539 per Ogbuagu JSC, and are reproduced verbatim in later judgments and texts under that citation. Because Ogbuagu JSC sat on both appeals, two readings are possible: (a) the textbook has mis-sourced a Sparkling Breweries dictum to Dahiru; or (b) Ogbuagu JSC repeated his own formula in Dahiru. Reading (a) is the more probable, because the textbook's footnote 4 already cites Sparkling Breweries as the 'also see'. RECOMMENDATION: cite Sparkling Breweries for the words, and cite Dahiru v Kamale for the proposition that a qualified acceptance is a counter-offer and that there must be offer, unqualified acceptance and consideration before a contract exists. Two further printed errors: the report begins at page 8, not page 50; and the first appellant is 'Dahiru', the respondent 'Kamale' (some sources print 'Kamala').",
+      "textbook_page": "p 23, fn 3 and the block quotation in the text",
+      "textbook_proposition": "An 'offer' is an expression of readiness to contract on the terms specified by the offeror which, if accepted by the offeree, will give rise to a binding contract; it is by acceptance that the offer is converted into a contract.",
+      "sources": [
+        {
+          "label": "Court of Appeal ruling in the same litigation (full text)",
+          "url": "https://lawcarenigeria.com/alhaji-m-c-dahiru-and-anor-v-alhaji-bubakare-kamale2000/",
+          "tier": "D",
+          "type": "Nigerian law-report website reproducing the judgment",
+          "accessed": "2026-11-22"
+        },
+        {
+          "label": "NigeriaLII record of Sparkling Breweries (SC 113/1996, 13 July 2001)",
+          "url": "https://nigerialii.org/akn/ng/judgment/ngsc/2001/25/eng@2001-07-13",
+          "tier": "B",
+          "type": "national legal information institute",
+          "accessed": "2026-11-22"
+        },
+        {
+          "label": "Journal of African Law article citing Dahiru v Kamale at 48-49 paras F-A",
+          "url": "https://www.cambridge.org/core/journals/journal-of-african-law/article/abs/application-of-limitation-laws-to-oil-spill-compensation-claims-in-nigeria/8FEED49FC5952B6C24B3C9F67853CB26",
+          "tier": "E",
+          "type": "peer-reviewed journal (abstract level only; paywalled)",
+          "accessed": "2026-11-22"
+        }
+      ],
+      "facts": "The litigation arose from the sale of the respondent's property at Mallamre Ward, Jimeta-Yola, Adamawa State, covered by Statutory Certificate of Occupancy No. GS/6706. The respondent (as plaintiff) pleaded that he had agreed to sell to the 1st appellant for a stated sum, had received a part-payment of N600,000 out of a N650,000 contract price, and that no valid contract had been reached. His writ, taken out on 31 May 1994 in the Adamawa State High Court (suit No. ADSY/39/94, Gwam J), sought declarations that no valid contract existed, that any transfer was void for want of the Governor's consent under the Land Use Act, that the 1st defendant had no title beyond a refund of the N600,000, delivery up of the title documents, N400,000 for trespass and a perpetual injunction. Each defendant counter-claimed; the 1st defendant sought specific performance, a declaration that he held the certificate of occupancy in equity, a declaration that only N50,000 remained outstanding, an injunction and N1,000,000 general damages, pleading that he had substantially altered his position under the contract. The respondent obtained judgment in the High Court and the appellants, having obtained leave on 16 March 1997, appealed on nine grounds.",
+      "procedure": "Adamawa State High Court, suit ADSY/39/94 (Gwam J) — judgment for the plaintiff/respondent → Court of Appeal, Jos Division, CA/J/68/97-(R) — appeal on nine grounds, leave obtained 16 March 1997; the ruling of 22 November 2000 determined a motion for leave to amend the grounds and to argue a fresh issue (whether, having received a part-payment of N600,000, the respondent's remedy was to sue for the balance rather than for nullification of the sale). The Court of Appeal refused that application, holding that an issue not raised below will not be entertained on appeal absent special circumstances → Supreme Court, SC.316/2001, 15 July 2005, allowing the substantive appeal.",
+      "issues": "Analytical summary; the issues were not formulated in the ruling read: (1) whether on the pleadings and evidence a valid contract of sale had been concluded; (2) whether the non-obtaining of the Governor's consent under the Land Use Act rendered the transaction void; and (3) before the Court of Appeal, whether the appellants could raise for the first time the new point about the effect of the part-payment.",
+      "holding": "The Court of Appeal held that a fresh issue would not be entertained where it was not canvassed below and no special circumstance was shown; the application failed and the ruling was dismissed with N2,000 costs. The Supreme Court allowed the substantive appeal in 2005. MARK: the precise terms of the Supreme Court's orders were not established from the materials located in this search and must not be stated as if verified.",
+      "ratio": "For the proposition the case is actually used for in Nigerian practice: for a contract to exist there must be a definite offer, an unqualified acceptance of that offer and legal consideration; there must be mutuality of purpose and intention, and the two contracting parties must agree. A qualified acceptance is simply a counter-offer and does not give rise to a binding contract. MARK: this ratio is taken from the textbook and from reported Nigerian judgments citing the case, not from the full Supreme Court text, and is therefore PARTLY VERIFIED.",
+      "exact_rule": "Paraphrase only, because the exact words are the subject of the attribution conflict above. The rule as generally stated: an offer is an expression of readiness to contract on the terms specified by the offeror which, if accepted by the offeree, gives rise to a binding contract, and it is by acceptance that an offer is converted into a contract. A purported acceptance that varies the terms of the offer is a counter-offer, operates as a rejection of the original offer, and cannot itself create a contract.",
+      "exceptions": "(1) A qualified, conditional or varying acceptance is not acceptance at all but a counter-offer (the mirror-image rule), which the original offeror may accept or reject. (2) An issue not raised in the court below will not ordinarily be entertained on appeal, save in the recognised special circumstances — the point must be substantial, no further evidence would be needed, and refusal must occasion a miscarriage of justice (Abinabina v Enyimadu 12 WACA 171; Shonekan v Smith (1964) 1 All NLR 168). (3) A disposition of land requires the Governor's consent under the Land Use Act, and want of consent is a distinct ground of invalidity from want of agreement.",
+      "application": "Footnoted to the definition of an offer, and also the source of the textbook's statement that acceptance converts an offer into a contract. In problem questions it is the authority for testing whether a reply is an acceptance or a counter-offer, and for insisting that offer and acceptance be shown as separate, provable acts rather than inferred from a course of dealing.",
+      "later_treatment": "The case is routinely cited by the Court of Appeal and Supreme Court for the elements of a binding contract and for the proposition that a qualified acceptance is a counter-offer. Reported examples located in this search include Agu v Okpoko (2009) and Okoli v NSITF Management Board (2016), both of which cite 'Dahiru v Kamale (2005) 9 NWLR (Pt 929) 8'. No case overruling or doubting it was located.",
+      "exam_significance": "Cite it for: the elements of a binding contract, and the counter-offer rule. Do NOT cite it for the definition of an offer without checking the attribution problem — the safest course in an examination is to cite Sparkling Breweries for the definition and Dahiru for the counter-offer/elements point, or to cite both together. The commonest mistake is to copy 'Pt 929) 50' from the textbook; the report begins at page 8.",
+      "secondary_account": [
+        {
+          "text": "Student and blog material reproduces the textbook's exact wording and attribution ('In Dahiru v Kamale [2005] 9 NWLR (PT 929) 50, Ogbuagu JSC said...') — the same secondary text from which the uploaded page appears to be drafted. Repetition across sites is not independent corroboration.",
+          "source": "BScholarly, 'Seven (7) Essential Characteristics of a Valid and Binding Contract'",
+          "url": "https://bscholarly.com/characteristics-of-a-valid-and-binding-contract/",
+          "type": "law blog (secondary)",
+          "accessed": "2026-11-22"
+        },
+        {
+          "text": "A published article states that the Court of Appeal in Dahiru v Kamale held that for a contract to exist there must be mutuality of purpose and intention, and that a qualified acceptance is a counter-offer.",
+          "source": "'Moment of Acceptance in Contracts Using Modern Means of Communication — An Appraisal' (ResearchGate)",
+          "url": "https://www.researchgate.net/publication/354507134_MOMENT_OF_ACCEPTANCE_IN_CONTRACTS_USING_MODERN_MEANS_OF_COMMUNICATION_-AN_APPRAISAL",
+          "type": "academic article (secondary)",
+          "accessed": "2026-11-22"
+        }
+      ],
+      "exam_note": {
+        "citation_court": "Alhaji M. C. Dahiru v Alhaji Bubakare Kamale (2005) 9 NWLR (Pt 929) 8 (SC) — textbook prints 50.",
+        "facts": [
+          "The respondent owned land at Mallamre Ward, Jimeta-Yola, Adamawa State, under a statutory certificate of occupancy.",
+          "He agreed to sell it to the 1st appellant for N650,000 and received N600,000 as part-payment.",
+          "He then sued in the Adamawa State High Court, asking for a declaration that no valid contract existed and that any transfer was void for want of the Governor's consent.",
+          "He also sought delivery up of the title documents, damages for trespass and an injunction; the appellants counter-claimed specific performance.",
+          "The High Court gave judgment for the respondent and the appellants appealed on nine grounds after obtaining leave.",
+          "The Court of Appeal refused leave to argue a new point about the effect of the part-payment, holding that fresh issues are not entertained on appeal absent special circumstances."
+        ],
+        "issue": "Whether a valid contract had been concluded between the parties, and whether a party may raise on appeal a point never canvassed at the trial court.",
+        "held": "The Court of Appeal refused the fresh issue; the Supreme Court allowed the substantive appeal in 2005.",
+        "rule": "A contract requires a definite offer, an unqualified acceptance and legal consideration, with mutuality of purpose; a qualified acceptance is a counter-offer and creates no contract.",
+        "exception": "A fresh point of law may be allowed on appeal where it is substantial, no further evidence is needed, and refusing it would occasion a miscarriage of justice.",
+        "why": "It is the Nigerian Supreme Court anchor for the counter-offer rule and for the list of elements that must coexist before a contract exists."
+      },
+      "mnemonics": {
+        "name_cue": "DAHIRU = 'DAre Him RUle': dare the offeree to vary the terms and he has RUled himself out by counter-offer.",
+        "facts_mnemonic": "SALE — Sold at N650,000 · Advance of N600,000 paid · Land Use Act consent missing · Everything counter-claimed.",
+        "rule_mnemonic": "O-A-C: Offer + unqualified Acceptance + Consideration = Contract. Vary the acceptance and you have C-O, not A.",
+        "trigger": "Any time a reply to an offer adds, subtracts or alters a term, or a question asks what must co-exist for a contract to exist.",
+        "drill": "State the citation correctly from memory (Pt 929 at page 8, not 50), then state the counter-offer rule in one sentence and give one exception about fresh issues on appeal."
+      }
+    },
+    {
+      "id": "tejumola",
+      "number": 3,
+      "name": "United Bank for Africa Ltd v Tejumola & Sons Ltd",
+      "citation_printed": "[1988] 2 NWLR (Pt 79) 662",
+      "citation_verified": "(1988) 2 NWLR (Pt 79) 662; (1988) LPELR-SC.31/1987; SC.31/1987, judgment delivered 27 May 1988",
+      "citation_short": "(1988) 2 NWLR (Pt 79) 662",
+      "court": "Supreme Court of Nigeria (on appeal from the Court of Appeal, Lagos Division, and the Lagos High Court)",
+      "jurisdiction": "Nigeria",
+      "date": "27 May 1988",
+      "judges": "Obaseki, Nnamani, Karibi-Whyte, Agbaje and Nnaemeka-Agu JJSC; lead judgment delivered by Agbaje JSC",
+      "confidence": "VERIFIED",
+      "verification_note": "The full judgment text was read, including the pleadings, the exhibits (Exhibits E, F, J, L, U, V), the trial judge's findings and the concurring judgments of Obaseki and Nnaemeka-Agu JJSC. Citation, court, date, panel, award and final orders are all corroborated by at least two independent sources.",
+      "textbook_page": "p 23, fn 2",
+      "textbook_proposition": "Cited (with Agomo v Guinness) for the definition of an offer as a proposition clearly and precisely indicating the terms under which the offeror is willing to contract.",
+      "sources": [
+        {
+          "label": "Full judgment text (LawCare Nigeria reproduction)",
+          "url": "https://lawcarenigeria.com/united-bank-for-africa-ltd-v-tejumola-sons-ltd-1988/",
+          "tier": "D",
+          "type": "Nigerian law-report website reproducing the judgment",
+          "accessed": "2026-11-22"
+        },
+        {
+          "label": "Judgment summary and citation (Hbriefs)",
+          "url": "https://www.hbriefs.com/sc/united-bank-for-africa-ltd-v-tejumola-sons-ltd-1988/",
+          "tier": "E",
+          "type": "case-summary website (secondary)",
+          "accessed": "2026-11-22"
+        }
+      ],
+      "facts": "Tejumola & Sons Ltd owned premises at 3 Docemo Street and 42 Idumagbo Avenue, Lagos. After lengthy negotiations, UBA wrote on 19 April 1982 a letter headed 'Subject to Contract' offering to take a sub-lease: 15 years from the date physical possession was given, with the bank reserving the right to break at the end of the 5th and 10th years, at N215 per square metre per annum revisable every five years, payable five years in advance, and 'subject to your showing evidence of good title'. Tejumola replied the same day accepting the terms, confirmed the covenants, and requested that the bank take physical possession on 1 May 1982 with the five years' advance. The bank then raised structural doubts (the building was said to have collapsed during construction); the landlord paid for engineers, and Ove Arup & Partners confirmed the building was safe for banking use. At the bank's request the landlord carried out substantial alterations at its own cost. On 28 October 1982, after its own officers had inspected and been satisfied, the bank wrote calling off the transaction. The landlord sued for N2,000,000 special and general damages.",
+      "procedure": "Lagos High Court (Ayorinde J, judgment 23 November 1984): held that the contract commenced on 1 May 1982, rejected the bank's case that negotiations had not crystallised, and awarded N732,200 — N200,000 general and N532,200 special damages → Court of Appeal, Lagos Division (Ademola JCA, with Mohammed and Kutigi JJCA): appeal dismissed; the proposed date was not in doubt and was not rebutted → Supreme Court (SC.31/1987): appeal allowed, both judgments set aside, plaintiff's claims dismissed, N500 costs to the appellant.",
+      "issues": "As formulated by the parties and adopted by the Supreme Court: whether, on the pleadings and the evidence, the finding that there was an agreement that the lease should commence on 1 May 1982 can be sustained.",
+      "holding": "The Supreme Court allowed the appeal. There was no concluded contract. The offer had been made 'subject to contract'; the commencement date — an essential term of an agreement for a lease — had never been agreed; the landlord's letter proposing 1 May 1982 was a counter-offer which could only have been accepted by the bank actually taking physical possession, which never happened. The trial court and the Court of Appeal were both wrong to fix 1 May 1982 as the agreed commencement date. The plaintiff's claims were dismissed.",
+      "ratio": "An agreement for a lease is subject to the general principles of contract: there is no binding contract until the parties are ad idem on the cardinal terms, and for a lease those terms include the parties, the property, the length of the term, the rent and the date of commencement. Where a term is left to be fixed by reference to a contingency that has not occurred, there is no agreement on that term and therefore no enforceable contract. An offer expressed to be 'subject to contract' keeps the matter in negotiation until a formal contract is drawn up and executed, and either party may walk away in the meantime.",
+      "exact_rule": "VERIFIED quotations: Agbaje JSC — 'as long as a necessary term of an agreement for a lease has not been agreed to the matter rests in negotiation and there is no concluded contract' (adopting Nesham v Selby (1872) 7 Ch App 406), and 'In sum I must hold that there is no concluded contract in this case and I must uphold the contention of Counsel for the Defendant that the transactions in the matter now before us on appeal were only steps in negotiations between the parties.' Obaseki JSC — 'What then does \"subject to contract\" mean? In my view, it means that until a formal contract is drawn up and executed everything is in the negotiation stage.' Agbaje JSC on acceptance — 'An acceptance is a final and unqualified expression of assent to the terms of an offer... Where in the attempt to accept an offer the offeree varies the terms of the offer or... introduces an entirely new term, it is not an acceptance and cannot result in a contract crystallizing.'",
+      "exceptions": "(1) 'Subject to contract' is a rule of construction, not a statutory formula: if the parties' conduct shows a concluded agreement notwithstanding the label, the label will not save them (contrast Storer). (2) Estoppel may be available where the representee has been induced to act to his detriment — but on these facts no estoppel arose, because the landlord's expenditure was incurred in the hope of a contract, not on the faith of a representation that one existed. (3) The decision does not make a lawyer's involvement a requirement of validity; it is a comment on risk. (4) Obaseki JSC expressly doubted whether the strict outcome was satisfactory and called for legislative reform, observing that the Statute of Frauds and its Nigerian equivalents were meant to be a shield against frauds and not an instrument of frauds.",
+      "application": "On the definition of an offer, Tejumola demonstrates the second limb: the letter had to specify terms with enough precision (premises, term, rent, revision, break clause, possession) for a definite promise to be extracted. But the case's real teaching, and its safest examination use, is on completeness and certainty of terms, on 'subject to contract', and on the distinction between an acceptance and a counter-offer — all of which fall squarely within the second condition for an offer set out at 2.2 of the uploaded page.",
+      "later_treatment": "UBN Ltd v Sax (Nig) Ltd (1994) 8 NWLR (Pt 361) 150 (SC) cites Tejumola at 686 for the proposition that where the parties have not agreed on a fundamental term there is no valid contract. Later Supreme Court and Court of Appeal decisions (for example I Bosah v Pius Oji (2002) and Efrede v Ita (2020) CA) apply the requirement that for a lease to be complete the parties, the property, the length of the term, the rent and the date of commencement must be defined. No decision overruling or doubting Tejumola was located.",
+      "exam_significance": "Cite it for: 'subject to contract' means the matter remains in negotiation; the essential terms of an agreement for a lease; and the requirement of certainty and completeness in a true offer. Do NOT cite it as authority for a bare definition of an offer, and do NOT say the Supreme Court held the negotiations produced a contract — the whole point is that they did not. The commonest mistake is to confuse Tejumola with Storer: in Storer there was no 'subject to contract' label and a contract was found; in Tejumola the label was present and no contract was found.",
+      "secondary_account": [
+        {
+          "text": "The blog account of Tejumola is inaccurate at one point: it says the Supreme Court held 'as a principle of law, an agreement for a lease must be signed before the lease can be said to have properly commenced'. That is not the ratio. The ratio is the absence of agreement on the commencement date and the effect of 'subject to contract'. Do not rely on the blog's formulation.",
+          "source": "BScholarly, 'UBA v Tejumola: Facts, Issues and Judgment of Court'",
+          "url": "https://bscholarly.com/uba-v-tejumola/",
+          "type": "law blog (secondary)",
+          "accessed": "2026-11-22"
+        },
+        {
+          "text": "Summary site gives the LPELR citation and reproduces Obaseki JSC's 'contingency' dictum, agreeing with the primary text.",
+          "source": "Hbriefs",
+          "url": "https://www.hbriefs.com/sc/united-bank-for-africa-ltd-v-tejumola-sons-ltd-1988/",
+          "type": "case-summary website (secondary)",
+          "accessed": "2026-11-22"
+        }
+      ],
+      "exam_note": {
+        "citation_court": "United Bank for Africa Ltd v Tejumola & Sons Ltd (1988) 2 NWLR (Pt 79) 662 (SC).",
+        "facts": [
+          "The respondent owned premises at 3 Docemo Street and 42 Idumagbo Avenue, Lagos, and negotiated to let them to the appellant bank for fifteen years.",
+          "The bank's letter of 19 April 1982 was headed 'Subject to Contract' and fixed the term as fifteen years from the date physical possession was given, with a break clause and five years' rent in advance.",
+          "The landlord accepted the terms the same day but asked the bank to take possession on 1 May 1982 — a date the bank had not proposed.",
+          "The bank raised structural doubts, and the landlord paid for two sets of engineers and carried out expensive alterations before the bank withdrew on 28 October 1982.",
+          "The landlord sued for N2,000,000; the High Court awarded N732,200 and the Court of Appeal upheld it, finding that 1 May 1982 was the agreed commencement date.",
+          "The Supreme Court allowed the bank's appeal, holding that the commencement date had never been agreed and that the dealings were still negotiations."
+        ],
+        "issue": "Whether, on the evidence, the lease was agreed to commence on 1 May 1982, so that a binding contract existed.",
+        "held": "No. The appeal was allowed, both lower judgments were set aside, and the landlord's claims were dismissed.",
+        "rule": "An offer marked 'subject to contract' keeps the matter in negotiation until a formal contract is executed, and there is no concluded agreement for a lease unless the parties, the property, the term, the rent and the date of commencement are all agreed.",
+        "exception": "Estoppel may bind a party who has induced the other to act to his detriment, and an unqualified 'subject to contract' label will not defeat a contract that the parties' conduct shows was actually concluded (contrast Storer).",
+        "why": "It shows that a proposal can be perfectly detailed and still not be an offer capable of acceptance, because a cardinal term is missing and the parties have reserved their position."
+      },
+      "mnemonics": {
+        "name_cue": "TEJUMOLA = 'TEll JUst MOre LAter': the bank kept saying 'tell me more later', so nothing was ever concluded.",
+        "facts_mnemonic": "FIRM-B — Fifteen years · Intending bank · Rent N215 · Marks 'SUBJECT TO CONTRACT' · Building alterations · Bank walked away.",
+        "rule_mnemonic": "P-P-T-R-C: Parties, Property, Term, Rent, Commencement — miss one and there is no lease.",
+        "trigger": "When you see the words 'subject to contract', or a lease/land question where one cardinal term is still open.",
+        "drill": "Reproduce the five essential terms of a lease agreement from memory, then explain in two sentences why the landlord lost despite doing everything the bank asked."
+      }
+    },
+    {
+      "id": "agomo",
+      "number": 4,
+      "name": "Agomo (also reported as Agoma) v Guinness (Nigeria) Ltd",
+      "citation_printed": "Agomo v Guinness (Nig) Plc [1995] 2 NWLR (Pt 580) 672",
+      "citation_verified": "(1995) 2 NWLR (Pt 380) 672; SC.189/1992, judgment delivered 17 February 1995. The report heading on the copy read prints the appellant as 'Mrs Margaret Agoma'; the case is cited throughout the texts as 'Agomo v Guinness (Nig) Ltd'.",
+      "citation_short": "(1995) 2 NWLR (Pt 380) 672",
+      "court": "Supreme Court of Nigeria",
+      "jurisdiction": "Nigeria",
+      "date": "17 February 1995",
+      "judges": "The panel is not stated on the copy read; the judgment is reported with a concurring opinion of Mohammed JSC. The full list of their Lordships was not established from the materials located.",
+      "confidence": "PARTLY VERIFIED",
+      "verification_note": "The judgment text, the facts, the disposition and the definition of an offer were read and are corroborated. The volume/part number in the textbook ('Pt 580') is wrong: the accepted citation is Pt 380. The pinpoint 'at 675' used in the labour-law courseware was NOT verified against the report, so no pinpoint is asserted here. There is also a genuine spelling conflict in the party name (Agomo/Agoma).",
+      "textbook_page": "p 23, fn 2",
+      "textbook_proposition": "Cited with Tejumola for the proposition that an offer is a proposition clearly and precisely indicating the terms under which the offeror is willing to enter into a contract with the offeree.",
+      "sources": [
+        {
+          "label": "Full judgment text (LawCare Nigeria, 'MRS MARGARET AGOMA v. GUINNESS NIGERIA LTD')",
+          "url": "https://lawcarenigeria.com/mrs-margaret-agoma-v-guinness-nigeria-ltd1995/",
+          "tier": "D",
+          "type": "Nigerian law-report website reproducing the judgment",
+          "accessed": "2026-11-22"
+        },
+        {
+          "label": "NOUN LAW 231 Labour Law I courseware, quoting the definition at 675",
+          "url": "https://nou.edu.ng/coursewarecontent/LAW%20231.pdf",
+          "tier": "E",
+          "type": "university open-educational-resources courseware (secondary)",
+          "accessed": "2026-11-22"
+        }
+      ],
+      "facts": "The appellant was an employee of Guinness Nigeria Ltd who was laid off when the company reduced production. Her employment was terminated with effect from 14 July 1984, and on 7 July 1984 she collected her terminal benefits, which included two months' salary in lieu of notice. She later relied on an internal document (Exhibit B), a directive instructing the company's Personnel Department to recruit at least 1,000 employees, adding that most of those to be recruited would be persons laid off a few months earlier. She argued that Exhibit B was an offer made to the class of retrenched workers, that she belonged to that class, and that she had accepted it by signifying that she was ready, willing and available — thus creating a contract of employment. The company denied that any offer had been made.",
+      "procedure": "The appellant's claim failed in the lower courts and she appealed to the Supreme Court (SC.189/1992). The appeal was dismissed: Exhibit B was not an offer she could accept, and in any event she had ceased to be an employee when she took her terminal benefits.",
+      "issues": "Analytical summary: (1) whether Exhibit B was an offer to the class of retrenched employees capable of acceptance by the appellant; and (2) whether, having accepted her terminal benefits, the appellant could still assert a subsisting contract of employment.",
+      "holding": "Appeal dismissed. Exhibit B was an internal administrative directive to the Personnel Department and not an offer to the appellant or to any member of her class; it said 'most of those to be recruited' and not 'all', so she could not bring herself within it. Even if it had been an offer, it was addressed to employees, and she had ceased to be one on 7 July 1984. Her acceptance of terminal benefits including salary in lieu of notice put an end to any contract, real or imagined.",
+      "ratio": "An offer is a proposition put by one person to another coupled with an intimation that the offeror is willing to be bound by that proposition; it must be communicated to the offeree and must evince a present intention to be bound. An internal instruction to a company's own department, which commits the company to nothing and is addressed to no offeree, is not an offer. An employee who accepts terminal benefits including salary in lieu of notice cannot afterwards assert a subsisting contract.",
+      "exact_rule": "VERIFIED quotation from the judgment: 'An offer is a proposition put by one person to another coupled with an intimation that he is willing to be bound to that proposition.' Paraphrase of the surrounding reasoning: in order to establish a contract, whether express or implied, there must be shown a meeting of the minds of the parties, with a definition of the contractual terms reasonably clearly made out, together with an intention to affect the legal relationship.",
+      "exceptions": "(1) A general offer to the world at large, or to a defined class, can be accepted by performance by a person who knows of it — but the offer must actually be made, and Carlill v Carbolic Smoke Ball Co [1893] 1 QB 256 was distinguished because there the advertisement itself promised a reward. (2) An offer of a reward for the return of lost property is enforceable by a finder who returns the property knowing of the offer. (3) The bar on an employee who has taken terminal benefits applies to termination; it does not apply in the same way to an unlawful or void retirement (see the distinction drawn in Nigerian labour-law authority).",
+      "application": "Supports the first limb of the textbook's definition (a proposition by the offeror to the offeree) and, more importantly, the requirement that the proposition be communicated and be intended to be binding. In a problem question it is the authority for asking 'to whom was this addressed, and did it commit the maker?' before asking whether it was accepted.",
+      "later_treatment": "Agomo is regularly cited in Nigerian labour-law and contract decisions for the definition of an offer and for the effect of accepting terminal benefits (for example Guinness (Nig) Ltd v Agoma in the Court of Appeal, per Ejiwunmi JCA, and the labour-law literature discussing the wrongful-retirement/wrongful-termination distinction). No decision overruling or doubting it was located.",
+      "exam_significance": "Cite it for: the definition of an offer as a proposition coupled with an intimation of willingness to be bound; and for the point that an internal directive is not an offer. Do NOT cite it for the general proposition that acceptance of terminal benefits always bars a claim — that depends on whether the termination was merely wrongful or the retirement unlawful. The commonest mistakes are the wrong part number (Pt 380, not Pt 580) and treating the case as being about offers to the world at large; it is really about the absence of any offer at all.",
+      "secondary_account": [
+        {
+          "text": "Labour-law courseware attributes to Agomo v Guinness (Nig) Ltd (1995) 2 NWLR (Pt 380) 672 at 675 a definition of an offer as 'a proposition put by one party (the offeror) to another (the offeree), coupled with an intention to be bound to that proposition'. The pinpoint 675 is unverified.",
+          "source": "National Open University of Nigeria, LAW 231 Labour Law I",
+          "url": "https://nou.edu.ng/coursewarecontent/LAW%20231.pdf",
+          "type": "university courseware (secondary)",
+          "accessed": "2026-11-22"
+        },
+        {
+          "text": "A published article on redundancy distinguishes wrongful retirement from wrongful termination and relies on Agoma v Guinness (Nig) Ltd [1995] 2 NWLR 672 at 689 for the terminal-benefits bar.",
+          "source": "BSUM journal article, 'Determination of Contract of Employment by Redundancy'",
+          "url": "https://bsum.edu.ng/journals/law/vol12n1/files/1.pdf",
+          "type": "peer-reviewed journal (secondary)",
+          "accessed": "2026-11-22"
+        }
+      ],
+      "exam_note": {
+        "citation_court": "Agomo v Guinness (Nig) Ltd (1995) 2 NWLR (Pt 380) 672 (SC) — textbook prints Pt 580.",
+        "facts": [
+          "The appellant worked for Guinness Nigeria Ltd and was laid off when the company cut production in 1984.",
+          "Her employment was terminated with effect from 14 July 1984, and on 7 July 1984 she collected terminal benefits including two months' salary in lieu of notice.",
+          "She then relied on an internal company directive telling the Personnel Department to recruit at least 1,000 staff, most of them recently laid off.",
+          "She argued that the directive was an offer to the class of retrenched workers, that she was within that class, and that she accepted it by declaring herself ready and available.",
+          "The company denied that any offer had been made to her, and the courts found that the document was an internal instruction only.",
+          "The Supreme Court dismissed her appeal, holding that there was no offer to accept and that her contract had ended when she took her benefits."
+        ],
+        "issue": "Whether an internal directive to recruit staff amounted to an offer capable of acceptance by a retrenched employee.",
+        "held": "No. The directive was not an offer; the appeal was dismissed.",
+        "rule": "An offer is a proposition put to another person with an intimation of willingness to be bound by it, and it must be communicated to the offeree; an internal administrative instruction commits the company to nobody and is not an offer.",
+        "exception": "A genuine offer to the world at large, or to a defined class, can be accepted by performance by anyone who knows of it, as in Carlill v Carbolic Smoke Ball Co.",
+        "why": "It supplies the Nigerian Supreme Court's own definition of an offer and shows how strictly the courts test whether a proposition was ever addressed to the claimant at all."
+      },
+      "mnemonics": {
+        "name_cue": "AGOMO = 'A GO-MO(ment) too late': she wanted to go back, but the moment had passed when she took her benefits.",
+        "facts_mnemonic": "LAID — Laid off · Accepted benefits · Internal directive · Declared availability.",
+        "rule_mnemonic": "PROPOSITION + INTIMATION + COMMUNICATION = OFFER. A memo to your own staff is none of the three.",
+        "trigger": "When the alleged offer is an internal memo, circular, advertisement or general announcement and you must ask 'was this addressed to and communicated to the offeree?'",
+        "drill": "Give the definition of an offer in the words of the Supreme Court, then distinguish Carlill in one sentence."
+      }
+    },
+    {
+      "id": "sparkling",
+      "number": 5,
+      "name": "Sparkling Breweries Ltd & 5 Ors v Union Bank of Nigeria Ltd",
+      "citation_printed": "[2001] 15 NWLR (Pt 737) 539; (2001) 7 SCNJ 321, 342",
+      "citation_verified": "(2001) 15 NWLR (Pt 737) 539; (2001) All NLR 575; (2001) 7 SCNJ 321; LPELR-3109; SC.113/1996, judgment delivered 13 July 2001",
+      "citation_short": "(2001) 15 NWLR (Pt 737) 539",
+      "court": "Supreme Court of Nigeria",
+      "jurisdiction": "Nigeria",
+      "date": "13 July 2001",
+      "judges": "Ogbuagu JSC delivered the dictum for which the case is cited on the definition of an offer. The full panel was not established from the materials located.",
+      "confidence": "PARTLY VERIFIED",
+      "verification_note": "The existence, citation, court, date and case number are VERIFIED from the NigeriaLII record and from multiple later judgments citing the report with pinpoints (556 and 560-561). The full judgment text was not opened: the NigeriaLII page returned metadata only, and the reported text sits behind subscription databases. The definition of an offer attributed to Ogbuagu JSC is VERIFIED as a quotation circulating under this citation in reported judgments and academic writing, but I did not read it in the report itself.",
+      "textbook_page": "p 23, fn 4 (the 'also see' footnote introducing the block quotation, and almost certainly the true source of the words quoted in the text)",
+      "textbook_proposition": "Cited by Ogbuagu JSC for the definition of an offer and for the proposition that acceptance converts an offer into a contract.",
+      "sources": [
+        {
+          "label": "NigeriaLII record: SPARKLING BREWERIES LIMITED AND 5 OTHERS v UNION BANK OF NIGERIA LIMITED (SC 113/1996) [2001] NGSC 25",
+          "url": "https://nigerialii.org/akn/ng/judgment/ngsc/2001/25/eng@2001-07-13",
+          "tier": "B",
+          "type": "national legal information institute (metadata; judgment body not rendered)",
+          "accessed": "2026-11-22"
+        },
+        {
+          "label": "Eke v Ogbonda (SC 64/2001) citing Sparkling Breweries at 556 on issues and abandoned grounds",
+          "url": "https://nigerialii.org/akn/ng/judgment/ngsc/2006/131/eng@2006-12-07",
+          "tier": "A",
+          "type": "primary judgment of the Supreme Court of Nigeria",
+          "accessed": "2026-11-22"
+        },
+        {
+          "label": "David-West v Oduwole (2003), citing the same report at 539",
+          "url": "https://lawcarenigeria.com/david-west-v-oduwole2003/",
+          "tier": "D",
+          "type": "Nigerian law-report website",
+          "accessed": "2026-11-22"
+        }
+      ],
+      "facts": "PARTLY VERIFIED. The appellants were a group of companies (Sparkling Breweries Ltd and five others). They requested a letter of credit from the respondent bank. The bank granted the facility but later cancelled it, which broke down the appellants' contractual arrangements with third parties. The appellants sued on several grounds, including unlawful interference with their contracts with third parties, and failed at trial and on appeal. MARK: this account rests on law-firm commentary, not on the judgment text; it is set out in the secondary-source block below and must not be treated as the court's findings.",
+      "procedure": "Not established from the materials located. The appeal reached the Supreme Court as SC.113/1996 and was determined on 13 July 2001; the outcome at the lower courts and the precise orders made were not verified in this search.",
+      "issues": "Not established from the materials located, save that the appeal engaged (i) the requisites of the tort of unlawful interference with contractual relations and (ii) the consequences of grounds of appeal on which no issue is predicated.",
+      "holding": "PARTLY VERIFIED. On the authorities citing it: the Supreme Court held that damages for tortious interference cannot be granted where the defendant's act is not itself unlawful (at 560-561, per Ogbuagu JSC), and that a ground of appeal on which no issue is predicated is deemed abandoned and liable to be struck out (at 556).",
+      "ratio": "For contract purposes the case is relied on for a general statement of what an offer is: an expression of readiness to contract on the terms specified by the offeror which, when accepted by the offeree, will give rise to a binding contract, acceptance being what converts the offer into a contract. MARK: the case's own ratio, on the tort of unlawful interference, is not a contract-law ratio and should not be conflated with it.",
+      "exact_rule": "Reported quotation, VERIFIED only as a reported quotation: 'An expression of readiness to contract on the terms specified by the offeror which when it is accepted by the offeree will give rise to a binding contract...' The fuller form, reproduced in later Nigerian judgments, is: 'An offer is an expression of readiness to contract on the terms specified by the offeror which if accepted by the offeree, will give rise to a binding contract. In other words, it is by acceptance that the offer is converted into a contract.'",
+      "exceptions": "Not applicable to this authority in its contract aspect. For its own subject-matter, the qualification is that liability for unlawful interference requires an unlawful act; a lawful act that damages another's contract does not found the tort.",
+      "application": "This is, on the balance of the evidence, the true source of the block quotation printed at 2.1 of the uploaded page. It matters for two reasons: it gives the Supreme Court's own formulation of the offer/acceptance relationship, and it exposes the misattribution in footnote 3. In an examination, the safe course is to cite Sparkling Breweries for the words and Dahiru v Kamale for the counter-offer and elements points.",
+      "later_treatment": "Cited repeatedly by the Supreme Court and Court of Appeal: Eke v Ogbonda (2006) SC.64/2001 at 556; David-West v Oduwole (2003); Josku Nigeria Ltd v Ijumu Local Government (on the basis on which parties can be bound); Akerele v Access Bank Plc (NICN) at 560-561 on the elements of unlawful interference. No decision overruling or doubting it was located.",
+      "exam_significance": "Cite it, if at all, only for the definitional formula on offer and acceptance, and preferably together with Dahiru v Kamale and Agomo. Do NOT cite it as a contract-formation case on its facts — its own subject is the economic tort of unlawful interference and appellate practice on abandoned grounds. The commonest mistake is to attribute the definition to Dahiru v Kamale, as the uploaded textbook does.",
+      "secondary_account": [
+        {
+          "text": "A law blog prints the definition and attributes it to the Supreme Court in Sparkling Breweries Ltd & 5 Ors v Union Bank of Nigeria Ltd, quoting only the first limb.",
+          "source": "LawGlobal Hub, 'Offer in Contract & Invitation to Treat'",
+          "url": "https://www.lawglobalhub.com/offer-in-contract-and-invitation-to-treat-definitions-more/",
+          "type": "law blog (secondary)",
+          "accessed": "2026-11-22"
+        },
+        {
+          "text": "A judgment of the Court of Appeal of Nigeria reproduces the fuller formula — 'An offer is an expression of readiness to contract on the terms specified by the offeror... In other words, it is by acceptance that the offer is converted into a contract' — in the course of a contract analysis.",
+          "source": "Judicial Poetry, 'Forming a Contract - Mutual Assent'",
+          "url": "https://www.judicialpoetry.com/sc/forming-a-contract-mutual-assent/",
+          "type": "judgment-reproduction website (secondary)",
+          "accessed": "2026-11-22"
+        },
+        {
+          "text": "Firm commentary describes the facts as a cancelled letter of credit and an unsuccessful claim in tortious interference.",
+          "source": "Legalnaija, 'Economic Tort of Interference'",
+          "url": "https://legalnaija.com/economic-tort-of-interference-tortious/",
+          "type": "law-firm commentary (secondary)",
+          "accessed": "2026-11-22"
+        }
+      ],
+      "exam_note": {
+        "citation_court": "Sparkling Breweries Ltd & 5 Ors v Union Bank of Nigeria Ltd (2001) 15 NWLR (Pt 737) 539 (SC), Ogbuagu JSC.",
+        "facts": [
+          "The first appellant was Sparkling Breweries Ltd, suing with five associated companies; the respondent was Union Bank of Nigeria Ltd.",
+          "The appellants asked the bank for a letter of credit to fund their operations, and the bank granted the facility.",
+          "The bank later cancelled the facility, and the appellants' arrangements with third parties collapsed.",
+          "The appellants sued, alleging among other things unlawful interference with their contracts with those third parties.",
+          "The claim failed in the lower courts and again on appeal to the Supreme Court, because the bank's conduct was not shown to be unlawful.",
+          "MARK: the facts in the last three lines rest on commentary, not on the judgment text, and are unverified for examination purposes."
+        ],
+        "issue": "Whether the bank was liable for unlawful interference with the appellants' contracts with third parties; and, for contract purposes, what an offer and an acceptance are.",
+        "held": "Damages for tortious interference cannot be awarded where the act complained of is not unlawful; the appeal failed. A ground of appeal without a predicated issue is deemed abandoned.",
+        "rule": "An offer is an expression of readiness to contract on the terms specified by the offeror which, if accepted by the offeree, gives rise to a binding contract — it is by acceptance that an offer is converted into a contract.",
+        "exception": "Not applicable to the definitional proposition. In its own field, the tort requires an unlawful act.",
+        "why": "It is the Supreme Court's own verbal formula for the offer/acceptance relationship, and the likely true source of the definition the textbook prints."
+      },
+      "mnemonics": {
+        "name_cue": "SPARKLING = the 'spark' that lights the contract: the offer is the spark, acceptance is the flame. But the bank's letter of credit was a spark that was put out.",
+        "facts_mnemonic": "LC — Letter of Credit asked · Cancelled · Loss to third-party deals.",
+        "rule_mnemonic": "READINESS + SPECIFIED TERMS + ACCEPTANCE = BINDING CONTRACT.",
+        "trigger": "When you need an apex-court sentence defining offer and acceptance, or when a question involves interference with another's contract.",
+        "drill": "Recite the definition and then state, in one sentence, why the case is a poor choice as an authority on offer and acceptance facts."
+      }
+    },
+    {
+      "id": "adebanjo",
+      "number": 6,
+      "name": "S. A. Adebanjo v A. A. Brown",
+      "citation_printed": "[1990] 3 NWLR (Pt 141) 661; [1990] 6 SCNJ 1",
+      "citation_verified": "(1990) 3 NWLR (Pt 141) 661; (1990) 6 SC 63; SC.132/1986",
+      "citation_short": "(1990) 3 NWLR (Pt 141) 661",
+      "court": "Supreme Court of Nigeria (on appeal from the Court of Appeal and the High Court of Lagos State)",
+      "jurisdiction": "Nigeria",
+      "date": "The NigeriaLII record gives 7 June 1990; the judgment text reads 'On Thursday, the 8th day of June 1990'. The two cannot both be right (8 June 1990 was a Friday). The conflict is recorded and unresolved.",
+      "judges": "Judgment of the Court delivered by Saidu Kawu JSC; Mohammed JSC is listed on the record.",
+      "confidence": "PARTLY VERIFIED",
+      "verification_note": "The judgment text, the facts, the pleadings and the dispositive reasoning were read on NigeriaLII. The date conflict above is unresolved. The citation to (1990) 6 SCNJ 1 printed in the textbook was not independently confirmed. The panel is only partly established.",
+      "textbook_page": "p 23, fn 4",
+      "textbook_proposition": "Cited by Ogbuagu JSC alongside Sparkling Breweries, UBN v Sax and others, in support of the definition and incidents of an offer.",
+      "sources": [
+        {
+          "label": "NigeriaLII full text: S.A. Adebanjo v A.A. Brown (SC 132/1986) [1990] NGSC 51",
+          "url": "https://nigerialii.org/akn/ng/judgment/ngsc/1990/51/eng@1990-06-07",
+          "tier": "B",
+          "type": "national legal information institute, full judgment",
+          "accessed": "2026-11-22"
+        },
+        {
+          "label": "UBN v Sax (1994) citing Adebanjo for the price of land as a fundamental term",
+          "url": "https://cases.lawyersonline.ng/union-bank-of-nigeria-ltd-v-sax-nigeria-ltd-ors/",
+          "tier": "D",
+          "type": "Nigerian law-report website",
+          "accessed": "2026-11-22"
+        }
+      ],
+      "facts": "The plaintiff, Alfred Adeyinka Brown, owned Plots 1, 9 and 10 at Tanimeda, Surulere, Lagos, having bought them by an indenture of 16 December 1967 registered as No. 87 at page 87 in Volume 1268. The defendant, Adebanjo, a legal practitioner, owned the adjoining Plot 3 Block IV and began building in 1972. While digging the foundation he discovered that part of his structure fell on the plaintiff's Plot 10. He reported to his vendors, the administrators of Alhaji N. B. Soule, and they approached the plaintiff. An arrangement was reached: the whole of Plot 10 would be released to the defendant, and the plaintiff would be given Plot 2A Block 2 from the defendant's vendors in substitution. In furtherance of it the plaintiff removed his shed from Plot 10 to Plot 9 at the defendant's expense. The plaintiff then extended his own building onto Plot 10, which he had agreed to release. When this was pointed out, the plaintiff agreed to accept cash compensation for the portion retained by the defendant, demarcated the boundary with a tape, and directed the defendant to his family surveyor, Alaka, who prepared Plan AL9/1976 in February 1976 for a fee paid by the defendant. When later asked to name his figure, the plaintiff turned round, denied ever consenting, and sued. He issued his writ in February 1977, about five years after the trespass, claiming N2,000 damages and an injunction; he had since died and his son was substituted.",
+      "procedure": "Lagos High Court: the trial judge accepted the defendant's account, found that the plaintiff's conduct amounted to estoppel by election (applying Spencer Bower and Turner, Estoppel by Representation, 3rd edn, p 324 para 318), and gave judgment for the defendant → Court of Appeal: set aside several findings of fact, held that the defendant had reneged on the exchange arrangement and that the breakdown of negotiations was the defendant's fault, and interfered with the estoppel finding → Supreme Court: appeal allowed; the Court of Appeal was wrong to disturb findings of fact that were supported by the evidence, wrong to make out a case the plaintiff had never made, and wrong to reject the trial court's conclusion that estoppel applied.",
+      "issues": "Analytical summary from the judgment's numbered complaints: (1) whether the Court of Appeal was right to hold that the defendant reneged on an agreement for the exchange of plots; (2) whether it was entitled to interfere with the trial court's findings of fact; (3) whether the breakdown of negotiations was caused by the plaintiff rather than the defendant; and (4) whether estoppel by representation/election applied.",
+      "holding": "Appeal allowed. The Supreme Court restored the trial court's findings. The plaintiff's conduct — accepting the substitution of plots, removing his shed at the defendant's expense, demarcating the boundary and commissioning a survey to assess compensation — induced the defendant to believe he had waived his complaint and to continue building, so the plaintiff could not resile. There was no concluded contract of sale or exchange on which either party could sue, and no particular sum was ever agreed for the portion retained.",
+      "ratio": "Where parties are still negotiating and no agreement has been concluded, neither side may rely on what was done in the course of the negotiations as a contract. But a party whose conduct has led the other to believe that a right has been given up or an arrangement accepted, and who has thereby induced the other to act to his detriment, is estopped from resiling from that position. The court also reaffirmed that an appellate court will not disturb findings of fact supported by the evidence absent perversity, and will not make out a case for a party that the party did not make for himself.",
+      "exact_rule": "VERIFIED from the judgment: the trial judge, upheld by the Supreme Court, concluded 'I have no doubt in my mind that all the ingredients to make the doctrine of estoppel by election applicable are present in this case.' The Supreme Court also held that 'a court should not make out a case for a party which he does not make for himself.' On the negotiations point, the Supreme Court's treatment is a paraphrase: dealings that never became a contract cannot be sued on as one, and 'if in the end the negotiations become fruitless and end without any contract or agreement ensuing, neither side to the bargain can rely on anything done by him in the course of the negotiations as estopping the other from resiling from the bargain' — that formulation appears in UBN v Sax's use of Adebanjo, not in Adebanjo itself.",
+      "exceptions": "(1) Estoppel by election requires knowledge of the right, an unequivocal act or representation, and detrimental reliance; the trial judge expressly addressed each element. (2) Estoppel does not create a contract where none was made — it bars inconsistent conduct, it does not supply missing terms. (3) An appellate court may interfere with findings of fact where they are perverse, unreasonable or unsound, or where a substantial principle of law or procedure was violated.",
+      "application": "On the uploaded page it is cited only as a supporting authority in footnote 4. Its genuine teaching for the conditions of an offer is negative: a long course of negotiation, part-performance and expense can generate estoppel yet still fail to generate a contract, because the parties never reached agreement on the essential terms — here, the amount of compensation for the land retained. That is the bridge to the second condition at 2.2 of the uploaded page: the proposition must be definite, certain, unequivocal and final.",
+      "later_treatment": "UBN Ltd v Sax (Nig) Ltd (1994) 8 NWLR (Pt 361) 150 cites Adebanjo for the proposition that the price of a parcel of land in negotiations for its sale is a fundamental term of the envisaged contract. Adebanjo is also cited in later Court of Appeal decisions on trespass, possession and estoppel (for example Okhuarobo v Aigbe; Unamka v Ugochukwu (2019); Jumbo v AMCON (2020) CA at 667-668). No decision overruling or doubting it was located.",
+      "exam_significance": "Cite it for: estoppel by election/representation in land negotiations, and for the proposition that inconclusive negotiations create no contract however much money has been spent. Do NOT cite it as a case that decided the price of land is a fundamental term — that is Sax's characterisation of Adebanjo, and even then the point is that the price was never agreed, not that the court laid down a rule. The commonest mistakes are to treat it as a contract-formation case holding that a contract existed, and to overlook that it is a decision on pleadings and estoppel.",
+      "secondary_account": [
+        {
+          "text": "Tables of cases list Adebanjo v Brown (1990) 3 NWLR (Pt 141) 661 and (1990) 6 SC 63, corroborating the citation but adding nothing to the facts.",
+          "source": "vLex Nigeria, Table of Cases (subscription preview)",
+          "url": "https://ng.vlex.com/vid/table-of-cases-936457065",
+          "type": "subscription database index (secondary; paywalled)",
+          "accessed": "2026-11-22"
+        },
+        {
+          "text": "Later Court of Appeal judgments cite pages 667-668 of the report for points on fraud and trespass to land.",
+          "source": "LawGlobal Hub, Jumbo v AMCON & Ors (2020) LLJR-CA",
+          "url": "https://www.lawglobalhub.com/jumbo-v-amcon-ors-2020-lljr-ca/",
+          "type": "judgment-reproduction website (secondary)",
+          "accessed": "2026-11-22"
+        }
+      ],
+      "exam_note": {
+        "citation_court": "Adebanjo v Brown (1990) 3 NWLR (Pt 141) 661 (SC); also (1990) 6 SC 63.",
+        "facts": [
+          "Brown owned Plots 1, 9 and 10 at Tanimeda, Surulere, Lagos; Adebanjo, a lawyer, owned the adjoining plot and began building in 1972.",
+          "Adebanjo's foundation encroached on Brown's Plot 10, and his vendors offered Brown Plot 2A Block 2 in exchange for the whole of Plot 10.",
+          "Brown accepted in conduct: he moved his shed off Plot 10 at Adebanjo's expense and let the building continue.",
+          "Brown then extended his own building onto Plot 10, and it was agreed he would instead be paid cash for the part he kept.",
+          "He demarcated the boundary, directed Adebanjo to his family surveyor, and a plan was prepared at Adebanjo's expense to value the land.",
+          "Brown later denied ever consenting and sued for trespass five years after the original encroachment, claiming damages and an injunction."
+        ],
+        "issue": "Whether, in the absence of any concluded contract, Brown's conduct estopped him from denying the arrangement he had accepted.",
+        "held": "The Supreme Court restored the trial court's judgment: estoppel by election applied and Brown could not resile.",
+        "rule": "Where negotiations never ripen into a contract, neither party can sue on what was done during them; but a party who by his conduct induces the other to believe a right has been given up, and so causes him to act to his detriment, is estopped from going back on it.",
+        "exception": "Estoppel bars inconsistent conduct only; it cannot create a contract or supply terms the parties never agreed, and it requires knowledge of the right plus detrimental reliance.",
+        "why": "It shows the outer limit of negotiation: expense and part-performance may raise an estoppel without ever producing an offer and acceptance."
+      },
+      "mnemonics": {
+        "name_cue": "ADE-BANJO: he 'banged' the boundary line with a tape — and that very act estopped the plaintiff.",
+        "facts_mnemonic": "SHED — Shed moved at defendant's expense · Half plot kept · Engineer surveyed · Denied consent.",
+        "rule_mnemonic": "NO CONTRACT → NO CLAIM ON THE DEAL; but CONDUCT + DETRIMENT → ESTOPPEL.",
+        "trigger": "When negotiations collapse after one side has spent money, or when a land dispute turns on acquiescence rather than agreement.",
+        "drill": "State the three elements of estoppel by election and identify which fact in Adebanjo evidences each one."
+      }
+    },
+    {
+      "id": "sax",
+      "number": 7,
+      "name": "Union Bank of Nigeria Ltd v Sax (Nigeria) Ltd & 2 Ors",
+      "citation_printed": "[1994] 8 NWLR (Pt 361) 150; [1994] 9 SCNJ 1, 18",
+      "citation_verified": "(1994) 8 NWLR (Pt 361) 150; (1994) 9 SCNJ 13; SC.236/1991, judgment delivered 30 September 1994; also cited as (1994) LPELR-3390 (SC). Some sources misprint the part as '(Pt 36)'.",
+      "citation_short": "(1994) 8 NWLR (Pt 361) 150",
+      "court": "Supreme Court of Nigeria",
+      "jurisdiction": "Nigeria",
+      "date": "30 September 1994",
+      "judges": "The panel is not stated on the copy read and was not established from the materials located.",
+      "confidence": "PARTLY VERIFIED",
+      "verification_note": "The reasoning on fundamental terms and on the inadmissibility of extrinsic evidence was read in a reproduction of the judgment. The pinpoint at 168 used in later citations was not verified. There is a printing conflict in the SCNJ page (13 versus 18) and in the part number (361 versus 36).",
+      "textbook_page": "p 23, fn 4",
+      "textbook_proposition": "Cited by Ogbuagu JSC, with the others, in support of the definition and incidents of an offer.",
+      "sources": [
+        {
+          "label": "Judgment text reproduced (Lawyers Online, 'U.B.N. LTD. V. SAX NIG. LTD')",
+          "url": "https://cases.lawyersonline.ng/union-bank-of-nigeria-ltd-v-sax-nigeria-ltd-ors/",
+          "tier": "D",
+          "type": "Nigerian law-report website reproducing the judgment",
+          "accessed": "2026-11-22"
+        },
+        {
+          "label": "Court of Appeal judgment relying on Sax for consensus ad idem",
+          "url": "https://www.lawglobalhub.com/akudigwe-v-a-g-anambra-state-2020-lljr-ca/",
+          "tier": "D",
+          "type": "judgment-reproduction website",
+          "accessed": "2026-11-22"
+        }
+      ],
+      "facts": "The respondents (as plaintiffs) had obtained loan and overdraft facilities from the appellant bank, secured by mortgage deeds (Exhibits 25, 26 and 27). They later contended that the bank had agreed to grant them a further or additional facility, and that the bank was not entitled to vary the interest rate without their consent or to exercise its power of sale. The dispute turned on whether a further facility had ever been agreed. Despite protracted correspondence, there was no evidence of the amount of the alleged additional loan, the period of repayment, the rate of interest, or the security to be provided. The bank relied on the written mortgage deeds; the respondents sought to rely on extraneous understandings.",
+      "procedure": "The trial court and the Court of Appeal dealt with the claims and cross-claims; the matter reached the Supreme Court as SC.236/1991 and was determined on 30 September 1994. MARK: the precise orders of the Supreme Court were not established from the reproduction read.",
+      "issues": "Analytical summary: (1) whether there was a concluded agreement for a further or additional loan facility; and (2) whether extrinsic evidence was admissible to add to, vary or contradict the written mortgage deeds.",
+      "holding": "There was no concluded agreement for a further facility. The amount of the loan, the period of repayment, the rate of interest and the security were fundamental terms which had to be provided for, and in the absence of agreement on fundamental terms there can be no valid contract. Extrinsic evidence was inadmissible to add to, vary, subtract from or contradict the terms of the written mortgage deeds, and it was not the business of a court to make a contract for the parties.",
+      "ratio": "Where the parties to a transaction have not agreed on its fundamental terms, there is no valid contract; the court will not fill the gap. Where they have reduced their agreement to writing, extrinsic evidence is inadmissible to add to, vary, subtract from or contradict the written instrument, and the written document is the authoritative legal source for resolving disagreements about its terms.",
+      "exact_rule": "VERIFIED quotations: 'The foregoing were fundamental terms which should be provided for in such a transaction. In the absence of agreement on the fundamental terms, there can be no valid contract.' And: 'It is not the business of a court to make a contract for the parties or to rewrite the one which they have made.'",
+      "exceptions": "(1) The parol evidence rule is subject to the recognised exceptions (custom, trade usage, implied terms, rectification, condition precedent, collateral contract, ambiguity), none of which was established on these facts. (2) A term may be implied where it is necessary, but not merely because it would have been convenient: 'Such a term could not be implied merely because it would have made things more convenient.'",
+      "application": "Supplies the second condition on the uploaded page — that a proposition must be definite and certain as to its terms. It is the clearest Nigerian statement that a purported offer which leaves the essential terms open is not an offer capable of acceptance at all, because acceptance of it could not produce a complete contract. It also links back to Tejumola and Adebanjo: all three are cases in which the parties had talked at length but had never agreed the critical term.",
+      "later_treatment": "Applied routinely: the Court of Appeal in Akudigwe v Attorney-General of Anambra State (2020) quotes Sax for the proposition that parties who say different things at different times are not ad idem and no valid contract is formed. Cited in Shobanke v Sarki (2005) and in the banking-law literature on interest-rate variation. No decision overruling or doubting it was located.",
+      "exam_significance": "Cite it for: the requirement that fundamental terms be agreed before a contract exists, and for the parol evidence rule in written contracts. Do NOT cite it as authority for the definition of an offer as such — it is authority on certainty and completeness. The commonest mistake is the misprinted part number '(Pt 36)' found in some judgments and notes; the correct part is 361.",
+      "secondary_account": [
+        {
+          "text": "A Court of Appeal judgment reproduces Sax's reasoning that 'where they say different things at different time they are not ad idem and no valid contract is formed'.",
+          "source": "LawGlobal Hub, Akudigwe v A-G Anambra State (2020) LLJR-CA",
+          "url": "https://www.lawglobalhub.com/akudigwe-v-a-g-anambra-state-2020-lljr-ca/",
+          "type": "judgment-reproduction website (secondary)",
+          "accessed": "2026-11-22"
+        },
+        {
+          "text": "A banking-law article relies on UBN v Sax (1994) 8 NWLR (Pt 361) for the requirement of offer and acknowledged acceptance of terms set out in the contract document.",
+          "source": "Tekedia, 'Can A Bank Be Held Liable for Fraudulent and Unauthorized Transaction...'",
+          "url": "https://www.tekedia.com/bank-fraudulent-unauthorized-transaction-customers-account/",
+          "type": "commentary website (secondary)",
+          "accessed": "2026-11-22"
+        }
+      ],
+      "exam_note": {
+        "citation_court": "Union Bank of Nigeria Ltd v Sax (Nigeria) Ltd & 2 Ors (1994) 8 NWLR (Pt 361) 150 (SC).",
+        "facts": [
+          "The respondents had borrowed from the appellant bank on overdraft and loan facilities secured by three mortgage deeds.",
+          "They later claimed that the bank had agreed to grant them an additional facility and could not vary interest without their consent.",
+          "The correspondence showed no agreement on the amount of the extra loan, on repayment, on interest or on security.",
+          "The bank relied on the written mortgage deeds, while the respondents sought to rely on understandings outside those documents.",
+          "The Supreme Court held that the missing items were fundamental terms and that no valid contract for a further facility existed.",
+          "It also held that extrinsic evidence could not be used to add to or vary the written deeds, and that courts do not make contracts for parties."
+        ],
+        "issue": "Whether a valid contract for an additional loan existed, and whether extrinsic evidence could vary the written mortgage deeds.",
+        "held": "No contract for a further facility; extrinsic evidence was inadmissible; the court will not rewrite the parties' bargain.",
+        "rule": "There can be no valid contract where the fundamental terms have not been agreed, and where parties have reduced their agreement to writing, extrinsic evidence cannot add to, vary or contradict it.",
+        "exception": "Terms may be admitted or implied outside the written document only on recognised grounds such as custom, trade usage, ambiguity, rectification, collateral contract or necessity — not mere convenience.",
+        "why": "It is the Nigerian Supreme Court's clearest statement that certainty of terms is a precondition of an offer capable of acceptance."
+      },
+      "mnemonics": {
+        "name_cue": "SAX: the bank wanted the notes in writing — 'SAX the record, or there is no contract'.",
+        "facts_mnemonic": "A-P-R-I-S: Amount · Period of repayment · Rate of interest · Instrument in writing · Security.",
+        "rule_mnemonic": "NO FUNDAMENTAL TERMS → NO CONTRACT, and NO WRITING → NO EXTRINSIC VARIATION.",
+        "trigger": "When an alleged agreement leaves the price, amount, duration or subject matter undecided, or when one side tries to add oral terms to a written contract.",
+        "drill": "List the four fundamental terms that were missing in Sax, and state the parol evidence rule with one exception."
+      }
+    },
+    {
+      "id": "statutes",
+      "number": 8,
+      "name": "Non-case authorities registered under Section 1 of the research prompt",
+      "citation_printed": "None printed on the page beyond the cases",
+      "citation_verified": "Law Reform (Contracts) Law, Cap 66, Laws of Lagos State, s 5; Statute of Frauds (1677) (England); Land Use Act, Cap L5, Laws of the Federation of Nigeria 2004 (Governor's consent, s 22)",
+      "citation_short": "Law Reform (Contracts) Law, Cap 66, Laws of Lagos State, s 5",
+      "court": "Not applicable to this authority",
+      "jurisdiction": "Nigeria",
+      "date": "Not applicable to this authority",
+      "judges": "Not applicable to this authority",
+      "confidence": "PARTLY VERIFIED",
+      "verification_note": "Section 5 of the Law Reform (Contracts) Law Cap 66 of Lagos State is VERIFIED as set out in the judgment in Tejumola, where it is reproduced in full. The Land Use Act consent requirement is referred to in the Court of Appeal ruling in Dahiru as a pleaded ground, not as a holding. The English Statute of Frauds is referred to only through Tejumola's citation of Bristol, Cardiff and Swansea Aerated Bread Co v Maggs (1890) 44 Ch D 616.",
+      "textbook_page": "Not cited on p 23; registered for completeness because these provisions govern the writing requirement that limits any discussion of offer and acceptance in land transactions.",
+      "textbook_proposition": "Not applicable to this authority.",
+      "sources": [
+        {
+          "label": "s 5 of the Law Reform (Contracts) Law Cap 66, set out in UBA v Tejumola",
+          "url": "https://lawcarenigeria.com/united-bank-for-africa-ltd-v-tejumola-sons-ltd-1988/",
+          "tier": "D",
+          "type": "judgment reproduction",
+          "accessed": "2026-11-22"
+        }
+      ],
+      "facts": "Not applicable to this authority.",
+      "procedure": "Not applicable to this authority.",
+      "issues": "Not applicable to this authority.",
+      "holding": "Not applicable to this authority.",
+      "ratio": "Section 5 of the Law Reform (Contracts) Law Cap 66, Laws of Lagos State: 'No contract to which this section applies shall be enforceable by action unless the contract or some memorandum or note in respect thereof is in writing and is signed by the party to be charged therewith or by some other person lawfully authorised by him.' VERIFIED as reproduced in Tejumola. It is a rule of evidence, not of formation: as Kay J put it in Bristol, Cardiff and Swansea Aerated Bread Co v Maggs (1890) 44 Ch D 616 at 622, 'the question whether the two letters relied on were a complete contract, or were only steps in a negotiation, is altogether independent of the Statute of Frauds.'",
+      "exact_rule": "See above. Note that the provision reproduced by the Supreme Court is the Lagos State law; a different State may have its own Contracts Law, and the applicable version and date must be checked before it is asserted in a problem answer.",
+      "exceptions": "Section 5 does not apply to every contract; it applies to the classes of contract within its terms (notably contracts for the sale or other disposition of land), subject to the recognised exceptions such as part performance and the doctrine of equitable estoppel. Do not assume the Lagos provision applies throughout Nigeria — it is a State law.",
+      "application": "Governs the formal validity of land contracts that would otherwise be concluded by offer and acceptance, and is the reason Tejumola's outcome, though described by Obaseki JSC as an instance of hard cases making bad law, was legally correct.",
+      "later_treatment": "Not applicable to this authority.",
+      "exam_significance": "Cite the Lagos provision only for Lagos transactions and check for the equivalent law in the relevant State. Do not present it as a federal statute. The commonest mistake is to attribute a general writing requirement to Nigerian contract law as a whole.",
+      "secondary_account": [],
+      "exam_note": {
+        "citation_court": "Law Reform (Contracts) Law Cap 66, Laws of Lagos State, s 5.",
+        "facts": [
+          "Not applicable to this authority."
+        ],
+        "issue": "Not applicable to this authority.",
+        "held": "Not applicable to this authority.",
+        "rule": "A contract within the section is unenforceable by action unless it, or a signed memorandum or note of it, is in writing.",
+        "exception": "Part performance and equitable estoppel; and the section is a rule of evidence, not of formation.",
+        "why": "It explains why a perfectly good offer and acceptance can still be unenforceable in a land transaction."
+      },
+      "mnemonics": {
+        "name_cue": "CAP 66: 'CAPture it in writing, or CAP it at 66 pages of regret'.",
+        "facts_mnemonic": "WRITE — Writing · Required · Instrument · Terms · Evidence.",
+        "rule_mnemonic": "NO WRITING → NO ACTION (but formation is a separate question).",
+        "trigger": "Any land contract problem where the agreement is oral or partly oral.",
+        "drill": "State the section, the State it belongs to, and one exception."
+      }
+    }
+  ],
+  "research_audit": {
+    "search_terms": [
+      "Storer v Manchester City Council [1974] 1 WLR 1403 Court of Appeal offer \"subject to contract\" Lord Denning",
+      "\"Dahiru v Kamale\" [2005] 9 NWLR (Pt 929) 50 Supreme Court offer acceptance",
+      "\"an offer is an expression of readiness to contract on the terms specified by the offeror which if accepted\" Ogbuagu JSC",
+      "nigerialii \"Dahiru\" \"Kamale\" judgment Court of Appeal Jos",
+      "\"United Bank for Africa\" v \"Tejumola\" 1988 2 NWLR Pt 79 662 offer counter-offer",
+      "\"Agomo v Guinness\" 1995 2 NWLR \"Pt 580\" 672 / \"Pt 380\" offer acceptance",
+      "\"Sparkling Breweries\" v \"Union Bank of Nigeria\" 2001 15 NWLR Pt 737 539",
+      "\"Adebanjo v Brown\" 1990 3 NWLR Pt 141 661 sale of land price fundamental term",
+      "\"Union Bank of Nigeria\" v \"Sax (Nigeria)\" 1994 8 NWLR Pt 361 150 fundamental terms",
+      "site-specific: nigerialii.org, lawcarenigeria.com, cases.lawyersonline.ng, lawglobalhub.com, cambridge.org"
+    ],
+    "engines_and_repositories_actually_used": [
+      "General web search (multiple rounds per case; several rewordings, citation formats and party-name variants)",
+      "NigeriaLII (nigerialii.org) — full text obtained for Adebanjo; metadata only for Sparkling Breweries and Eke v Ogbonda",
+      "LawCare Nigeria (lawcarenigeria.com) — full text for Tejumola, Dahiru (CA), Agoma",
+      "Lawyers Online (cases.lawyersonline.ng) — full text for Sax",
+      "University-hosted reproduction of the All ER report (uni-trier.de)",
+      "Barbados Court of Appeal judgments portal (Davco) — for Storer's objective test",
+      "Cambridge Core / Journal of African Law — abstract only",
+      "BScholarly, LawGlobal Hub, IPSALOQUITUR, Hbriefs, Judicial Poetry, Legalnaija, Studocu, ResearchGate — secondary leads only"
+    ],
+    "inaccessible_or_paywalled": [
+      "LawPavilion and similar authorised NWLR databases — no lawful access in this environment",
+      "vLex Nigeria and Legalpedia — subscription; only tables of cases and headlines were visible",
+      "NigeriaLII body text for Sparkling Breweries — page returned document metadata only",
+      "Full Supreme Court judgment in Dahiru v Kamale — not located in free full text",
+      "The uploaded textbook itself — only page 23 was supplied, so no wider verification of its authorship or edition was possible"
+    ],
+    "conflicts_recorded": [
+      "Dahiru v Kamale: the printed page number (50) is wrong; the report begins at 8. The quoted dictum is verbatim Sparkling Breweries (2001).",
+      "Agomo v Guinness: printed part '(Pt 580)' should be '(Pt 380)'; the report heading prints the appellant as 'Agoma'.",
+      "Adebanjo v Brown: NigeriaLII gives 7 June 1990; the judgment text says Thursday 8 June 1990. Unresolved.",
+      "UBN v Sax: some sources print '(Pt 36)' instead of '(Pt 361)' and the SCNJ page as 13 or 18.",
+      "Storer: the name is printed 'Storer v Man-chester CC'; the correct name is Storer v Manchester City Council.",
+      "Widespread secondary copying: several blogs reproduce the uploaded textbook's wording and its errors, so agreement among them is not independent corroboration."
+    ]
+  }
+}
