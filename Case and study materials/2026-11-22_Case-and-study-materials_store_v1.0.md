@@ -28,7 +28,8 @@ Case and study materials/
 │       ├── 2026-11-22_legal_cases_seed_v1.0.sql
 │       └── 2026-11-22_materials_seed_v1.0.sql
 └── pdf/
-    └── 2026-11-22_OFFER-casebook_v1.0.pdf   108 pages
+    ├── 2026-11-22_OFFER-casebook_v1.0.pdf   108 pages, the main deliverable
+    └── 2026-11-22_Store-guide_v1.0.pdf      9 pages, this guide as a PDF
 ```
 
 **Naming convention:** `YYYY-MM-DD_<slug>_v<version>.<ext>`. Dates sort

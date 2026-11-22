@@ -1,5 +1,5 @@
 -- Seed for materials / material_versions / material_authorities.
--- Generated from data/manifest.json on 2026-11-22T02:57:17+00:00.
+-- Generated from data/manifest.json on 2026-11-22T03:07:46+00:00.
 -- Review DATABASE_SCHEMA.md first: the deployed schema has not been checked
 -- against this checkout, and materials.content_text belongs in
 -- material_versions, not in materials.
@@ -13,11 +13,11 @@ WHERE NOT EXISTS (SELECT 1 FROM materials WHERE title = 'OFFER — CASEBOOK AND 
 
 -- File record for the compiled PDF:
 --   file_storage_path: pdf/2026-11-22_OFFER-casebook_v1.0.pdf
---   sha256: 4f1155ea81baf4444694bbfa054693249b5cad09aefff11d28e948175c14ca56
+--   sha256: a7b2b8bbcc7f2aa49a2bad94ba4866e1914933d6fc75bcea1d062dfc71587e32
 --   bytes: 380921
 --
 -- Files in this store:
--- 2026-11-22_Case-and-study-materials_store_v1.0.md  (2026-11-22, 9,209 bytes, sha256 0aa830730fe7998a...)
+-- 2026-11-22_Case-and-study-materials_store_v1.0.md  (2026-11-22, 9,311 bytes, sha256 64a5cb8db57e6185...)
 -- cases/2026-11-22_01_Storer-v-Manchester-City-Council_v1.0.md  (2026-11-22, 12,091 bytes, sha256 c91ae30816c78e4f...)
 -- cases/2026-11-22_02_Alhaji-M-C-Dahiru-Anor-v-Alhaji-Bubakare-Kamale_v1.0.md  (2026-11-22, 14,371 bytes, sha256 8fb45781cd195f7c...)
 -- cases/2026-11-22_03_United-Bank-for-Africa-Ltd-v-Tejumola-Sons-Ltd_v1.0.md  (2026-11-22, 12,509 bytes, sha256 9e62a15df18d5102...)
@@ -29,8 +29,9 @@ WHERE NOT EXISTS (SELECT 1 FROM materials WHERE title = 'OFFER — CASEBOOK AND 
 -- data/2026-11-22_cases_v1.0.json  (2026-11-22, 95,818 bytes, sha256 587e8ec68b2e72f8...)
 -- data/2026-11-22_synthesis-and-questions_v1.0.json  (2026-11-22, 26,964 bytes, sha256 f9c1242a7ea4b10d...)
 -- data/db-seed/2026-11-22_legal_cases_seed_v1.0.sql  (2026-11-22, 22,700 bytes, sha256 45ee63e07fa67cd8...)
--- data/db-seed/2026-11-22_materials_seed_v1.0.sql  (2026-11-22, 3,176 bytes, sha256 3c5adb0a254f708c...)
--- pdf/2026-11-22_OFFER-casebook_v1.0.pdf  (2026-11-22, 380,921 bytes, sha256 4f1155ea81baf444...)
+-- data/db-seed/2026-11-22_materials_seed_v1.0.sql  (2026-11-22, 3,271 bytes, sha256 477b8198fe553de5...)
+-- pdf/2026-11-22_OFFER-casebook_v1.0.pdf  (2026-11-22, 380,921 bytes, sha256 a7b2b8bbcc7f2aa4...)
+-- pdf/2026-11-22_Store-guide_v1.0.pdf  (2026-11-22, 27,806 bytes, sha256 86695c60b3097bf8...)
 -- source/2026-11-22_Master-Prompt_All-Cases-Research.pdf  (2026-11-22, 28,356 bytes, sha256 f3ac0cd941e852a2...)
 -- source/2026-11-22_Textbook-page-23_Offer_original-photo.jpg  (2026-11-22, 3,685,285 bytes, sha256 b9eef58b70d2b9e6...)
 -- source/2026-11-22_Textbook-page-23_Offer_verbatim.md  (2026-11-22, 2,908 bytes, sha256 47f1a2767d6c4968...)

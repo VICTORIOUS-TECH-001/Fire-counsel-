@@ -140,7 +140,7 @@ class Doc:
     def width_of(self, s, font=SERIF, size=12, tracking=0.0):
         return sw(s, font, size) + tracking * len(s)
 
-    def __init__(self, path: str, title: str):
+    def __init__(self, path: str, title: str, running_head: str = ""):
         self.c = canvas.Canvas(path, pagesize=A4)
         self.c.setTitle(title)
         self.c.setAuthor("FIRE COUNSEL legal research workspace")
@@ -149,6 +149,7 @@ class Doc:
         self.y = FRAME_TOP
         self.page = 0
         self.toc_pages: dict[str, int] = {}
+        self.running_head = running_head or "OFFER — CASEBOOK AND STUDY MATERIALS"
         self.new_page()
 
     # ---------------------------------------------------------- pages
@@ -159,7 +160,7 @@ class Doc:
         self.page += 1
         self.y = FRAME_TOP
         if self.page > 1:
-            label = "OFFER — CASEBOOK AND STUDY MATERIALS"
+            label = self.running_head
             w = self.width_of(label, SERIF, 9, 0.45)
             self.text(PAGE_W / 2 - w / 2, PAGE_H - 42, label, SERIF, 9, 0.45, MUTED)
             self.c.setStrokeColor(RULE)

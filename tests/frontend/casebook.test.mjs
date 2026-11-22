@@ -131,9 +131,19 @@ test("every file in the store is dated, listed and hashed", async () => {
 
 test("the PDF deliverable exists and the SQL seed matches cases.json", async () => {
   const pdfs = manifest.files.filter((f) => f.kind === "pdf");
-  assert.ok(pdfs.length >= 1, "no compiled deliverable in the manifest");
-  const { size } = await stat(path.join(STORE, pdfs[0].path));
-  assert.ok(size > 100_000, "the deliverable looks truncated");
+  assert.ok(pdfs.length >= 2, "expected the casebook and the store guide");
+  for (const pdf of pdfs) {
+    const { size } = await stat(path.join(STORE, pdf.path));
+    assert.ok(size > 20_000, `${pdf.path} looks truncated`);
+  }
+  assert.ok(
+    pdfs.some((f) => f.path.includes("OFFER-casebook")),
+    "the casebook PDF is missing from the store",
+  );
+  assert.ok(
+    pdfs.some((f) => f.path.includes("Store-guide")),
+    "the store guide PDF is missing",
+  );
 
   const seed = await readFile(
     path.join(STORE, "data", "db-seed", "2026-11-22_legal_cases_seed_v1.0.sql"),
