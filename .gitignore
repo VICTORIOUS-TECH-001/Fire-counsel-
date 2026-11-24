@@ -1,6 +1,7 @@
 # Do not track dependency trees, local emulator state, or Python bytecode.
 node_modules/
 __pycache__/
+.venv/
 *.py[cod]
 .firebase/
 firebase-debug.log
