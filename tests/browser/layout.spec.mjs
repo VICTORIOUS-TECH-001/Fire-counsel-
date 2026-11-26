@@ -31,3 +31,30 @@ test("the responsive assertion observes a settled layout even when headless anim
   });
   await expectNoHorizontalOverflow(page);
 });
+
+test("the responsive assertion keeps observing layout when renderer timers and frames are paused", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setContent('<!doctype html><html><body><div id="resizing" style="width:1000px;height:30px">Resize fixture</div></body></html>');
+  await page.evaluate(() => {
+    const width = Object.getOwnPropertyDescriptor(Element.prototype, "scrollWidth").get;
+    window.__layoutMeasurements = 0;
+    Object.defineProperty(document.documentElement, "scrollWidth", { get() {
+      window.__layoutMeasurements++;
+      const measured = width.call(this);
+      if (window.__layoutMeasurements === 1) queueMicrotask(() => { document.getElementById("resizing").style.width = "100%"; });
+      return measured;
+    } });
+  });
+  const client = await page.context().newCDPSession(page);
+  // Pauses native renderer timers, not the test runner's real 7s deadline.
+  // The first read sees real overflow; the microtask settles the CSS. A helper
+  // that depends on another renderer timer/frame can never observe the change.
+  await client.send("Emulation.setVirtualTimePolicy", { policy: "pause" });
+  try {
+    await expectNoHorizontalOverflow(page);
+    expect(await page.evaluate(() => window.__layoutMeasurements)).toBeGreaterThanOrEqual(2);
+  } finally {
+    await client.send("Emulation.setVirtualTimePolicy", { policy: "advance" });
+    await client.detach();
+  }
+});

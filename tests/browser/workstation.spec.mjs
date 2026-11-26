@@ -7,9 +7,9 @@ const source = "[Page 1]\nOriginal source with <script>unsafe()</script> and a l
 const text = "[Page 1]\nCorrected document with <img src=x onerror=unsafe()> kept as literal text.";
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 
-async function fixture(page, { user = admin, result = {}, onPoll, onSave, database = "ready" } = {}) {
+async function fixture(page, { user = admin, result = {}, onPoll, onSave, onDocuments, onTest, database = "ready" } = {}) {
   await stubAuth(page, { user });
-  const processing = [], approvals = [], mutations = [];
+  const processing = [], approvals = [], mutations = [], diagnostics = [];
   const polls = new Map();
   await page.route("**/api/**", async route => {
     const request = route.request(), path = new URL(request.url()).pathname, method = request.method();
@@ -25,8 +25,12 @@ async function fixture(page, { user = admin, result = {}, onPoll, onSave, databa
     if (path.includes("/database/options/materials")) return json(route, { data: [{ id: materialId, label: "Original notes — keep previous versions" }] });
     if (path.includes("/database/options/")) return json(route, { data: [] });
     if (path === "/api/v1/admin/documents/usage") return json(route, { data: { used_bytes: 0, budget_bytes: 350 * 1048576, files: 0, max_file_bytes: 25 * 1048576, ocr: { ai: true } } });
-    if (path === "/api/v1/admin/documents") return json(route, { data: [] });
+    if (path === "/api/v1/admin/documents") return onDocuments ? onDocuments(route) : json(route, { data: [] });
     if (path === "/api/v1/admin/workstation/status") return json(route, { data: { database, providers: { configured: true, cloudflare: { configured: true, model: "test-cf" }, gemini: { configured: true, model: "test-gemini" }, ocr: "admin_gemini" } } });
+    if (path === "/api/v1/admin/workstation/providers/test") {
+      const body = request.postDataJSON(); diagnostics.push(body);
+      return onTest ? onTest(route, body) : json(route, { data: { ok: true, provider: body.provider, model: `test-${body.provider}` } });
+    }
     if (path === "/api/v1/admin/workstation/jobs" && method === "POST") {
       processing.push(request.postDataJSON());
       const id = `${processing.length}23e4567-e89b-42d3-a456-426614174000`;
@@ -41,7 +45,7 @@ async function fixture(page, { user = admin, result = {}, onPoll, onSave, databa
     }
     if (jobId && method === "GET") {
       const n = (polls.get(jobId) || 0) + 1; polls.set(jobId, n);
-      if (onPoll) await onPoll(route, jobId, n);
+      if (onPoll && await onPoll(route, jobId, n) === true) return;
       return json(route, { data: { id: jobId, name: processing.at(-1)?.name || "source.pdf", status: "ready", result: { text, source_text: source, method: "pdf_text", pages: 1, characters: text.length, sections: 1, providers: [{ provider: "cloudflare", model: "test-cf" }], warnings: [], truncated: false, ...result } } });
     }
     return json(route, { error: "Not part of this workstation fixture" }, 404);
@@ -51,7 +55,7 @@ async function fixture(page, { user = admin, result = {}, onPoll, onSave, databa
   await expect(page.locator("#fc-preloader")).toHaveCount(0);
   await page.locator("[data-panel=uploads]").click();
   if (user && user.uid !== student.uid) await expect(page.locator("#station-connection-summary")).toContainText("Neon");
-  return { processing, approvals, mutations };
+  return { processing, approvals, mutations, diagnostics, polls };
 }
 async function paste(page, value = "[Page 1]\nWorking source text.") {
   await page.locator(".station-paste summary").click();
@@ -218,4 +222,210 @@ test("a student sees a locked station and a missing Neon connection allows TXT r
   await page.locator("#station-approval").check();
   await expect(page.locator("#station-download")).toBeEnabled();
   await expect(page.locator("#station-save")).toBeDisabled();
+});
+
+
+// Fake time drives production backoff deadlines exactly. These are not sleeps
+// or whole-test retries, and no external/provider request is made by the suite.
+async function controlTime(page) {
+  await page.clock.install();
+  await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 1000);
+}
+
+test("temporary API 503 and 429 recover the same workstation job and honor Retry-After without re-uploading", async ({ page }) => {
+  const state = await fixture(page, { onPoll: async (route, _id, n) => {
+    if (n === 1) { await route.fulfill({ status: 503, contentType: "text/html", body: "<h1>API ingress unavailable</h1>" }); return true; }
+    if (n === 2) { await route.fulfill({ status: 429, contentType: "application/json", headers: { "Retry-After": "12" }, body: JSON.stringify({ code: "ADMIN_READ_RATE_LIMIT", error: "Administrator status requests are temporarily limited." }) }); return true; }
+  } });
+  await paste(page); await controlTime(page);
+  await page.locator("#station-submit").click();
+  await expect(page.locator("#station-status")).toContainText("HTTP 503");
+  await expect(page.locator("#station-status")).toContainText("same job again in 2 seconds");
+  await page.clock.runFor(1999);
+  expect([...state.polls.values()]).toEqual([1]);
+  await page.clock.runFor(1);
+  await expect(page.locator("#station-status")).toContainText("same job again in 12 seconds");
+  await page.clock.runFor(11999);
+  expect([...state.polls.values()]).toEqual([2]);
+  await page.clock.runFor(1);
+  await expect(page.locator("#station-output")).toHaveValue(text);
+  await expect(page.locator("#station-output")).toBeEnabled();
+  expect([...state.polls.values()]).toEqual([3]);
+  expect(state.processing).toHaveLength(1);
+  expect(state.approvals).toHaveLength(0);
+  expect(state.diagnostics).toHaveLength(0);
+});
+
+test("repeated transient status failures stop after five scheduled checks; manual progress resumes only the same job", async ({ page }) => {
+  const state = await fixture(page, { onPoll: async (route, _id, n) => {
+    if (n <= 6) { await route.fulfill({ status: 503, contentType: "text/html", body: "Temporarily unavailable" }); return true; }
+  } });
+  await paste(page); await controlTime(page);
+  await page.locator("#station-submit").click();
+  await expect(page.locator("#station-status")).toContainText("(1/5)");
+  for (const [index, delay] of [2000, 5000, 10000, 20000, 30000].entries()) {
+    await page.clock.runFor(delay);
+    await expect(page.locator("#station-status")).toContainText(index === 4 ? "Automatic status checks are paused" : `(${index + 2}/5)`);
+  }
+  await expect(page.locator("#station-submit > span:first-child")).toHaveText("Check progress");
+  await page.locator("#classic-upload-mode").click();
+  await page.locator("#station-mode").click();
+  await page.clock.runFor(120000);
+  expect([...state.polls.values()]).toEqual([6]);
+  expect(state.processing).toHaveLength(1);
+  await page.locator("#station-submit").click();
+  await expect(page.locator("#station-output")).toHaveValue(text);
+  expect([...state.polls.values()]).toEqual([7]);
+  expect(state.processing).toHaveLength(1);
+  expect(state.approvals).toHaveLength(0);
+});
+
+test("hidden station polling pauses and navigation resumes its job rather than starting another", async ({ page }) => {
+  const state = await fixture(page, { onPoll: async (route, id, n) => {
+    if (n === 1) { await json(route, { data: { id, status: "processing", progress: "Reading the photo…" } }); return true; }
+  } });
+  await paste(page); await controlTime(page);
+  await page.locator("#station-submit").click();
+  await expect(page.locator("#station-status")).toContainText("Reading the photo");
+  await page.locator("#classic-upload-mode").click();
+  await page.clock.runFor(120000);
+  expect([...state.polls.values()]).toEqual([1]);
+  await page.locator("#station-mode").click();
+  await expect(page.locator("#station-output")).toHaveValue(text);
+  expect([...state.polls.values()]).toEqual([2]);
+  expect(state.processing).toHaveLength(1);
+});
+
+test("a missing RAM job explains restart/expiry and never automatically recreates the upload", async ({ page }) => {
+  const state = await fixture(page, { onPoll: async route => {
+    await json(route, { error: "Temporary job not found", code: "DRAFT_NOT_FOUND" }, 404); return true;
+  } });
+  await paste(page, "Private source retained after restart"); await controlTime(page);
+  await page.locator("#station-submit").click();
+  await expect(page.locator("#station-status")).toContainText("server no longer has this temporary job");
+  await expect(page.locator("#station-paste")).toHaveValue("Private source retained after restart");
+  await expect(page.locator("#station-submit > span:first-child")).toHaveText("Process");
+  await page.clock.runFor(120000);
+  expect([...state.polls.values()]).toEqual([1]);
+  expect(state.processing).toHaveLength(1);
+  expect(state.approvals).toHaveLength(0);
+});
+
+test("sign-out cancels scheduled recovery and cannot restore another account's private draft", async ({ page }) => {
+  const state = await fixture(page, { onPoll: async route => {
+    await route.fulfill({ status: 503, contentType: "text/html", body: "Unavailable" }); return true;
+  } });
+  await paste(page, "Private text from previous administrator"); await controlTime(page);
+  await page.locator("#station-submit").click();
+  await expect(page.locator("#station-status")).toContainText("same job again");
+  await page.locator("#admin-signout").click();
+  await expect(page.locator("#station-submit")).toBeDisabled();
+  await page.clock.runFor(120000);
+  expect([...state.polls.values()]).toEqual([1]);
+  await expect(page.locator("#station-paste")).toHaveValue("");
+  await expect(page.locator("#station-chat")).toBeEmpty();
+});
+
+test("Classic keeps a Reading upload during 429/503 and recovers GETs without submitting a duplicate file", async ({ page }) => {
+  let phase = "seed";
+  let reads = 0;
+  const row = { id: rowId, purpose: "material", file_name: "IMG_20261124_105054_298.jpg", size_bytes: 4000, has_file: true, status: "processing", progress: "Reading the photo…" };
+  const state = await fixture(page, { onDocuments: async route => {
+    expect(route.request().method()).toBe("GET"); reads++;
+    if (phase === "throttle") { phase = "outage"; return route.fulfill({ status: 429, contentType: "application/json", headers: { "Retry-After": "7" }, body: JSON.stringify({ code: "ADMIN_READ_RATE_LIMIT", error: "API status requests are temporarily limited." }) }); }
+    if (phase === "outage") { phase = "recovered"; return route.fulfill({ status: 503, contentType: "text/html", body: "<h1>API unavailable</h1>" }); }
+    return json(route, { data: [{ ...row, ...(phase === "recovered" ? { status: "ready" } : {}) }] });
+  } });
+  await controlTime(page); phase = "throttle";
+  const before = reads;
+  await page.locator("#classic-upload-mode").click();
+  await expect(page.locator("#upload-status")).toContainText("existing upload list again in 7 seconds");
+  await expect(page.locator("#upload-rows")).toContainText(row.file_name);
+  await expect(page.locator("[data-upload-state=processing]")).toBeVisible();
+  await page.clock.runFor(6999); expect(reads).toBe(before + 1);
+  await page.clock.runFor(1);
+  await expect(page.locator("#upload-status")).toContainText("HTTP 503");
+  await expect(page.locator("#upload-status")).toContainText("again in 5 seconds");
+  await page.clock.runFor(5000);
+  await expect(page.locator("[data-upload-state=ready]")).toBeVisible();
+  await expect(page.locator("#upload-status")).toContainText("Connection restored");
+  expect(reads).toBe(before + 3);
+  expect(state.mutations).toHaveLength(0);
+});
+
+test("provider diagnostics are explicit admin-only calls, explain rejected credentials and clear on sign-out", async ({ page }) => {
+  const state = await fixture(page, { onTest: (route, body) => body.provider === "gemini"
+    ? json(route, { error: "Google rejected the admin Gemini credential or its permissions.", code: "ADMIN_PROVIDER_AUTH" }, 503)
+    : json(route, { data: { ok: true, provider: "cloudflare", model: "test-cf" } }) });
+  expect(state.diagnostics).toHaveLength(0);
+  await page.locator(".station-connection summary").click();
+  await page.getByRole("button", { name: "Test Admin Gemini", exact: true }).click();
+  await expect(page.locator("#station-test-status")).toContainText("ADMIN_PROVIDER_AUTH");
+  await expect(page.locator("#station-test-status")).toContainText("student key was not used");
+  expect(state.diagnostics).toEqual([{ provider: "gemini" }]);
+  await page.getByRole("button", { name: "Test Cloudflare", exact: true }).click();
+  await expect(page.locator("#station-test-status")).toContainText("Cloudflare Workers AI accepted the test");
+  expect(state.diagnostics).toEqual([{ provider: "gemini" }, { provider: "cloudflare" }]);
+  expect(state.processing).toHaveLength(0);
+  expect(state.approvals).toHaveLength(0);
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expectNoHorizontalOverflow(page);
+  }
+  await page.locator(".station-connection").screenshot({ path: ".cache/counsel-station-diagnostics.png" });
+  await page.locator("#admin-signout").click();
+  await expect(page.getByRole("button", { name: "Test Admin Gemini", exact: true })).toBeDisabled();
+  await expect(page.locator("#station-test-status")).not.toContainText("accepted the test");
+});
+
+
+test("neither job creation nor a raw Classic upload is replayed after an unconfirmed 503", async ({ page }) => {
+  let creates = 0, uploads = 0;
+  const state = await fixture(page, { onDocuments: async route => {
+    if (route.request().method() === "POST") {
+      uploads++;
+      return route.fulfill({ status: 503, contentType: "text/html", body: "Upload acknowledgement unavailable" });
+    }
+    return json(route, { data: [] });
+  } });
+  await page.route("**/api/v1/admin/workstation/jobs", route => {
+    creates++;
+    return route.fulfill({ status: 503, contentType: "text/html", body: "Job acknowledgement unavailable" });
+  });
+  await paste(page); await controlTime(page);
+  await page.locator("#station-submit").click();
+  await expect(page.locator("#station-status")).toContainText("HTTP 503");
+  await page.clock.runFor(120000);
+  expect(creates).toBe(1);
+  expect(state.approvals).toHaveLength(0);
+  await page.locator("#classic-upload-mode").click();
+  await page.locator("#upload-files").setInputFiles({ name: "One attempt.txt", mimeType: "text/plain", buffer: Buffer.from("One raw upload attempt only.") });
+  await page.locator("#upload-submit").click();
+  await expect(page.locator("#upload-status")).toContainText("HTTP 503");
+  await page.clock.runFor(120000);
+  expect(uploads).toBe(1);
+  expect(creates).toBe(1);
+});
+
+test("Classic recovery is bounded across tab switches and manual Refresh checks only the existing list", async ({ page }) => {
+  let failing = false, failures = 0;
+  const state = await fixture(page, { onDocuments: route => {
+    if (failing) { failures++; return route.fulfill({ status: 503, contentType: "text/html", body: "Unavailable" }); }
+    return json(route, { data: [] });
+  } });
+  await controlTime(page); failing = true;
+  await page.locator("#classic-upload-mode").click();
+  await expect(page.locator("#upload-status")).toContainText("(1/5)");
+  for (const [index, delay] of [2000, 5000, 10000, 20000, 30000].entries()) {
+    await page.clock.runFor(delay);
+    await expect(page.locator("#upload-status")).toContainText(index === 4 ? "Automatic checks are paused" : `(${index + 2}/5)`);
+  }
+  await page.locator("#station-mode").click();
+  await page.locator("#classic-upload-mode").click();
+  await page.clock.runFor(120000);
+  expect(failures).toBe(6);
+  failing = false;
+  await page.locator("#upload-refresh").click();
+  await expect(page.locator("#upload-status")).toContainText("Connection restored");
+  expect(state.mutations).toHaveLength(0);
 });

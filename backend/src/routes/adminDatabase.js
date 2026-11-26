@@ -2,6 +2,7 @@ import express from "express";
 import { getPool } from "../config/database.js";
 import { getAdminDatabaseCatalog, getAdminDataset } from "../config/databaseCatalog.js";
 import { requireAdmin } from "../middleware/requireAdmin.js";
+import { createAdminRequestGate } from "../middleware/adminRateLimit.js";
 import { verifyFirebaseToken } from "../middleware/verifyFirebaseToken.js";
 import { chunkPages, textToPages } from "../services/documents/extract.js";
 
@@ -359,10 +360,11 @@ export function createAdminDatabaseRouter({
   poolProvider = getPool,
   verifyToken = verifyFirebaseToken,
   adminGate = requireAdmin,
+  requestGate = createAdminRequestGate(),
   configured = databaseIsConfigured
 } = {}) {
   const router = express.Router();
-  router.use(verifyToken, adminGate);
+  router.use(verifyToken, adminGate, requestGate);
 
   router.get("/catalog", (_req, res) => {
     res.json({ data: getAdminDatabaseCatalog(), database: "Neon" });

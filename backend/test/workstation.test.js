@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import { test } from "node:test";
 import express from "express";
-import { adminExtractionEnv, adminProviderConfig, describeAdminProviders, generateAdmin } from "../src/services/documents/adminProviders.js";
+import { PDFDocument } from "pdf-lib";
+import { adminExtractionEnv, adminProviderConfig, describeAdminProviders, generateAdmin, testAdminProvider } from "../src/services/documents/adminProviders.js";
 import { createWorkstation, STATION_LIMITS, validateStationRequest } from "../src/services/documents/workstation.js";
 import { createAdminWorkstationRouter } from "../src/routes/adminWorkstation.js";
 import { createAdminAiRouter } from "../src/routes/adminAi.js";
+import { createFirebaseTokenVerifier } from "../src/middleware/verifyFirebaseToken.js";
 import { generate as studentGenerate } from "../src/services/ai/providers.js";
 
 const account = "a".repeat(32);
@@ -201,4 +203,138 @@ test("scan-only Working Station uses the admin key once and surfaces a truncated
   assert.equal(done.result.truncated, true);
   assert.equal(calls, 1, "extract-only does not run another correction request");
   await assert.rejects(station.save(job.id, "admin-a", { approved: true }, () => assert.fail()), { code: "INCOMPLETE_REVIEW_REQUIRED" });
+});
+
+
+test("admin setting states explain missing/blank/reused credentials without leaking a value", () => {
+  assert.equal(describeAdminProviders({}).gemini.setting_state, "missing");
+  assert.equal(describeAdminProviders({ ADMIN_GEMINI_API_KEY: ' \"\" ' }).gemini.setting_state, "empty");
+  assert.equal(describeAdminProviders({ GEMINI_API_KEY: "student-key", ADMIN_GEMINI_API_KEY: '\u200B"Bearer student-key"\uFEFF' }).gemini.setting_state, "same_as_student");
+  assert.equal(describeAdminProviders({ ADMIN_GEMINI_API_KEY: "bad embedded whitespace" }).gemini.setting_state, "invalid_format");
+  const settings = describeAdminProviders({ ADMIN_CLOUDFLARE_ACCOUNT_ID: "https://wrong-worker.example", ADMIN_CLOUDFLARE_API_TOKEN: "bad token" });
+  assert.equal(settings.cloudflare.configured, false);
+  assert.equal(settings.cloudflare.account_state, "invalid_format");
+  assert.equal(settings.cloudflare.token_state, "invalid_format");
+  assert.doesNotMatch(JSON.stringify(settings), /wrong-worker|bad token/);
+});
+
+test("explicit admin connection probes are one small request to exactly the selected admin provider", async () => {
+  for (const provider of ["cloudflare", "gemini"]) {
+    const calls = [];
+    const result = await testAdminProvider(provider, { env, fetchImpl: async (url, init) => {
+      calls.push(url);
+      const payload = JSON.parse(init.body);
+      assert.equal(init.redirect, "error");
+      assert.equal(payload.tools, undefined);
+      assert.equal(payload.contents?.[0]?.parts?.some(p => p.inline_data), provider === "gemini" ? false : undefined);
+      assert.equal(JSON.stringify(payload).includes("Document text"), false);
+      if (provider === "gemini") {
+        assert.match(url, /generativelanguage/);
+        assert.equal(init.headers["x-goog-api-key"], env.ADMIN_GEMINI_API_KEY);
+        assert.ok(payload.generationConfig.maxOutputTokens <= 512);
+        return response(200, { candidates: [{ content: { parts: [{ text: "READY" }] } }] });
+      }
+      assert.match(url, /api.cloudflare.com/);
+      assert.equal(init.headers.Authorization, `Bearer ${env.ADMIN_CLOUDFLARE_API_TOKEN}`);
+      assert.ok(payload.max_tokens <= 32);
+      return response(200, { success: true, result: { response: "READY" } });
+    } });
+    assert.equal(calls.length, 1);
+    assert.equal(result.ok, true);
+    assert.equal(result.provider, provider);
+    assert.equal(result.check, "live_provider_request");
+    assert.equal(Object.hasOwn(result, "text"), false, "do not return upstream text in diagnostics");
+    for (const secret of [env.ADMIN_GEMINI_API_KEY, env.GEMINI_API_KEY, env.ADMIN_CLOUDFLARE_API_TOKEN, account]) assert.equal(JSON.stringify(result).includes(secret), false);
+  }
+  let requests = 0;
+  await assert.rejects(testAdminProvider("cloudflare", { env, fetchImpl: async url => { requests++; assert.match(url, /cloudflare/); return response(401, {}); } }), { code: "ADMIN_PROVIDER_AUTH" });
+  assert.equal(requests, 1, "a failed selected-provider probe must not fall back to the other key");
+  await assert.rejects(testAdminProvider("auto", { env, fetchImpl: () => assert.fail() }), { code: "VALIDATION_ERROR" });
+  await assert.rejects(testAdminProvider("gemini", { env: { GEMINI_API_KEY: "student-only" }, fetchImpl: () => assert.fail() }), { code: "ADMIN_AI_NOT_CONFIGURED" });
+});
+
+test("admin provider probes require Google/admin verification, have their own small limit and never access Neon", async t => {
+  let requests = 0;
+  const call = await serve(t, ({ verifyToken }) => createAdminWorkstationRouter({ verifyToken, env, configured: () => false,
+    poolProvider: () => assert.fail("diagnostic must not query or mutate Neon"),
+    fetchImpl: async () => { requests++; return response(200, { success: true, result: { response: "READY" } }); } }));
+  for (const [token, status] of [[null, 401], ["student", 403]]) assert.equal((await call("/providers/test", { provider: "cloudflare" }, token)).status, status);
+  assert.equal(requests, 0);
+  assert.equal((await call("/status")).status, 200);
+  assert.equal(requests, 0, "status must never spend provider quota");
+  for (let n = 0; n < 6; n++) assert.equal((await call("/providers/test", { provider: "cloudflare" })).status, 200);
+  const limited = await call("/providers/test", { provider: "cloudflare" });
+  assert.equal(limited.status, 429);
+  assert.equal((await limited.json()).code, "ADMIN_TEST_RATE_LIMIT");
+  assert.ok(Number(limited.headers.get("Retry-After")) > 0);
+  assert.equal(requests, 6);
+  assert.equal((await call("/providers/test", { provider: "cloudflare", key: "do-not-accept-keys" }, "admin-b")).status, 400);
+  assert.equal(requests, 6);
+  assert.equal((await call("/providers/test", { provider: "cloudflare" }, "admin-b")).status, 200, "test budgets are per verified administrator");
+});
+
+test("Gemini auth, model, quota and outage replies remain distinct and redact all upstream detail", async () => {
+  for (const [status, code, http] of [[401, "ADMIN_PROVIDER_AUTH", 503], [403, "ADMIN_PROVIDER_AUTH", 503], [404, "ADMIN_MODEL_UNAVAILABLE", 503],
+    [429, "ADMIN_PROVIDER_QUOTA", 429], [402, "ADMIN_PROVIDER_QUOTA", 429], [503, "ADMIN_PROVIDER_UNAVAILABLE", 502]]) {
+    await assert.rejects(testAdminProvider("gemini", { env, fetchImpl: async () => response(status, { error: { message: `private upstream ${env.ADMIN_GEMINI_API_KEY} ${env.GEMINI_API_KEY}` } }) }), error => {
+      assert.equal(error.code, code); assert.equal(error.status, http);
+      assert.doesNotMatch(error.message, /private upstream|private-admin|private-STUDENT/);
+      return true;
+    });
+  }
+});
+
+test("photo and fully scanned PDF jobs preserve classified admin-provider errors instead of generic OCR failures", async () => {
+  const pdf = await PDFDocument.create(); pdf.addPage();
+  const attachments = [
+    { name: "photo.jpg", mimeType: "image/jpeg", data: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]).toString("base64") },
+    { name: "scan.pdf", mimeType: "application/pdf", data: Buffer.from(await pdf.save()).toString("base64") }
+  ];
+  for (const attachment of attachments) {
+    let requests = 0;
+    const station = createWorkstation({ env, fetchImpl: async (_url, init) => {
+      requests++; assert.equal(init.headers["x-goog-api-key"], env.ADMIN_GEMINI_API_KEY);
+      return response(429, { error: { message: "quota" } });
+    } });
+    const job = station.start("admin-a", { attachment, operation: "extract" }); await station.idle();
+    const failed = station.get(job.id, "admin-a");
+    assert.equal(failed.status, "failed");
+    assert.equal(failed.error.code, "ADMIN_PROVIDER_QUOTA");
+    assert.match(failed.error.message, /admin Google project's limits/);
+    assert.equal(requests, 1);
+  }
+});
+
+test("an explicit Cloudflare probe bounds a stalled response body even when transport ignores AbortSignal", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1000 });
+  let signal;
+  const never = new Promise(() => {});
+  const pending = testAdminProvider("cloudflare", { env: { ...env, ADMIN_AI_TIMEOUT_MS: 240000 }, fetchImpl: async (_url, init) => {
+    signal = init.signal; return { ok: true, json: () => never };
+  } });
+  const checked = assert.rejects(pending, { code: "ADMIN_PROVIDER_TIMEOUT", status: 504 });
+  await Promise.resolve();
+  t.mock.timers.tick(20000);
+  await checked;
+  assert.equal(signal.aborted, true);
+});
+
+
+test("provider tests use the real revoked-token/Google verifier before accepting an admin UID", async t => {
+  let providerCalls = 0;
+  const checked = [];
+  const verifyToken = createFirebaseTokenVerifier(() => ({ async verifyIdToken(token, revoked) {
+    checked.push({ token, revoked });
+    return { uid: "verified-admin", admin: true, firebase: { sign_in_provider: token === "password-session" ? "password" : "google.com" } };
+  } }));
+  const call = await serve(t, () => createAdminWorkstationRouter({ env, verifyToken, configured: () => false,
+    poolProvider: () => assert.fail("provider tests do not need Neon"),
+    fetchImpl: async () => { providerCalls++; return response(200, { success: true, result: { response: "READY" } }); } }));
+  const denied = await call("/providers/test", { provider: "cloudflare" }, "Bearer password-session");
+  assert.equal(denied.status, 403);
+  assert.equal((await denied.json()).code, "GOOGLE_SIGN_IN_REQUIRED");
+  assert.equal(providerCalls, 0);
+  assert.equal((await call("/providers/test", { provider: "cloudflare" }, "Bearer google-session")).status, 200);
+  assert.equal(providerCalls, 1);
+  assert.deepEqual(checked, [{ token: "password-session", revoked: true }, { token: "google-session", revoked: true }]);
 });

@@ -37,18 +37,51 @@ Set these in the environment of the **API service that serves this website**, no
 1. In Google AI Studio, select/create the intended **separate admin project** and create its API key.
 2. Set `ADMIN_GEMINI_API_KEY` privately in the running API service. Leave the old student `GEMINI_API_KEY` in place.
 3. Choose an available model with `ADMIN_GEMINI_MODEL` if the default alias is not available to that project. Review provider billing, quotas, document handling and regional availability.
-4. Deploy and process a disposable small scan. The provider status is only a presence check, not proof that a key/model works live.
+4. Deploy the updated API and frontend. Open **Connections & setup → Test Admin Gemini** for one small text acceptance check, then process a disposable small scan. Status is only a presence check; even a successful text probe does not prove OCR or a large document fits the project's limits.
 
 ### Cloudflare Workers AI
 
 This implementation uses the **Cloudflare Workers AI REST API**, not an arbitrary custom Worker endpoint. No custom Worker deployment or browser-visible Cloudflare token is required.
 
-1. In the Cloudflare dashboard, open the intended account and copy its **Account ID**.
-2. Create an API token restricted to the intended account with the **Workers AI** permission needed to run/read inference (the Workers AI REST setup's token template). Do not use or share a global API key.
+1. In the Cloudflare dashboard, select the intended account and open **Workers AI → Use REST API**. Follow the [official REST setup](https://developers.cloudflare.com/workers-ai/get-started/rest-api/).
+2. Use **Create a Workers AI API Token**, keep it private, and copy the **Account ID**. If creating a custom scoped token instead, the documented permissions are **Workers AI — Read AND Edit** for the intended account. Do not use or share a global API key.
 3. Set `ADMIN_CLOUDFLARE_ACCOUNT_ID` and `ADMIN_CLOUDFLARE_API_TOKEN` in the API service. Optionally select an available text model with `ADMIN_CLOUDFLARE_MODEL`.
-4. Deploy and process a disposable digital PDF/TXT with **Cloudflare Workers AI** selected. The server calls only `https://api.cloudflare.com/client/v4/accounts/<id>/ai/run/<model>`; upstream redirects are refused and credentials are sent in a header, not the URL.
+4. Deploy the updated API and frontend, open **Connections & setup → Test Cloudflare**, then process a disposable digital PDF/TXT with **Cloudflare Workers AI** selected. The server calls only `https://api.cloudflare.com/client/v4/accounts/<id>/ai/run/<model>`; upstream redirects are refused and credentials are sent in a header, not the URL.
 
 Cloudflare processes **extracted text**, not raw PDF bytes in this adapter. A scan/photo first needs admin Gemini or the optional OCR.space fallback. The UI explains this extra OCR step and shows the extraction method and writing provider. The existing **AI studio & prompts** provider test remains an explicit diagnostic of the *student* service; it is not the admin document provider and only makes calls when requested.
+
+## Connection tests and upload recovery
+
+**Deploy both the API and the frontend** to use the repair. A configured label does not prove credentials, model availability or quota. Public `/api/health` and the retained **AI studio & prompts** test describe the student service; they are not the admin inference test.
+
+Inside the station, expand **Connections & setup**:
+
+- **Refresh status** checks admin setting presence and Neon library-table readiness. It never calls an AI provider. Canonical setting states explain missing/blank values, invalid formatting and an identical refused student/admin key, without returning any credential, account ID, hash or key fragment.
+- **Test Admin Gemini** / **Test Cloudflare** sends **one small text request only to that selected admin provider**. It does not fall back to another provider, use the student key, upload a document, or access Neon. It may use provider quota/billing. The server enforces six test requests per verified administrator per 15 minutes and a 5–20 second deadline (at most 20 seconds, using a shorter configured admin deadline where valid).
+- The protected endpoint is `POST /api/v1/admin/workstation/providers/test` with only `{"provider":"gemini"}` or `{"provider":"cloudflare"}`. Unknown fields and client-supplied keys are rejected. Google sign-in, revoked-token checks and the administrator claim are required before the test or its UID allowance.
+- Success confirms a small text response, **not** scan/image support, complete transcription, remaining quota for a large PDF, or Neon write permission. Provider errors distinguish `ADMIN_PROVIDER_AUTH`, `ADMIN_MODEL_UNAVAILABLE`, `ADMIN_PROVIDER_QUOTA`, `ADMIN_PROVIDER_TIMEOUT` and availability failures; upstream error details/credentials are not returned.
+
+### When progress shows 429 or 503
+
+- **Do not upload another copy of a Classic file already marked Reading.** A failed list/status request does not establish that processing stopped. API throttles now include a JSON error code, `Retry-After` and `retry_after_seconds`; a bare 429 is not evidence of Gemini quota.
+- Station checks reuse the **same job ID**. Classic refreshes the **existing upload list**. Transient network failures and HTTP **429/502/503/504** get at most five scheduled recovery checks with 2/5/10/20/30 second backoff, never earlier than `Retry-After`. Holds longer than 15 minutes pause for manual follow-up rather than being shortened.
+- Hidden document tabs/admin panels stop recurring checks. Returning resumes the existing read after any remaining wait; it does not reset an exhausted retry budget. After exhaustion, choose **Check progress** (station) or **Refresh** (Classic). Only a successful status response or an explicit manual check resets that recovery budget.
+- Job creation, raw uploads, provider tests, retries that launch AI, approvals and saves are **never automatically replayed** by this recovery. An uncertain station save retains the exact frozen approval for a manual idempotent retry. A lost RAM job returns `DRAFT_NOT_FOUND` with restart/expiry guidance; it is not silently recreated. Source/previous draft text still in the page is retained.
+- A job returned as `failed` is terminal, not a status-transport error. Admin provider errors also survive scan OCR so a provider quota/auth/model failure is distinguishable from an API ingress failure. Review the code/message before deliberately retrying that document.
+- Persistent **503** still requires the API service's Render events/runtime logs. An ingress outage, instance restart/sleep, Firebase Admin availability or resource problem cannot be repaired by adding an AI key. A redeploy/restart discards station RAM drafts; Classic originals remain in Neon and interrupted imports can be retried explicitly after their status is checked. Use one API instance for the current in-memory station; it is not a durable, distributed job system.
+
+### Separate API allowances
+
+All protected admin routers share one verified-UID read/write limiter **after** Firebase verification and `requireAdmin`. The existing bootstrap-claim exception first checks the verified Google email against server `ADMIN_EMAILS`; request-body/header identity assertions never qualify. Student AI/presence keep their existing IP allowance and cannot spend an admin UID's allowance.
+
+| Allowance | Default per 15 minutes |
+| --- | --- |
+| Admin GET/HEAD reads, shared across admin routes | 3,600 per verified UID |
+| Admin changes (including document creation/approval), separate from reads | 300 per verified UID |
+| Explicit admin-provider tests (also count as changes) | 6 per verified UID |
+| Pre-auth denied/unknown admin requests | 300 per connection IP |
+
+Ordinary authorized polling and UID-throttled replies do not spend the failed-auth IP budget. The IP guard remains in front of authentication to protect token verification from anonymous/forged traffic; it is not bypassed merely by supplying an Authorization header. These process-local API limits do not change provider quotas, database budgets, student Premium or Google/admin authorization.
 
 ## Neon and version compatibility
 
@@ -69,4 +102,4 @@ The TXT appears in Recent uploads with method **Reviewed in Counsel Working Stat
 
 ## Local verification and live boundary
 
-Backend tests use stubbed provider HTTP responses and local PGlite SQL. Browser tests use synthetic accounts and stubbed API boundaries with external requests blocked. They exercise credential isolation, source validation, ownership, cancellation/expiry, incomplete-result approval, atomic saves/rollback/budget/idempotency, preserved versions, mobile layout, TXT downloads, follow-ups and account-change races. They do **not** validate live Cloudflare/Gemini credentials, real Neon permissions or a production deployment. Configure/review those privately and test disposable documents first.
+Backend tests use stubbed provider HTTP responses and local PGlite SQL. Browser tests use synthetic accounts and stubbed API boundaries with external requests blocked. They exercise credential isolation, explicit provider probes and deadlines, verified-UID/read-write budgets, JSON throttles, same-job/list 429/503 recovery and retry exhaustion, no mutation replay, source validation, ownership, cancellation/expiry, incomplete-result approval, atomic saves/rollback/budget/idempotency, preserved versions, mobile layout, TXT downloads, follow-ups and account-change races. Backoff tests advance a fake clock at exact production deadlines; they do not sleep or rerun whole tests. They do **not** validate live Cloudflare/Gemini credentials, real Neon permissions or a production deployment. Configure/review those privately and test disposable documents first.

@@ -14,6 +14,7 @@ import express from "express";
 import { getPool } from "../config/database.js";
 import { verifyFirebaseToken } from "../middleware/verifyFirebaseToken.js";
 import { requireAdmin } from "../middleware/requireAdmin.js";
+import { createAdminRequestGate } from "../middleware/adminRateLimit.js";
 import { FieldValue } from "firebase-admin/firestore";
 import { getFirebaseFirestore } from "../config/firebaseAdmin.js";
 import { validateSiteContent as validatePublicSiteContent } from "../../../firebase/content-schema.mjs";
@@ -115,13 +116,14 @@ export function createAdminSiteRouter({
   poolProvider = getPool,
   verifyToken = verifyFirebaseToken,
   adminGate = requireAdmin,
+  requestGate = createAdminRequestGate(),
   configured = () => Boolean(process.env.DATABASE_URL),
   onPublish = () => {},
   firestoreProvider = getFirebaseFirestore,
   firestoreTimestamp = () => FieldValue.serverTimestamp()
 } = {}) {
   const router = express.Router();
-  router.use(verifyToken, adminGate);
+  router.use(verifyToken, adminGate, requestGate);
 
   // Full 12-slide/8-link validation exceeds Firestore's 1000-expression rule
   // budget. Validate the complete shared schema here, behind verified Google

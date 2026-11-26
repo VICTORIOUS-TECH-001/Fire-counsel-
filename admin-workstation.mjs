@@ -1,5 +1,7 @@
 // Counsel Working Station: an approval-first document desk alongside the
 // classic uploader. No keys, files, instructions or drafts are cached locally.
+import { adminResponse, statusRetryDelay } from "./admin-network.mjs";
+
 const $ = selector => document.querySelector(selector);
 let authClient;
 let verified = false;
@@ -15,16 +17,19 @@ let timer;
 let config;
 let saved = false;
 let approvalSnapshot = null;
+let pollPending = null;
+let pollNotBefore = 0;
+let pollFailures = 0;
+let pollExhausted = false;
+let activeInstructions = "";
+let testingProvider = false;
 const busy = () => ["starting", "polling", "saving"].includes(phase);
 const setText = (selector, text, kind = "") => { const node = $(selector); node.textContent = text; node.dataset.kind = kind; };
 
 async function api(path, options = {}) {
-  const response = await authClient.apiRequest(path, options);
-  let body = {};
-  try { body = await response.json(); } catch { /* do not treat an empty reply as success */ }
-  if (!response.ok) throw Object.assign(new Error(body.error || `The server could not confirm this operation (HTTP ${response.status}).`), { code: body.code, status: response.status });
-  if (response.status !== 204 && !body.data) throw new Error("The server reply was incomplete. Check the operation's status before trying a new request.");
-  return body.data;
+  const read = !options.method || ["GET", "HEAD"].includes(options.method);
+  const request = read && !options.signal && globalThis.AbortSignal?.timeout ? { ...options, signal: AbortSignal.timeout(30_000) } : options;
+  return (await adminResponse(await authClient.apiRequest(path, request))).data;
 }
 
 function mode(value) {
@@ -36,6 +41,7 @@ function mode(value) {
     button.setAttribute("aria-selected", String(selected));
     button.tabIndex = selected ? 0 : -1;
   }
+  document.dispatchEvent(new CustomEvent("fire-counsel:upload-mode", { detail: { mode: classic ? "classic" : "station" } }));
 }
 for (const button of document.querySelectorAll("[data-upload-mode]")) {
   button.addEventListener("click", () => mode(button.dataset.uploadMode));
@@ -57,26 +63,31 @@ function fields() {
 }
 
 function controls() {
-  const locked = !verified || busy() || Boolean(approvalSnapshot);
+  const pending = busy() || Boolean(activeId);
+  const locked = !verified || pending || Boolean(approvalSnapshot);
   for (const id of ["station-input", "station-file-input", "station-attach", "station-tool", "station-provider", "station-paste", "station-remove-file"]) document.getElementById(id).disabled = locked;
   for (const button of document.querySelectorAll("[data-station-tool]")) button.disabled = locked;
   $("#station-new").disabled = !verified || phase === "saving" || Boolean(approvalSnapshot);
   $("#station-submit").disabled = !verified || busy() || Boolean(approvalSnapshot);
   $("#station-submit").firstElementChild.textContent = activeId && phase === "paused" ? "Check progress" : readyId ? "Refine again" : "Process";
   $("#station-progress").hidden = !busy();
-  $("#station-output").disabled = !verified || !result || busy() || saved || Boolean(approvalSnapshot);
+  $("#station-output").disabled = !verified || !result || pending || saved || Boolean(approvalSnapshot);
   $("#station-download").disabled = !verified || !result || !$("#station-output").value.trim();
-  for (const element of $("#station-save-form").elements) element.disabled = !verified || !result || busy() || saved || Boolean(approvalSnapshot);
+  for (const element of $("#station-save-form").elements) element.disabled = !verified || !result || pending || saved || Boolean(approvalSnapshot);
   const acknowledged = !result?.truncated || $("#station-incomplete").checked;
-  $("#station-save").disabled = !verified || !result || busy() || saved || config?.database !== "ready"
+  $("#station-save").disabled = !verified || !result || pending || saved || config?.database !== "ready"
     || (!approvalSnapshot && (!$("#station-approval").checked || !acknowledged || !$("#station-output").value.trim()));
   $("#station-save").textContent = phase === "saving" ? "Confirming the save…" : approvalSnapshot ? "Retry the same save" : saved ? "Saved to Neon ✓" : "Approve & save to Neon ↗";
+  $("#station-refresh-connections").disabled = !verified || testingProvider;
+  for (const button of document.querySelectorAll("[data-station-test]")) button.disabled = !verified || testingProvider || busy() || !config?.providers?.[button.dataset.stationTest]?.configured;
   fields();
 }
 
 function reset() {
   clearTimeout(timer);
   revision++;
+  pollPending = null; pollNotBefore = 0; pollFailures = 0; pollExhausted = false; activeInstructions = ""; testingProvider = false;
+  setText("#station-test-status", "Provider tests run only when you press a test button; they use the selected admin service quota.");
   selectedFile = null; activeId = null; readyId = null; result = null; saved = false; approvalSnapshot = null;
   docName = "Reviewed document.txt"; phase = "idle";
   for (const id of ["station-file-input", "station-input", "station-paste", "station-output", "station-title"]) document.getElementById(id).value = "";
@@ -118,7 +129,15 @@ async function loadConnections(mySession) {
     if (mySession !== session || !verified) return;
     config = data;
     const p = config.providers;
-    const label = name => p[name]?.configured ? "ready (not a live key test)" : "not configured";
+    const label = name => {
+      if (p[name]?.configured) return "ready (not a live key test)";
+      if (name === "gemini") {
+        const state = p.gemini?.setting_state;
+        return state === "same_as_student" ? "not configured — identical student key refused; set a different ADMIN_GEMINI_API_KEY"
+          : state ? `not configured — ADMIN_GEMINI_API_KEY: ${state.replaceAll("_", " ")}` : "not configured";
+      }
+      return p.cloudflare?.account_state ? `not configured — account: ${p.cloudflare.account_state.replaceAll("_", " ")}; token: ${p.cloudflare.token_state.replaceAll("_", " ")}` : "not configured";
+    };
     setText("#station-providers", `Cloudflare Workers AI: ${label("cloudflare")}. Admin Gemini: ${label("gemini")}. Scan OCR: ${p.ocr || "not configured"}. Student Gemini is isolated from this desk.`);
     setText("#station-neon", config.database === "ready" ? "Neon library tables are ready. Saving still requires your explicit approval." : `Neon: ${config.database.replaceAll("_", " ")}. You can process and download drafts; database saving stays locked.`);
     setText("#station-connection-summary", `${p.configured ? "Admin AI configured" : "Extract digital text without AI"} · Neon ${config.database === "ready" ? "ready" : "not ready"}`);
@@ -143,7 +162,7 @@ async function loadOptions(resource, id, label, mySession) {
 
 function acceptJob(job) {
   const previousId = readyId;
-  readyId = job.id; activeId = null; result = job.result; saved = false; approvalSnapshot = null; phase = "idle";
+  readyId = job.id; activeId = null; activeInstructions = ""; pollNotBefore = 0; pollFailures = 0; pollExhausted = false; result = job.result; saved = false; approvalSnapshot = null; phase = "idle";
   docName = job.name;
   selectedFile = null; $("#station-file-input").value = ""; $("#station-paste").value = "";
   $("#station-file").hidden = true;
@@ -166,28 +185,75 @@ function acceptJob(job) {
   if (previousId && previousId !== readyId) api(`/api/v1/admin/workstation/jobs/${encodeURIComponent(previousId)}`, { method: "DELETE" }).catch(() => {});
 }
 
+function canPoll() {
+  return verified && !document.hidden && !$("#station-panel").hidden && !$("#panel-uploads").hidden;
+}
+function schedulePoll(id, mySession, myRevision, delay) {
+  clearTimeout(timer);
+  timer = setTimeout(() => poll(id, mySession, myRevision), delay);
+}
 async function poll(id, mySession, myRevision) {
-  if (!verified || mySession !== session || myRevision !== revision) return;
+  if (!verified || mySession !== session || myRevision !== revision || activeId !== id) return;
+  if (!canPoll()) { phase = "paused"; controls(); return; }
+  if (pollPending?.id === id && pollPending.session === mySession && pollPending.revision === myRevision) return;
+  if (Date.now() < pollNotBefore) {
+    const left = pollNotBefore - Date.now();
+    if (left > 15 * 60_000) {
+      phase = "paused";
+      setText("#station-status", "The server requested a longer wait. Check progress after its Retry-After period; nothing will be re-uploaded or saved automatically.", "error");
+      controls();
+    } else schedulePoll(id, mySession, myRevision, left);
+    return;
+  }
+  const token = { id, session: mySession, revision: myRevision };
+  pollPending = token;
   try {
     const job = await api(`/api/v1/admin/workstation/jobs/${encodeURIComponent(id)}`);
     if (!verified || mySession !== session || myRevision !== revision) return;
+    pollNotBefore = 0; pollFailures = 0;
     if (job.status === "ready") { acceptJob(job); return; }
     if (job.status === "failed") {
       activeId = null; phase = "idle";
+      $("#station-input").value ||= activeInstructions;
       setText("#station-status", `${job.error?.message || "Processing failed."} Any earlier draft below is unchanged.`, "error");
       message("assistant", job.error?.message || "Processing stopped. Nothing was saved.");
       controls(); return;
     }
     phase = "polling";
-    setText("#station-status", `${job.progress} You may use another admin tab while it works.`);
-    timer = setTimeout(() => poll(id, mySession, myRevision), 1200);
+    setText("#station-status", `${job.progress} The server continues processing if you change tabs; status checks resume when you return.`);
+    schedulePoll(id, mySession, myRevision, 2500);
   } catch (error) {
     if (!verified || mySession !== session || myRevision !== revision) return;
-    phase = "paused";
-    setText("#station-status", `${error.message} Use Check progress to resume the same job; do not submit the file again.`, "error");
+    if (error.status === 404 && error.code === "DRAFT_NOT_FOUND") {
+      activeId = null; phase = "idle";
+      $("#station-input").value ||= activeInstructions;
+      setText("#station-status", "The server no longer has this temporary job (it may have restarted or the draft expired). Your source/previous draft is still here. Nothing was automatically re-uploaded or saved; Process starts a new job only when you choose it.", "error");
+    } else {
+      const delay = statusRetryDelay(error, ++pollFailures);
+      pollNotBefore = Date.now() + (error.retryAfterMs || 0);
+      if (delay !== null) {
+        phase = "polling";
+        pollNotBefore = Date.now() + delay;
+        setText("#station-status", `${error.message} Checking the same job again in ${Math.ceil(delay / 1000)} seconds (${pollFailures}/5). No file is being re-uploaded and no new AI job is started.`, "error");
+        schedulePoll(id, mySession, myRevision, delay);
+      } else {
+        phase = "paused"; pollExhausted = true;
+        setText("#station-status", `${error.message} Automatic status checks are paused. Use Check progress to resume the same job; do not submit the file again.`, "error");
+      }
+    }
+  } finally {
+    if (pollPending === token) pollPending = null;
   }
   controls();
 }
+function resumePolling() {
+  clearTimeout(timer);
+  if (!activeId || !verified || ["starting", "saving"].includes(phase)) return;
+  if (!canPoll() || pollExhausted) { phase = "paused"; controls(); return; }
+  phase = "polling"; controls();
+  poll(activeId, session, revision);
+}
+for (const name of ["visibilitychange", "fire-counsel:admin-panel", "fire-counsel:upload-mode"]) document.addEventListener(name, resumePolling);
 
 function readFile(file) {
   return new Promise((resolve, reject) => {
@@ -200,7 +266,7 @@ function readFile(file) {
 $("#station-form").addEventListener("submit", async event => {
   event.preventDefault();
   if (!verified || busy() || approvalSnapshot) return;
-  if (activeId) { phase = "polling"; controls(); poll(activeId, session, revision); return; }
+  if (activeId) { pollFailures = 0; pollExhausted = false; phase = "polling"; controls(); poll(activeId, session, revision); return; }
   const mySession = session; const myRevision = ++revision;
   const file = selectedFile;
   const pasted = $("#station-paste").value.trim();
@@ -221,7 +287,7 @@ $("#station-form").addEventListener("submit", async event => {
     if (!verified || mySession !== session || myRevision !== revision) return;
     const job = await api("/api/v1/admin/workstation/jobs", { method: "POST", body: JSON.stringify(payload) });
     if (!verified || mySession !== session || myRevision !== revision) return;
-    activeId = job.id; phase = "polling";
+    activeId = job.id; activeInstructions = instructions; pollNotBefore = 0; pollFailures = 0; pollExhausted = false; phase = "polling";
     message("user", `${file ? file.name : "Current document text"}\n${instructions || ({ correct: "Clean up OCR errors and spacing; preserve all substantive content.", extract: "Extract faithfully, without correction or summarising.", format: "Improve headings, paragraphs and lists without shortening." })[operation]}`);
     $("#station-input").value = "";
     controls(); poll(job.id, mySession, myRevision);
@@ -265,7 +331,7 @@ for (const id of ["station-purpose", "station-course", "station-material", "stat
 for (const id of ["station-approval", "station-incomplete"]) document.getElementById(id).addEventListener("change", controls);
 $("#station-save-form").addEventListener("submit", async event => {
   event.preventDefault();
-  if (!verified || !readyId || !result || busy() || saved) return;
+  if (!verified || !readyId || !result || busy() || activeId || saved) return;
   if (!approvalSnapshot && (!$("#station-approval").checked || (result.truncated && !$("#station-incomplete").checked))) return;
   const mySession = session; const myRevision = revision;
   const purpose = $("#station-purpose").value;
@@ -299,6 +365,23 @@ $("#station-download").addEventListener("click", () => {
   link.download = `${($("#station-title").value || docName.replace(/\.[^.]+$/, "")).replace(/[\\/:*?"<>|]/g, "_").slice(0, 180)}.txt`;
   document.body.append(link); link.click(); link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+$("#station-refresh-connections").addEventListener("click", () => { if (verified) loadConnections(session); });
+for (const button of document.querySelectorAll("[data-station-test]")) button.addEventListener("click", async () => {
+  if (!verified || testingProvider || busy()) return;
+  const mySession = session;
+  testingProvider = true; controls();
+  setText("#station-test-status", `Testing ${button.dataset.stationTest === "gemini" ? "Admin Gemini" : "Cloudflare Workers AI"} with one small admin-only text request…`);
+  try {
+    const data = await api("/api/v1/admin/workstation/providers/test", { method: "POST", body: JSON.stringify({ provider: button.dataset.stationTest }) });
+    if (!verified || mySession !== session) return;
+    if (data?.ok !== true) throw new Error("The provider test was not confirmed.");
+    setText("#station-test-status", `${data.provider === "gemini" ? "Admin Gemini" : "Cloudflare Workers AI"} accepted the test · ${data.model}. This does not publish documents or prove a photo/large PDF will fit the provider's limits.`, "ok");
+  } catch (error) {
+    if (!verified || mySession !== session) return;
+    setText("#station-test-status", `${error.message}${error.code ? ` (${error.code})` : ""} No document was saved and the student key was not used.`, "error");
+  } finally { if (mySession === session) { testingProvider = false; controls(); } }
 });
 
 function adminState(state) {

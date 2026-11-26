@@ -7,6 +7,7 @@ import express from "express";
 import { getPool } from "../config/database.js";
 import { verifyFirebaseToken } from "../middleware/verifyFirebaseToken.js";
 import { requireAdmin } from "../middleware/requireAdmin.js";
+import { createAdminRequestGate } from "../middleware/adminRateLimit.js";
 import { describeAdminProviders } from "../services/documents/adminProviders.js";
 import { sniffType } from "../services/documents/extract.js";
 import { createDocumentImporter } from "../services/documents/importer.js";
@@ -41,6 +42,7 @@ export function createAdminDocumentsRouter({
   poolProvider = getPool,
   verifyToken = verifyFirebaseToken,
   adminGate = requireAdmin,
+  requestGate = createAdminRequestGate(),
   configured = () => Boolean(process.env.DATABASE_URL),
   env = process.env,
   importer = null
@@ -51,7 +53,7 @@ export function createAdminDocumentsRouter({
   const budgetBytes = Math.max(Number(env.FILE_STORAGE_LIMIT_MB) || 350, 1) * 1024 * 1024;
   let staleChecked = 0;
 
-  router.use(verifyToken, adminGate);
+  router.use(verifyToken, adminGate, requestGate);
   router.use((_req, res, next) => (configured() ? next() : fail(res, 503, "Neon is not configured on this server.", "DATABASE_NOT_CONFIGURED")));
 
   async function usedBytes(db) {
