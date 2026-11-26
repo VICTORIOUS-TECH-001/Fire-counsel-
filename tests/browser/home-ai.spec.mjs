@@ -35,22 +35,22 @@ async function setOrbitTime(page, time) {
   }, time);
 }
 
-async function sampleFullOrbit(page) {
-  // Sample every 5 seconds of the actual CSS animation in one evaluation.
+async function sampleFullOrbit(page, step = 5000) {
+  // Sample the actual CSS animation in one evaluation (a full 80s rotation).
   // Explicit timeline positions avoid native-clock waits and repeated renderer
-  // round trips without changing CSS, substituting geometry or skipping phases.
-  return page.locator("#home-ai-scene").evaluate(scene => {
+  // round trips without changing CSS or substituting geometry.
+  return page.locator("#home-ai-scene").evaluate((scene, step) => {
     const animations = scene.getAnimations({ subtree: true })
       .filter(animation => ["homeAIOrbit", "homeAIUpright"].includes(animation.animationName));
     animations.forEach(animation => animation.pause());
     const samples = [];
-    for (let time = 0; time < 80_000; time += 5000) {
+    for (let time = 0; time < 80_000; time += step) {
       animations.forEach(animation => { animation.currentTime = time; });
-      const elements = [...scene.querySelectorAll(".home-ai-chip"), scene.querySelector("#home-ai-pause")].filter(element => element && !element.hidden);
+      const elements = [...scene.querySelectorAll(".home-ai-chip")];
       samples.push({ time, pills: elements.map(element => ({ text: element.textContent, ...element.getBoundingClientRect().toJSON() })) });
     }
     return samples;
-  });
+  }, step);
 }
 
 function expectPillsFit(pills, width) {
@@ -83,7 +83,7 @@ test("AI section uses the exact owner copy, reference labels and gated AI links 
   await expect(page.locator("#home-ai-intro")).toHaveText(copy.intro);
   await expect(page.locator("#home-ai-closing")).toHaveText(copy.closing);
   await expect(page.locator(".home-ai-chip")).toHaveText(copy.chips);
-  await expect(page.locator("#home-ai [data-ai-entry]")).toHaveCount(7);
+  await expect(page.locator("#home-ai [data-ai-entry]")).toHaveCount(8);
   for (const link of await page.locator("#home-ai [data-ai-entry]").all()) await expect(link).toHaveAttribute("href", "./ai.html");
   await expect(page.locator("#learning + #home-ai + #cases")).toHaveCount(1);
   await expect(page.locator("#home h1")).toHaveText("Fire Counsel");
@@ -93,12 +93,12 @@ test("AI section uses the exact owner copy, reference labels and gated AI links 
   await expect(page.locator("#brand-image")).toHaveAttribute("src", bundled.brand.markImage);
   await expect(page.locator("#case-image")).toHaveAttribute("src", bundled.caseNotes.image);
   await expect(page.locator("#home-ai-scene")).toHaveAttribute("data-motion", "reduced");
-  await expect(page.locator("#home-ai-pause")).toBeHidden();
+  await expect(page.locator("#home-ai-pause")).toHaveCount(0);
   expect(authReads).toEqual([], "public browsing does not load account code");
   expect(mutations).toEqual([]);
 });
 
-test("real matrix, burning flame, growing rotating light and upright 80-second orbits animate and can be paused", async ({ page }) => {
+test("real matrix, burning flame, growing rotating light and upright 80-second orbits animate and respect automatic motion safeguards", async ({ page }) => {
   await home(page);
   // Settle page loading under reduced motion, then exercise the real live
   // preference switch and frame loop. Warming the unrelated hero for 1.8s
@@ -152,16 +152,15 @@ test("real matrix, burning flame, growing rotating light and upright 80-second o
     expect(rotation.a).toBeCloseTo(1, 5); expect(rotation.d).toBeCloseTo(1, 5);
     expect(rotation.b).toBeCloseTo(0, 5); expect(rotation.c).toBeCloseTo(0, 5);
   }
-  await page.locator("#home-ai-pause").click();
+  await expect(page.locator("#home-ai button")).toHaveCount(0);
+  // Leave below the section so this test exercises the orb's offscreen stop
+  // without also warming the unrelated hero canvas on a virtual frame clock.
+  await page.locator("#resources").evaluate(section => section.scrollIntoView({ block: "start", behavior: "instant" }));
   await expect(scene).toHaveAttribute("data-motion", "paused");
   const paused = await matrix.evaluate(canvas => canvas.toDataURL());
   await page.clock.runFor(600);
   expect(await matrix.evaluate(canvas => canvas.toDataURL())).toBe(paused);
   await expect(page.locator(".home-ai-ring")).toHaveCSS("animation-play-state", "paused");
-  await page.getByRole("button", { name: "Resume animation", exact: true }).click();
-  await expect(scene).toHaveAttribute("data-motion", "running");
-  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
-  await expect(scene).toHaveAttribute("data-motion", "paused");
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(scene).toHaveAttribute("data-motion", "reduced");
   await expect(page.locator(".home-ai-flame")).toHaveCSS("animation-name", "none");
@@ -172,6 +171,21 @@ test("AI copy and all orbit positions fit 320, 390, 768 and 1440 pixels with no 
   await page.emulateMedia({ reducedMotion: "no-preference" });
   for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
+    const seam = await page.evaluate(() => {
+      const learning = document.getElementById("learning"), ai = document.getElementById("home-ai");
+      const before = getComputedStyle(learning), after = getComputedStyle(ai);
+      return {
+        gap: ai.getBoundingClientRect().top - learning.getBoundingClientRect().bottom,
+        leftRadius: before.borderBottomLeftRadius, rightRadius: before.borderBottomRightRadius,
+        before: before.backgroundColor, after: after.backgroundColor,
+        copyGap: document.getElementById("home-ai-title").getBoundingClientRect().top - document.querySelector(".learning-split").getBoundingClientRect().bottom
+      };
+    });
+    expect(Math.abs(seam.gap)).toBeLessThanOrEqual(.5);
+    expect(seam.leftRadius).toBe("0px"); expect(seam.rightRadius).toBe("0px");
+    expect(seam.before).toBe("rgb(10, 8, 32)"); expect(seam.after).toBe(seam.before);
+    expect(seam.copyGap).toBeGreaterThanOrEqual(40); expect(seam.copyGap).toBeLessThanOrEqual(90);
+    await expect(page.locator("#home-ai button")).toHaveCount(0);
     await viewScene(page);
     await expect(page.locator("#home-ai-scene")).toHaveAttribute("data-motion", "running");
     for (const { pills } of await sampleFullOrbit(page)) expectPillsFit(pills, width);
@@ -324,6 +338,17 @@ test("keyboard focus freezes the orbit, shows its focus ring and activates Googl
   await expect(page).toHaveURL(/\/auth\.html\?next=ai\.html$/);
 });
 
+test("a legacy five-label publish keeps custom copy and adds Cases without rewriting stored content", async ({ page }) => {
+  const legacy = structuredClone(bundled);
+  legacy.aiSpotlight.chips = ["Study ideas", "Clarity", "Legislation", "Statues", "Exam"];
+  await home(page, { content: legacy });
+  await expect(page.locator(".home-ai-chip")).toHaveText([...legacy.aiSpotlight.chips, "Cases"]);
+  await expect(page.locator("#home-ai button")).toHaveCount(0);
+  await expect(page.locator(".home-ai-chip").last()).toHaveAttribute("href", "./ai.html");
+  expect(await page.evaluate(() => window.__firestore.document.aiSpotlight.chips)).toEqual(legacy.aiSpotlight.chips);
+  expect(await page.evaluate(() => window.__firestore.writes)).toEqual([]);
+});
+
 test("static markup and old published documents retain the AI section and protected destinations", async ({ page }) => {
   const old = structuredClone(bundled); delete old.aiSpotlight;
   await home(page, { content: old, user: null });
@@ -336,7 +361,7 @@ test("static markup and old published documents retain the AI section and protec
   await page.bringToFront();
   await expect(page.locator("#home-ai-intro")).toHaveText(copy.intro);
   await expect(page.locator("#home-ai-scene")).toHaveAttribute("data-motion", "paused");
-  await expect(page.locator("#home-ai [data-ai-entry]")).toHaveCount(7);
+  await expect(page.locator("#home-ai [data-ai-entry]")).toHaveCount(8);
   await expect(page.locator(".home-ai-flame svg")).toBeVisible();
   await page.locator(".home-ai-open").click();
   await expect(page).toHaveURL(/\/ai\.html$/);
@@ -345,12 +370,12 @@ test("static markup and old published documents retain the AI section and protec
   await expect(page.locator("body")).toHaveAttribute("data-auth-gate", "locked");
 });
 
-test("long AI edits are safe text and cannot change any protected destination or overlap on mobile", async ({ page }) => {
+test("long AI edits are safe text and cannot change destinations or overlap at responsive breakpoints", async ({ page }) => {
   const content = structuredClone(bundled);
   content.aiSpotlight = {
     title: "LegalFocus".repeat(12), intro: "Keep <script>alert(1)</script> as words.",
     closing: "Study with <b>clarity</b>.", buttonLabel: "Open <b>Fire Counsel AI</b>",
-    chips: Array.from({ length: 5 }, (_item, i) => `${"Legal".repeat(6)} <b>${i}`)
+    chips: Array.from({ length: 6 }, (_item, i) => `${"Legal".repeat(6)} <b>${i}`)
   };
   await page.setViewportSize({ width: 320, height: 1000 });
   await home(page, { content });
@@ -360,9 +385,18 @@ test("long AI edits are safe text and cannot change any protected destination or
   await expect(page.locator("#home-ai-closing")).toHaveText(content.aiSpotlight.closing);
   await expect(page.locator("#home-ai-button-label")).toHaveText(content.aiSpotlight.buttonLabel);
   await expect(page.locator("#home-ai b, #home-ai script, #home-ai img")).toHaveCount(0);
-  await viewScene(page);
-  for (const { pills } of await sampleFullOrbit(page)) expectPillsFit(pills, 320);
-  await expectNoHorizontalOverflow(page);
+  await expect(page.locator(".home-ai-chip")).toHaveText(content.aiSpotlight.chips);
+  for (const [index, label] of content.aiSpotlight.chips.entries()) {
+    await expect(page.locator(".home-ai-chip").nth(index)).toHaveAttribute("title", label);
+    await expect(page.locator(".home-ai-chip").nth(index)).toHaveAttribute("aria-label", `Open Fire Counsel AI: ${label}`);
+  }
+  await expect(page.locator(".home-ai-chip-text").first()).toHaveCSS("text-overflow", "ellipsis");
+  for (const width of [320, 390, 600, 601, 640, 768, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await viewScene(page);
+    for (const { pills } of await sampleFullOrbit(page, 1000)) expectPillsFit(pills, width);
+    await expectNoHorizontalOverflow(page);
+  }
   for (const link of await page.locator("#home-ai [data-ai-entry]").all()) await expect(link).toHaveAttribute("href", "./ai.html");
   expect(await page.evaluate(() => window.__firestore.writes)).toEqual([]);
 });
@@ -371,7 +405,7 @@ test.describe("touch AI entry", () => {
   test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
   test("a tap on an orbit label opens AI for a Google-authenticated student", async ({ page }) => {
     await home(page, { user: student });
-    await page.getByRole("link", { name: "Open Fire Counsel AI: Legislation", exact: true }).tap();
+    await page.getByRole("link", { name: "Open Fire Counsel AI: Cases", exact: true }).tap();
     await expect(page).toHaveURL(/\/ai\.html$/);
     await expect(page.locator("body")).toHaveAttribute("data-auth-gate", "unlocked");
   });

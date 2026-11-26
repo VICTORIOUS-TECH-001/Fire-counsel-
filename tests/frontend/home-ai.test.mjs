@@ -12,6 +12,11 @@ const bundled = JSON.parse(read("data/site-content.json"));
 test("the new AI section keeps the owner's exact title and two paragraphs, including old-document fallbacks", () => {
   assert.deepEqual(aiCopy(bundled), DEFAULT_AI_COPY);
   assert.deepEqual(aiCopy({}), DEFAULT_AI_COPY);
+  assert.equal(DEFAULT_AI_COPY.chips.length, 6);
+  assert.equal(DEFAULT_AI_COPY.chips[5], "Cases");
+  const cases = updateHomepageCopy(bundled, "aiSpotlight.chips.5", "Case law");
+  assert.equal(aiCopy(cases).chips[5], "Case law");
+  assert.equal(validateSiteContent(cases).ok, true);
   assert.equal(DEFAULT_AI_COPY.title, "Study Smart with Fire Counsel AI");
   assert.equal(DEFAULT_AI_COPY.intro, "Your personal AI legal study companion. Understand complex legal principles, simplify difficult cases, test your knowledge, discover relevant authorities, and prepare confidently for your law theory examinations. Learn faster, think critically, and study with the intelligence you need to succeed.");
   assert.equal(DEFAULT_AI_COPY.closing, "Let Fire Counsel AI turn the way you study law into the way you master it.");
@@ -22,7 +27,7 @@ test("the new AI section keeps the owner's exact title and two paragraphs, inclu
   assert.deepEqual(edited.caseNotes, bundled.caseNotes);
   assert.deepEqual(bundled.aiSpotlight.chips, DEFAULT_AI_COPY.chips);
   assert.equal(validateSiteContent(edited).ok, true);
-  for (const path of ["aiSpotlight.href", "aiSpotlight.__proto__", "aiSpotlight.chips.5", "aiSpotlight.chips.constructor"]) assert.throws(() => updateHomepageCopy(bundled, path, "No"));
+  for (const path of ["aiSpotlight.href", "aiSpotlight.__proto__", "aiSpotlight.chips.6", "aiSpotlight.chips.constructor"]) assert.throws(() => updateHomepageCopy(bundled, path, "No"));
 });
 
 test("the optional AI copy map is bounded plain text, not configurable redirects or a required migration", () => {
@@ -60,8 +65,7 @@ function harness({ reduced = false } = {}) {
   const starsContext = { setTransform() {}, clearRect() {}, beginPath() {}, arc() {}, fill() {} };
   const matrix = { width: 480, height: 480, getContext: () => matrixContext };
   const stars = { width: 0, height: 0, getContext: () => starsContext, getBoundingClientRect: () => ({ width: 800, height: 450 }) };
-  const pause = new EventTarget();
-  const scene = { dataset: {}, querySelector: selector => selector.includes("matrix") ? matrix : selector.includes("stars") ? stars : pause };
+  const scene = { dataset: {}, querySelector: selector => selector.includes("matrix") ? matrix : selector.includes("stars") ? stars : null };
   motion.matches = reduced; doc.hidden = false;
   Object.assign(host, {
     devicePixelRatio: 3, matchMedia: () => motion,
@@ -70,7 +74,7 @@ function harness({ reduced = false } = {}) {
     IntersectionObserver: class { constructor(fn) { this.fn = fn; host.intersection = this; } observe() {} disconnect() { this.disconnected = true; } emit(value) { this.fn([{ isIntersecting: value }]); } },
     ResizeObserver: class { constructor(fn) { this.fn = fn; host.size = this; } observe() {} disconnect() { this.disconnected = true; } }
   });
-  return { host, doc, motion, scene, matrix, stars, pause, frames, draws: () => draws,
+  return { host, doc, motion, scene, matrix, stars, frames, draws: () => draws,
     mount: () => mountHomeAI(scene, { host, doc, random: () => .5 }),
     tick(time) { const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach(fn => fn(time)); }
   };
@@ -110,20 +114,29 @@ test("reduced motion has a genuine still matrix with no loop and responds to liv
   assert.equal(mountHomeAI({ querySelector: () => ({ getContext: () => null }) }, { host: h.host, doc: h.doc }), null);
 });
 
-test("the explicit pause choice survives re-entry and preference changes without storing personal state", () => {
+test("no manual pause control is rendered or injected; automatic motion preferences still work", () => {
+  for (const path of ["index.html", "home-ai.mjs", "home-ai.css"]) {
+    assert.doesNotMatch(read(path), /home-ai-pause|Pause animation|Resume animation/, path);
+  }
   const h = harness(), control = h.mount();
-  h.host.intersection.emit(true);
-  assert.equal(h.pause.hidden, false); assert.equal(h.pause.textContent, "Pause animation");
-  h.pause.dispatchEvent(new Event("click"));
-  assert.equal(h.frames.size, 0); assert.equal(h.pause.textContent, "Resume animation");
-  h.host.intersection.emit(false); h.host.intersection.emit(true);
-  assert.equal(h.frames.size, 0);
-  h.motion.matches = true; h.motion.dispatchEvent(new Event("change")); assert.equal(h.pause.hidden, true);
-  h.motion.matches = false; h.motion.dispatchEvent(new Event("change")); assert.equal(h.pause.hidden, false);
-  assert.equal(h.frames.size, 0);
-  h.pause.dispatchEvent(new Event("click")); assert.equal(h.frames.size, 1);
-  control.destroy();
-  h.pause.dispatchEvent(new Event("click")); assert.equal(h.frames.size, 0);
+  h.host.intersection.emit(true); assert.equal(h.frames.size, 1);
+  h.motion.matches = true; h.motion.dispatchEvent(new Event("change")); assert.equal(h.frames.size, 0);
+  h.motion.matches = false; h.motion.dispatchEvent(new Event("change")); assert.equal(h.frames.size, 1);
+  control.destroy(); assert.equal(h.frames.size, 0);
+});
+
+test("legacy five-label documents keep custom words and receive Cases without writes or migration", () => {
+  const legacy = structuredClone(bundled);
+  legacy.aiSpotlight.chips = ["Custom hacks", "Clear thinking", "Legislation", "Statues", "Exam"];
+  const before = structuredClone(legacy);
+  assert.equal(validateSiteContent(legacy).ok, true);
+  assert.deepEqual(aiCopy(legacy).chips, [...legacy.aiSpotlight.chips, "Cases"]);
+  assert.deepEqual(legacy, before);
+  const edited = updateHomepageCopy(legacy, "aiSpotlight.chips.5", "Cases & decisions");
+  assert.equal(edited.aiSpotlight.chips.length, 6);
+  assert.equal(edited.aiSpotlight.chips[5], "Cases & decisions");
+  assert.deepEqual(edited.aiSpotlight.chips.slice(0, 5), legacy.aiSpotlight.chips);
+  for (const count of [0, 1, 4, 7]) assert.equal(validateSiteContent({ ...bundled, aiSpotlight: { ...DEFAULT_AI_COPY, chips: Array(count).fill("Word") } }).ok, false);
 });
 
 function auth(user, google = true, synchronous = false) {

@@ -210,7 +210,8 @@
     $("#home-ai-closing").textContent = copy.closing;
     $("#home-ai-button-label").textContent = copy.buttonLabel;
     $$("#home-ai .home-ai-chip").forEach((link, index) => {
-      link.textContent = copy.chips[index];
+      (link.querySelector(".home-ai-chip-text") || link).textContent = copy.chips[index];
+      link.title = copy.chips[index];
       link.setAttribute("aria-label", `Open Fire Counsel AI: ${copy.chips[index]}`);
     });
     // Only words change: the live orbit is not rebuilt and JSON cannot alter

@@ -3,7 +3,7 @@
 .home-streams .home-ai {
   position: relative;
   margin: 0;
-  padding: clamp(32px, 5vw, 72px) 0 clamp(64px, 8vw, 110px);
+  padding: clamp(24px, 3vw, 40px) 0 clamp(64px, 8vw, 110px);
   background: #0a0820;
   color: #e9e8f6;
   text-align: center;
@@ -32,14 +32,17 @@
 }
 .home-ai .home-ai-heading .home-ai-closing { margin-top: 14px; color: #d1cde8; }
 .home-ai .home-ai-scene {
-  --ai-orbit-size: min(560px, calc(100vw - 124px));
+  --ai-chip-max: clamp(94px, 21vw, 144px);
+  /* Diameter + a full pill + focus-ring room must fit, even at tablet widths.
+     Pills travel at .52 of this diameter, hence the 1.04 sizing factor. */
+  --ai-orbit-size: min(560px, calc(100vw - 124px), calc((100vw - var(--ai-chip-max) - 24px) / 1.04));
   position: relative;
   isolation: isolate;
   /* The scene is a viewport for counter-rotating layers. Contain their
      intermediate transform bounds; visible links still fit independently. */
   overflow: clip;
   width: min(100%, 1060px);
-  height: calc(var(--ai-orbit-size) * 1.24 + 64px);
+  height: calc(var(--ai-orbit-size) * 1.24 + 40px);
   margin: 12px auto 0;
 }
 .home-ai .home-ai-scene::after {
@@ -57,7 +60,7 @@
 .home-ai .home-ai-wrap {
   position: absolute;
   left: 50%;
-  top: 48%;
+  top: 50%;
   width: var(--ai-orbit-size);
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
@@ -144,7 +147,7 @@
   display: grid;
   place-items: center;
   width: max-content;
-  max-width: clamp(94px, 21vw, 144px);
+  max-width: var(--ai-chip-max);
   min-height: 36px;
   padding: 8px 15px;
   border: 1px solid rgba(170, 160, 255, .2);
@@ -160,6 +163,9 @@
   transform: translate(-50%, -50%) rotate(calc(-1 * var(--phase)));
   animation: homeAIUpright 80s linear infinite;
 }
+/* Long admin labels keep their full accessible name/title, but a compact
+   single-line pill prevents collisions throughout the six-label orbit. */
+.home-ai .home-ai-chip-text { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-ai .home-ai-chip::before { content: ""; position: absolute; inset: -5px; border-radius: inherit; }
 .home-ai .home-ai-chip:hover { border-color: rgba(127, 240, 221, .6); color: #fff; background: #25233e; }
 .home-ai .home-ai-chip:focus-visible { outline: 3px solid #8ffff0; outline-offset: 4px; color: #fff; }
@@ -171,23 +177,6 @@
 .home-ai .home-ai-scene:not([data-motion="running"]) *,
 .home-ai .home-ai-scene:not([data-motion="running"]) *::before,
 .home-ai .home-ai-scene:not([data-motion="running"]) *::after { animation-play-state: paused; }
-.home-ai .home-ai-pause {
-  position: absolute;
-  left: 50%;
-  bottom: 8px;
-  transform: translateX(-50%);
-  min-height: 44px;
-  padding: 8px 14px;
-  border: 1px solid rgba(170, 160, 255, .16);
-  border-radius: 99px;
-  background: transparent;
-  color: #aaa6c7;
-  font: inherit;
-  font-size: 11px;
-  cursor: pointer;
-}
-.home-ai .home-ai-pause:hover { color: #fff; border-color: #8c89b2; }
-.home-ai .home-ai-pause:focus-visible { outline: 3px solid #8ffff0; outline-offset: 4px; }
 .home-ai .home-ai-open {
   display: inline-flex;
   align-items: center;
@@ -228,19 +217,19 @@
   12% { opacity: .8; }
   100% { transform: translate(8px, -38px) scale(.15); opacity: 0; }
 }
+@media (max-width: 767px) {
+  /* Six evenly spaced pills stay separate throughout the full orbit, even
+     with long edited labels. Wider screens retain the reference grouping. */
+  .home-ai .home-ai-slot { --phase: calc(200deg + var(--chip-index) * 60deg); }
+}
 @media (max-width: 600px) {
   .home-ai .home-ai-heading { width: calc(100% - 40px); }
   .home-ai .home-ai-heading p { font-size: 13px; line-height: 1.8; }
-  .home-ai .home-ai-scene { height: calc(var(--ai-orbit-size) * 1.24 + 104px); margin-top: 24px; }
-  .home-ai .home-ai-wrap { top: 45%; }
-  /* Even spacing on small screens keeps the pills apart for the entire orbit,
-     not just the opening frame. Desktop preserves the reference's grouping. */
-  .home-ai .home-ai-slot { --phase: calc(200deg + var(--chip-index) * 72deg); }
+  .home-ai .home-ai-scene { margin-top: 24px; }
   .home-ai .home-ai-chip { padding: 8px 12px; font-size: 10px; }
   .home-ai .home-ai-shade { box-shadow: inset 0 0 20px 5px rgba(0, 8, 30, .95); }
 }
 @media (prefers-reduced-motion: reduce) {
   .home-ai *, .home-ai *::before, .home-ai *::after { animation: none !important; transition: none !important; }
   .home-ai .home-ai-orbit { transform: none; }
-  .home-ai .home-ai-pause { display: none; }
 }

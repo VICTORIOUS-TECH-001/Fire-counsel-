@@ -10,7 +10,7 @@ export const DEFAULT_AI_COPY = Object.freeze({
   intro: "Your personal AI legal study companion. Understand complex legal principles, simplify difficult cases, test your knowledge, discover relevant authorities, and prepare confidently for your law theory examinations. Learn faster, think critically, and study with the intelligence you need to succeed.",
   closing: "Let Fire Counsel AI turn the way you study law into the way you master it.",
   buttonLabel: "Open Fire Counsel AI",
-  chips: Object.freeze(["Hacks", "Clarity", "Legislation", "Statues", "Exam"])
+  chips: Object.freeze(["Hacks", "Clarity", "Legislation", "Statues", "Exam", "Cases"])
 });
 const PREVIEWS = [
   { badge: "Your study, better organised.", labels: ["Your study", "Better organised", "Course choice", "Selected course", "Subjects", "One clear study space", "Personal notes", "Keep organised", "Exam practice", "A steady pace"] },
@@ -62,7 +62,7 @@ export function updateHomepageCopy(content, path, value) {
     result.hero.copy = { ...heroCopy(result), [match[1]]: text };
     return result;
   }
-  match = /^aiSpotlight\.(title|intro|closing|buttonLabel|chips\.([0-4]))$/.exec(path);
+  match = /^aiSpotlight\.(title|intro|closing|buttonLabel|chips\.([0-5]))$/.exec(path);
   if (match) {
     const copy = aiCopy(result);
     if (match[2] !== undefined) copy.chips[Number(match[2])] = text;

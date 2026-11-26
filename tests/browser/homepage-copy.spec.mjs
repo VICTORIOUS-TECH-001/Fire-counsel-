@@ -59,6 +59,7 @@ test("plain-text homepage fields share the protected draft, unsaved preview and 
   await field(page, "aiSpotlight.closing").fill("A closing paragraph from the administrator.");
   await field(page, "aiSpotlight.buttonLabel").fill("Open our AI study companion");
   await field(page, "aiSpotlight.chips.0").fill("Study ideas");
+  await field(page, "aiSpotlight.chips.5").fill("Case decisions");
   await page.locator(".homepage-preview-copy > summary").first().click();
   await field(page, "learning.cards.0.preview.badge").fill("Organised by you <b>not bold</b>");
   await field(page, "learning.cards.0.preview.labels.2").fill("A custom course choice");
@@ -98,6 +99,7 @@ test("plain-text homepage fields share the protected draft, unsaved preview and 
     await expect(preview.locator("#home-ai-closing")).toHaveText(edited.aiSpotlight.closing);
     await expect(preview.locator("#home-ai-button-label")).toHaveText(edited.aiSpotlight.buttonLabel);
     await expect(preview.locator(".home-ai-chip").first()).toHaveText("Study ideas");
+    await expect(preview.locator(".home-ai-chip").last()).toHaveText("Case decisions");
     await expect(preview.locator("#home-ai b, #home-ai script")).toHaveCount(0);
     await expect(preview.locator(".home-ai-open")).toHaveAttribute("href", "./ai.html");
     expect(errors).toEqual([]);
@@ -119,6 +121,7 @@ test("plain-text homepage fields share the protected draft, unsaved preview and 
     await expect(visitor.locator("#learning-pane-0 .learning-badge")).toHaveText(edited.learning.cards[0].preview.badge);
     await expect(visitor.locator("#home-ai-title")).toHaveText(edited.aiSpotlight.title);
     await expect(visitor.locator(".home-ai-chip").first()).toHaveText("Study ideas");
+    await expect(visitor.locator(".home-ai-chip").last()).toHaveText("Case decisions");
   } finally { await visitor.close(); }
 });
 
