@@ -42,11 +42,18 @@ a.sr-only:focus{position:fixed!important;top:8px;left:8px;width:auto;height:auto
 .fc-home{display:flex;flex-direction:column;justify-content:flex-end;min-height:100%;padding:18px 4px 6px}
 body:not([data-view="home"]) .fc-home{display:none}
 body[data-view="home"] .fc-mode-bar,body[data-view="home"] .fc-thread{display:none}
-.fc-logo{position:relative;width:84px;height:92px;margin-bottom:16px;display:grid;place-items:end center;
-  clip-path:polygon(50% 0,96% 25%,96% 75%,50% 100%,4% 75%,4% 25%);
-  background:linear-gradient(160deg,#3b3a44,#121118 55%,#26142a);box-shadow:inset 0 0 0 2px rgba(255,255,255,.14)}
-.fc-logo:after{content:"";position:absolute;inset:auto 10px 4px;height:24px;border-radius:50%;background:radial-gradient(closest-side,rgba(255,122,26,.65),transparent);filter:blur(6px)}
-body[data-theme="light"] .fc-logo{background:linear-gradient(160deg,#ffffff,#eceaf5 60%,#ffe7d4)}
+.fc-logo{position:relative;flex:none;width:84px;height:100px;margin-bottom:16px}
+.fc-logo img{display:block;width:100%;height:100%;object-fit:contain}
+/* Animate only the fire from the supplied image; the hexagon stays still. */
+.fc-logo:before{content:"";position:absolute;inset:0;background:url("./assets/images/fire-counsel-flame.png") center/contain no-repeat;
+  -webkit-mask-image:radial-gradient(ellipse 31% 29% at 52% 63%,#000 55%,transparent 100%);mask-image:radial-gradient(ellipse 31% 29% at 52% 63%,#000 55%,transparent 100%);
+  transform-origin:52% 83%;animation:fcLogoFlicker 1.2s ease-in-out infinite alternate}
+.fc-logo:after{content:"";position:absolute;inset:auto 13px 11px;height:14px;border-radius:50%;background:radial-gradient(closest-side,rgba(255,122,26,.4),transparent);filter:blur(5px);animation:fcLogoGlow 1.8s ease-in-out infinite alternate}
+.fc-logo-ember{position:absolute;left:50%;bottom:24px;width:3px;height:3px;border-radius:50%;background:#ffb347;box-shadow:0 0 6px #ff7a1a;opacity:0;animation:fcEmber 2s ease-out infinite}
+.fc-logo-ember-2{left:40%;animation-delay:.7s}.fc-logo-ember-3{left:60%;animation-delay:1.4s}
+@keyframes fcLogoFlicker{0%{transform:scale(1);filter:brightness(1)}35%{transform:scale(.97,1.035);filter:brightness(1.18)}70%{transform:scale(1.025,.985);filter:brightness(1.06)}100%{transform:scale(.99,1.025);filter:brightness(1.12)}}
+@keyframes fcLogoGlow{from{opacity:.5}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.fc-logo:before,.fc-logo:after,.fc-logo-ember{animation:none}.fc-logo-ember{opacity:0}}
 .fc-home h1{margin:0 0 6px;font-size:clamp(30px,8vw,40px);line-height:1.1;font-weight:750;letter-spacing:-.02em}
 .fc-sub{margin:0 0 20px;color:var(--muted);font-size:15px;line-height:1.4;max-width:560px}
 .fc-unlock{position:relative;display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;min-height:136px;padding:22px 26px;border:0;border-radius:34px;text-align:left;overflow:hidden;
@@ -141,7 +148,7 @@ body[data-theme="light"] .fc-wait-title{color:#d9540a;text-shadow:none}
 body[data-theme="light"] .fc-task{color:#a94a08}
 .fc-task button{display:grid;place-items:center;width:22px;height:22px;border:0;border-radius:50%;background:rgba(255,255,255,.14);font-size:15px;line-height:1}
 .fc-options{display:flex;gap:8px 14px;flex-wrap:wrap;margin:0 6px 8px}
-.fc-options:not(:has(.ai-option:not([hidden]))),body[data-view="home"] .fc-options{display:none}
+.fc-options:not(:has(.ai-option:not([hidden]))){display:none}
 .fc-ai .ai-option{color:var(--muted);font-size:13px}
 .fc-ai .ai-option input[type="text"],.fc-ai .ai-option input[type="number"],.fc-ai .ai-option select{padding:9px 12px;border:1px solid var(--line);border-radius:12px;background:var(--soft);color:var(--text)}
 .fc-ai .ai-option input[type="checkbox"]{accent-color:var(--accent)}

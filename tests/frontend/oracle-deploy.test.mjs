@@ -18,7 +18,7 @@ test("Oracle deployment scripts are valid bash and the paste-in template holds n
     assert.equal(result.status, 0, `${file}: ${result.stderr}`);
   }
   const template = read("deploy/oracle/oracle-start.sh");
-  for (const name of ["ADMIN_EMAILS", "DATABASE_URL", "GEMINI_API_KEY", "OPENROUTER_API_KEY"]) assert.match(template, new RegExp(`^${name}=$`, "m"), `${name} is left blank`);
+  for (const name of ["ADMIN_EMAILS", "DATABASE_URL", "GROQ_API_KEY", "DEEPSEEK_API_KEY", "SERPAPI_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY", "TAVILY_API_KEY", "BRAVE_SEARCH_API_KEY"]) assert.match(template, new RegExp(`^${name}=$`, "m"), `${name} is left blank`);
   assert.doesNotMatch(template, /AIza|sk-or-|postgres(ql)?:\/\/|BEGIN PRIVATE KEY/);
   assert.match(template, /<<'FIRE_COUNSEL_SETTINGS'/, "quoted heredoc: pasted values are never expanded by the shell");
   assert.match(template, /raw\.githubusercontent\.com\/VICTORIOUS-TECH-001\/Fire-counsel-\/main\/deploy\/oracle\/setup\.sh/);
@@ -74,7 +74,7 @@ test("re-running setup keeps earlier settings, reports what is missing, and the 
     let result = cli();
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /PUBLIC_HOST=129-1-2-3\.sslip\.io/);
-    assert.match(result.stdout, /MISSING=DATABASE_URL, GEMINI_API_KEY, ADMIN_EMAILS, FIREBASE key file/);
+    assert.match(result.stdout, /MISSING=DATABASE_URL, ADMIN_EMAILS, AI writer key \(GROQ_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY or OPENROUTER_API_KEY\), FIREBASE key file/);
     writeFileSync(join(dir, "secrets"), "ADMIN_EMAILS=me@gmail.com\nDATABASE_URL=postgresql://u:p@h.neon.tech/db\nGEMINI_API_KEY=AIzaSynthetic\nFC_DOMAIN=study.example.com\n");
     writeFileSync(join(dir, "firebase.json"), JSON.stringify(key, null, 2));
     result = cli();

@@ -527,7 +527,7 @@ test("documents: footnotes, links and verification table make it into the PDF an
 
 // ---------------- reliability: model health, time limits, progress, deadlines ----------------
 
-test("a missing or hanging model is skipped for the next request, but never refused outright", async () => {
+test("missing or hanging models respect cooldowns, including when every writer is down", async () => {
   const { resetProviderHealth, providerHealth } = await import("../src/services/ai/providers.js");
   resetProviderHealth();
   const seen = [];
@@ -545,10 +545,10 @@ test("a missing or hanging model is skipped for the next request, but never refu
   seen.length = 0;
   await generate({ messages: [{ role: "user", text: "Q" }], timeoutMs: 50 }, { env, fetchImpl });
   assert.deepEqual(seen, ["m3"], "known-bad models are skipped");
-  // When every model is marked bad they are still all tried.
+  // When every model is cooled down, fail clearly without hammering them.
   seen.length = 0;
   await assert.rejects(generate({ messages: [{ role: "user", text: "Q" }], timeoutMs: 50 }, { env: { GEMINI_API_KEY: "g", GEMINI_MODELS: "m1,slow" }, fetchImpl }), { code: "PROVIDER_TIMEOUT" });
-  assert.deepEqual(seen, ["m1", "slow"]);
+  assert.deepEqual(seen, [], "do not bypass the circuit breaker when all models are unavailable");
   resetProviderHealth();
 });
 
@@ -752,7 +752,7 @@ test("chat searches the library and the web at the same time and streams the ans
       log.push("web start");
       await new Promise((resolve) => setTimeout(resolve, 30));
       log.push("web end");
-      return { text: "notes", sources: [], searchQueries: [], provider: "gemini", model: "m" };
+      return { text: "notes", sources: [{ url: "https://synthetic.example/report" }], searchQueries: [], provider: "gemini", model: "m" };
     }
     request.onText("Partial answer");
     return { text: "Full answer", sources: [], provider: "gemini", model: "m" };
@@ -821,7 +821,7 @@ test("while the AI is writing, the partial answer is saved so the page can show 
   assert.match(last.content, /Done\.$/);
 });
 
-// ---------------- Groq (fast backup writer) and Tavily (backup web search) ----------------
+// ---------------- Independent Groq writer and Tavily retrieval ----------------
 
 test("Groq answers when Gemini is busy, with the answer length fitted to the free token budget", async () => {
   const { resetProviderHealth } = await import("../src/services/ai/providers.js");
@@ -840,7 +840,7 @@ test("Groq answers when Gemini is busy, with the answer length fitted to the fre
   assert.equal(result.text, "Estoppel answer");
   assert.equal(groqCalls[0].headers.Authorization, "Bearer gsk_test");
   assert.equal(groqCalls[0].body.model, "openai/gpt-oss-120b");
-  assert.ok(groqCalls[0].body.max_tokens < 8000 && groqCalls[0].body.max_tokens > 7000, `fitted max_tokens: ${groqCalls[0].body.max_tokens}`);
+  assert.ok(groqCalls[0].body.max_completion_tokens < 8000 && groqCalls[0].body.max_completion_tokens > 7000, `fitted max_completion_tokens: ${groqCalls[0].body.max_completion_tokens}`);
   assert.deepEqual(groqCalls[0].body.messages[0], { role: "system", content: "S" });
   resetProviderHealth();
 });
@@ -862,7 +862,7 @@ test("requests Groq cannot take (too long, or with photos/PDFs) go straight to O
   assert.equal(providerHealth().length, 0, "Groq is not marked unhealthy for these");
 });
 
-test("Tavily is the backup web search: real links, notes written by the next free model", async () => {
+test("Tavily retrieves real links/extracts without an extra writer; exhausted monthly quota is cooled down", async () => {
   const { resetProviderHealth, providerHealth } = await import("../src/services/ai/providers.js");
   resetProviderHealth();
   const calls = [];
@@ -882,10 +882,11 @@ test("Tavily is the backup web search: real links, notes written by the next fre
     return jsonResponse(200, { model: "openai/gpt-oss-120b", choices: [{ message: { content: "Research notes on Carlill" }, finish_reason: "stop" }] });
   };
   const env = { GEMINI_API_KEY: "g", GEMINI_SEARCH_MODELS: "s1", GEMINI_MODELS: "w1", GROQ_API_KEY: "gsk_x", TRIVILY_API_KEY: "tvly-abc" };
-  // Gemini writers are busy too (429), so Groq writes the notes.
+  // Dedicated retrieval runs first and needs no writer to summarise snippets.
   const result = await generate({ search: true, searchQuery: "Carlill v Carbolic case", system: "R", messages: [{ role: "user", text: "Research this case: Carlill v Carbolic" }] }, { env, fetchImpl });
-  assert.equal(result.provider, "groq+tavily");
-  assert.equal(result.text, "Research notes on Carlill");
+  assert.equal(result.provider, "tavily");
+  assert.match(result.text, /An advertisement can be a unilateral offer/);
+  assert.deepEqual(calls.map((c) => c.host), ["api.tavily.com"], "no Gemini or Groq call is needed for retrieval");
   assert.deepEqual(result.sources, [{ url: "https://en.wikipedia.org/wiki/Carlill_v_Carbolic_Smoke_Ball_Co", title: "Carlill v Carbolic Smoke Ball Co", origin: "tavily" }]);
   const tavily = calls.find((c) => c.host === "api.tavily.com");
   assert.equal(tavily.auth, "Bearer tvly-abc");
@@ -894,7 +895,7 @@ test("Tavily is the backup web search: real links, notes written by the next fre
   // Monthly free credits used up: Tavily is paused for hours, not retried on every request.
   resetProviderHealth();
   tavilyStatus = 432;
-  await assert.rejects(generate({ search: true, messages: [{ role: "user", text: "Research: Donoghue v Stevenson" }] }, { env, fetchImpl }), /Tavily free searches for this month are used up/);
+  await assert.rejects(generate({ search: true, messages: [{ role: "user", text: "Research: Donoghue v Stevenson" }] }, { env, fetchImpl }), /Tavily monthly search allowance is exhausted/);
   assert.ok(providerHealth().some((item) => item.model === "tavily" && item.code === "PROVIDER_MONTHLY_QUOTA" && item.retry_in_seconds > 3600));
   const before = calls.filter((c) => c.host === "api.tavily.com").length;
   await assert.rejects(generate({ search: true, messages: [{ role: "user", text: "Research: Hyde v Wrench" }] }, { env, fetchImpl }));
@@ -950,7 +951,7 @@ test("key names are forgiving, wrong keys are explained, and no key is ever show
   assert.deepEqual(good.groq.models, ["openai/gpt-oss-120b", "openai/gpt-oss-20b"]);
 });
 
-test("admin AI test checks the health of Gemini, Groq, OpenRouter and Tavily one by one", async t => {
+test("admin AI test checks configured writers and explicitly requested search providers", async t => {
   const { resetProviderHealth } = await import("../src/services/ai/providers.js");
   resetProviderHealth();
   const fetchImpl = async (url, init) => {
@@ -963,14 +964,14 @@ test("admin AI test checks the health of Gemini, Groq, OpenRouter and Tavily one
     if (url.includes("openrouter")) return jsonResponse(200, { model: "free-model", choices: [{ message: { content: "FIRE COUNSEL AI is connected." } }] });
     return jsonResponse(429, { error: { message: "quota" } });
   };
-  const env = { GEMINI_API_KEY: "g", GEMINI_MODELS: "w1", GROQ_API_KEY: "gsk_x", OPENROUTER_API_KEY: "o", TAVILY_API_KEY: "tvly-x" };
+  const env = { GEMINI_API_KEY: "g", GEMINI_MODELS: "w1", GEMINI_SEARCH_MODELS: "w1", GROQ_API_KEY: "gsk_x", OPENROUTER_API_KEY: "o", TAVILY_API_KEY: "tvly-x" };
   const request = await serve(t, app => app.use("/api/v1/admin/ai", createAdminAiRouter({ poolProvider: () => pool, verifyToken: stubVerify, env, fetchImpl, configured: () => true })));
   const status = await (await request("/api/v1/admin/ai/status", { token: "admin" })).json();
   assert.deepEqual([status.data.providers.groq.configured, status.data.providers.tavily.configured], [true, true]);
-  const body = await (await request("/api/v1/admin/ai/test", { token: "admin", method: "POST", body: {} })).json();
+  const body = await (await request("/api/v1/admin/ai/test", { token: "admin", method: "POST", body: { search: true } })).json();
   assert.deepEqual(body.data.models.map((m) => [m.provider, m.model, m.ok]), [
-    ["gemini", "w1", false], ["groq", "openai/gpt-oss-120b", true], ["groq", "openai/gpt-oss-20b", false], ["openrouter", "free-model", true], ["tavily", "tavily", true]]);
-  assert.match(body.data.models[2].error, /Groq rejected the API key/);
+    ["gemini", "w1", false], ["gemini", "w1", false], ["groq", "openai/gpt-oss-120b", true], ["groq", "openai/gpt-oss-20b", false], ["openrouter", "free-model", true], ["tavily", "tavily", true]]);
+  assert.match(body.data.models[3].error, /Groq rejected the API key/);
   assert.equal(body.data.provider, "groq", "the first healthy writer, not Tavily");
   assert.equal(body.data.fallback, true);
   assert.deepEqual(body.data.search, { ok: true, provider: "tavily", model: "tavily", sources: 1 });
@@ -985,7 +986,7 @@ test("the admin AI test checks every service at the same time and never runs pas
     await new Promise((resolve) => setTimeout(resolve, 120));
     if (url.includes("tavily")) return jsonResponse(200, { results: [{ title: "SC", url: "https://supremecourt.gov.ng/", content: "x" }] });
     if (url.includes("groq") || url.includes("openrouter")) return jsonResponse(200, { model: "m", choices: [{ message: { content: "FIRE COUNSEL AI is connected." } }] });
-    return jsonResponse(200, { candidates: [{ finishReason: "STOP", content: { parts: [{ text: "FIRE COUNSEL AI is connected." }] } }] });
+    return jsonResponse(200, { candidates: [{ finishReason: "STOP", content: { parts: [{ text: "FIRE COUNSEL AI is connected." }] }, groundingMetadata: { groundingChunks: [{ web: { uri: "https://example.org/report", title: "Supplied report" } }] } }] });
   };
   const env = { GEMINI_API_KEY: "g", GEMINI_MODELS: "a,b,c,hang", GEMINI_SEARCH_MODELS: "gemini-2.5-flash-lite", GROQ_API_KEY: "gsk_x", OPENROUTER_API_KEY: "o", TAVILY_API_KEY: "tvly-x" };
   const started = Date.now();
@@ -1063,7 +1064,7 @@ test("a pasted code example or 'Bearer' around a key is cleaned, and a non-key v
   assert.equal(describeProviders({ GEMINI_API_KEY: "AIzaSyA0123456789abcdefghijklmnopqrstuv" }).gemini.warning, null);
 });
 
-test("free-plan Gemini 3 search quota (0): one try, all Gemini 3 search models skipped, Tavily searches instead", async () => {
+test("Gemini-first override: shared search-quota failure is cooled down and independent Tavily retrieval takes over", async () => {
   const { resetProviderHealth, providerHealth } = await import("../src/services/ai/providers.js");
   resetProviderHealth();
   const calls = [];
@@ -1074,23 +1075,23 @@ test("free-plan Gemini 3 search quota (0): one try, all Gemini 3 search models s
     if (body.tools) return jsonResponse(429, { error: { message: "Quota exceeded for metric: search_grounding_request, limit: 0" } });
     return jsonResponse(200, { candidates: [{ finishReason: "STOP", content: { parts: [{ text: "notes from Tavily pages" }] } }] });
   };
-  const env = { GEMINI_API_KEY: "AIzaSyA0123456789abcdefghijklmnopqrstuv", TAVILY_API_KEY: "tvly-abcdefghijkl" };
+  const env = { GEMINI_API_KEY: "AIzaSyA0123456789abcdefghijklmnopqrstuv", TAVILY_API_KEY: "tvly-abcdefghijkl", WEB_SEARCH_PROVIDER_ORDER: "gemini,tavily,brave" };
   const first = await generate({ search: true, messages: [{ role: "user", text: "Q" }] }, { env, fetchImpl });
   assert.equal(first.searchProvider, "tavily");
-  assert.deepEqual(calls.map((c) => c.kind), ["gemini-search", "tavily", "gemini-write"], "the other Gemini 3 models share the same quota and are not tried");
+  assert.deepEqual(calls.map((c) => c.kind), ["gemini-search", "tavily"], "the other Gemini 3 models share the same quota and are not tried");
   const health = providerHealth();
   for (const model of ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.6-flash"]) {
     const row = health.find((h) => h.model === `search:${model}`);
     assert.equal(row.code, "SEARCH_QUOTA");
-    assert.match(row.message, /FREE Gemini plan[\s\S]*Tavily[\s\S]*limit: 0/);
+    assert.match(row.message, /grounding quota[\s\S]*TAVILY_API_KEY[\s\S]*limit: 0/);
     assert.ok(row.retry_in_seconds > 3000);
   }
   calls.length = 0;
   await generate({ search: true, messages: [{ role: "user", text: "Q2" }] }, { env, fetchImpl });
-  assert.deepEqual(calls.map((c) => c.kind), ["tavily", "gemini-write"], "next time Tavily is used straight away");
+  assert.deepEqual(calls.map((c) => c.kind), ["tavily"], "next time Tavily is used straight away, without an intermediate writer");
   // Without Tavily the student is told why, in plain words.
   resetProviderHealth();
-  await assert.rejects(generate({ search: true, messages: [{ role: "user", text: "Q" }] }, { env: { GEMINI_API_KEY: env.GEMINI_API_KEY }, fetchImpl }), (error) => error.code === "SEARCH_QUOTA" && /Tavily/.test(error.message));
+  await assert.rejects(generate({ search: true, messages: [{ role: "user", text: "Q" }] }, { env: { GEMINI_API_KEY: env.GEMINI_API_KEY }, fetchImpl }), (error) => error.code === "SEARCH_QUOTA" && /TAVILY_API_KEY/.test(error.message));
   resetProviderHealth();
 });
 
@@ -1112,4 +1113,156 @@ test("a model closed to new users is skipped for a day; a busy model that never 
   assert.ok(health.find((h) => h.model === "old").retry_in_seconds > 20 * 3600);
   assert.equal(health.find((h) => h.model === "busy").code, "PROVIDER_TIMEOUT");
   resetProviderHealth();
+});
+
+// Full application paths: synthetic HTTP/DB/providers, never live credentials.
+test("online assistant completes a Brave failover + Groq job and reports sources without Gemini", async t => {
+  const { resetProviderHealth } = await import("../src/services/ai/providers.js");
+  resetProviderHealth(); t.after(resetProviderHealth);
+  await pool.query("INSERT INTO ai_user_limits (firebase_uid, premium) VALUES ('user-a', true)");
+  const env = { GROQ_API_KEY: "gsk_synthetic", TAVILY_API_KEY: "tvly-synthetic", BRAVE_SEARCH_API_KEY: "brave-synthetic" };
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push(new URL(url).hostname);
+    if (String(url).includes("tavily")) return jsonResponse(401, { error: "Synthetic authentication denial" });
+    if (String(url).includes("brave")) return jsonResponse(200, { web: { results: [{ url: "https://example.org/report", title: "Supplied synthetic report", description: "Synthetic content" }] } });
+    assert.match(JSON.parse(init.body).messages.at(-1).content, /Synthetic content/);
+    return jsonResponse(200, { model: "synthetic-writer", choices: [{ message: { content: "See [supplied report](https://example.org/report)." } }] });
+  };
+  const studioFactory = options => createStudio({ ...options, fetchImpl, researchCache: false, verify: async sources => sources.map(s => ({ ...s, status: "reachable" })) });
+  const request = await serve(t, app => app.use("/api/v1/ai", createAiRouter({ poolProvider: () => pool, verifyToken: stubVerify, env, studioFactory, configured: () => true })));
+  const me = (await (await request("/api/v1/ai/me")).json()).data;
+  assert.equal(me.configured, true);
+  assert.equal(me.web_search, true);
+  assert.deepEqual(me.search_providers, ["tavily", "brave"]);
+  assert.doesNotMatch(JSON.stringify(me), /gsk_synthetic|tvly-synthetic|brave-synthetic/);
+  const sent = await (await request("/api/v1/ai/messages", { method: "POST", body: { mode: "chat", text: "Explain the supplied synthetic report", options: { webSearch: true } } })).json();
+  const done = await waitForMessage(request, sent.data.conversation.id);
+  assert.equal(done.status, "done", done.content);
+  assert.equal(done.provider, "groq");
+  assert.equal(done.meta.web_search, true);
+  assert.deepEqual(done.meta.search_providers, ["brave"]);
+  assert.equal(done.sources[0].origin, "brave");
+  assert.equal(done.sources[0].url, "https://example.org/report");
+  assert.deepEqual(calls, ["api.tavily.com", "api.search.brave.com", "api.groq.com"]);
+  assert.equal((await getAllowance(pool, "user-a")).features.chat.used, 1);
+});
+
+test("when online search fails, the queued job fails clearly, never calls the writer and refunds daily usage", async t => {
+  const { resetProviderHealth } = await import("../src/services/ai/providers.js");
+  resetProviderHealth(); t.after(resetProviderHealth);
+  await pool.query("INSERT INTO ai_user_limits (firebase_uid, premium) VALUES ('user-a', true)");
+  const env = { GROQ_API_KEY: "gsk_synthetic", TAVILY_API_KEY: "tvly-synthetic", BRAVE_API_KEY: "brave-synthetic" };
+  const calls = [];
+  const studioFactory = options => createStudio({ ...options, researchCache: false, verify: async () => [], fetchImpl: async url => {
+    calls.push(new URL(url).hostname);
+    return jsonResponse(503, { error: "Synthetic outage" });
+  } });
+  const request = await serve(t, app => app.use("/api/v1/ai", createAiRouter({ poolProvider: () => pool, verifyToken: stubVerify, env, studioFactory, configured: () => true })));
+  const sent = await (await request("/api/v1/ai/messages", { method: "POST", body: { mode: "chat", text: "Explain the supplied report", options: { webSearch: true } } })).json();
+  const done = await waitForMessage(request, sent.data.conversation.id);
+  assert.equal(done.status, "failed");
+  assert.equal(done.meta.code, "PROVIDER_UNAVAILABLE");
+  assert.match(done.content, /Online search failed/);
+  assert.match(done.content, /not counted/);
+  assert.deepEqual(calls, ["api.tavily.com", "api.search.brave.com"]);
+  assert.equal((await getAllowance(pool, "user-a")).features.chat.used, 0);
+});
+
+test("search-only admin diagnostics work without Neon or a writer and remain Google/admin protected", async t => {
+  const { resetProviderHealth } = await import("../src/services/ai/providers.js");
+  resetProviderHealth(); t.after(resetProviderHealth);
+  const env = { BRAVE_SEARCH_API_KEY: "brave-private-synthetic" };
+  let calls = 0;
+  const request = await serve(t, app => app.use("/api/v1/admin/ai", createAdminAiRouter({ verifyToken: stubVerify, env, configured: () => false,
+    fetchImpl: async () => { calls += 1; return jsonResponse(200, { web: { results: [{ url: "https://example.org/report", title: "Supplied report", description: "Synthetic" }] } }); }
+  })));
+  assert.equal((await request("/api/v1/admin/ai/test", { token: "missing", method: "POST", body: { search: true } })).status, 401);
+  assert.equal((await request("/api/v1/admin/ai/test", { method: "POST", body: { search: true } })).status, 403);
+  assert.equal(calls, 0);
+  const status = (await (await request("/api/v1/admin/ai/status", { token: "admin" })).json()).data;
+  assert.equal(status.providers.configured, false);
+  assert.equal(status.providers.brave.configured, true);
+  assert.equal(status.providers.search.configured, true);
+  assert.equal(status.schema_ready, false);
+  const result = await request("/api/v1/admin/ai/test", { token: "admin", method: "POST", body: { search: true } });
+  assert.equal(result.status, 200);
+  const body = await result.json();
+  assert.equal(body.data.ok, false, "do not claim a writer is working when only search was tested");
+  assert.deepEqual(body.data.search, { ok: true, provider: "brave", model: "brave", sources: 1 });
+  assert.equal(calls, 1);
+  assert.doesNotMatch(JSON.stringify(body), /brave-private-synthetic/);
+});
+
+test("queued RAG job retrieves from SerpAPI once, fails over DeepSeek to Groq and preserves sources/ownership", async t => {
+  const { resetProviderHealth } = await import("../src/services/ai/providers.js");
+  resetProviderHealth(); t.after(resetProviderHealth);
+  await pool.query("INSERT INTO ai_user_limits (firebase_uid, premium) VALUES ('user-a', true)");
+  const env = { DEEPSEEK_API_KEY: "sk-synthetic-private-deepseek", GROQ_API_KEY: "gsk_synthetic", SERPAPI_API_KEY: "synthetic-private-serpapi", AI_WRITER_PROVIDER_ORDER: "deepseek,groq" };
+  const calls = [];
+  const studioFactory = options => createStudio({ ...options, researchCache: false, verify: async sources => sources.map(source => ({ ...source, status: "reachable" })), fetchImpl: async (url, init) => {
+    calls.push(new URL(url).hostname);
+    if (String(url).includes("serpapi")) return jsonResponse(200, { search_metadata: { status: "Success" }, organic_results: [{ link: "https://example.org/report", title: "Supplied report", snippet: "Synthetic retrieved evidence" }] });
+    assert.match(JSON.parse(init.body).messages.at(-1).content, /Synthetic retrieved evidence/);
+    if (String(url).includes("deepseek")) return jsonResponse(402, { error: { message: `No credit ${env.DEEPSEEK_API_KEY}` } });
+    return jsonResponse(200, { model: "synthetic-backup", choices: [{ message: { content: "See [supplied report](https://example.org/report)." } }] });
+  } });
+  const request = await serve(t, app => app.use("/api/v1/ai", createAiRouter({ poolProvider: () => pool, verifyToken: stubVerify, env, studioFactory, configured: () => true })));
+  const me = (await (await request("/api/v1/ai/me")).json()).data;
+  assert.equal(me.configured, true);
+  assert.deepEqual(me.search_providers, ["serpapi"]);
+  const response = await request("/api/v1/ai/messages", { method: "POST", body: { mode: "chat", text: "Explain the supplied report", options: { webSearch: true } } });
+  assert.equal(response.status, 202);
+  const sent = await response.json();
+  const done = await waitForMessage(request, sent.data.conversation.id);
+  assert.equal(done.status, "done", done.content);
+  assert.equal(done.provider, "groq");
+  assert.equal(done.meta.fallback, true);
+  assert.deepEqual(done.meta.writer_attempts.map(item => [item.provider, item.status]), [["deepseek", "failed"], ["groq", "completed"]]);
+  assert.deepEqual(done.meta.search_providers, ["serpapi"]);
+  assert.equal(done.sources[0].origin, "serpapi");
+  assert.equal((await getAllowance(pool, "user-a")).features.chat.used, 1);
+  assert.equal((await request(`/api/v1/ai/conversations/${sent.data.conversation.id}`, { token: "user-b" })).status, 404);
+  assert.doesNotMatch(JSON.stringify(done), /synthetic-private|No credit/);
+  assert.deepEqual(calls, ["serpapi.com", "api.deepseek.com", "api.groq.com"]);
+});
+
+test("an exhausted DeepSeek-only writer fails the queued job, refunds usage and never stores reasoning", async t => {
+  const { resetProviderHealth } = await import("../src/services/ai/providers.js");
+  resetProviderHealth(); t.after(resetProviderHealth);
+  await pool.query("INSERT INTO ai_user_limits (firebase_uid, premium) VALUES ('user-a', true)");
+  const env = { DEEPSEEK_API_KEY: "sk-synthetic-private-deepseek" };
+  const studioFactory = options => createStudio({ ...options, fetchImpl: async () => jsonResponse(200, { choices: [{ finish_reason: "length", message: { content: "", reasoning_content: "PRIVATE REASONING" } }] }) });
+  const request = await serve(t, app => app.use("/api/v1/ai", createAiRouter({ poolProvider: () => pool, verifyToken: stubVerify, env, studioFactory, configured: () => true })));
+  const sent = await (await request("/api/v1/ai/messages", { method: "POST", body: { mode: "chat", text: "Supplied question", options: { webSearch: false } } })).json();
+  const done = await waitForMessage(request, sent.data.conversation.id);
+  assert.equal(done.status, "failed");
+  assert.equal(done.meta.code, "PROVIDER_OUTPUT_LIMIT");
+  assert.match(done.content, /not counted/);
+  assert.doesNotMatch(JSON.stringify(done), /PRIVATE REASONING|synthetic-private/);
+  assert.equal((await getAllowance(pool, "user-a")).features.chat.used, 0);
+});
+
+test("protected admin diagnostics support DeepSeek/SerpAPI without Neon and only search when selected", async t => {
+  const { resetProviderHealth } = await import("../src/services/ai/providers.js");
+  resetProviderHealth(); t.after(resetProviderHealth);
+  const calls = [];
+  const env = { DEEPSEEK_API_KEY: "sk-synthetic-private-deepseek", SERPAPI_API_KEY: "synthetic-private-serpapi" };
+  const request = await serve(t, app => app.use("/api/v1/admin/ai", createAdminAiRouter({ verifyToken: stubVerify, env, configured: () => false,
+    fetchImpl: async url => { calls.push(new URL(url).hostname); return String(url).includes("serpapi")
+      ? jsonResponse(200, { search_metadata: { status: "Success" }, organic_results: [{ link: "https://example.org/report", title: "Supplied report", snippet: "Synthetic evidence" }] })
+      : jsonResponse(200, { choices: [{ message: { content: "FIRE COUNSEL AI is connected." } }] }); }
+  })));
+  assert.equal((await request("/api/v1/admin/ai/test", { token: "missing", method: "POST", body: { search: true } })).status, 401);
+  assert.equal((await request("/api/v1/admin/ai/test", { token: "user-a", method: "POST", body: { search: true } })).status, 403);
+  assert.deepEqual(calls, []);
+  const writers = (await (await request("/api/v1/admin/ai/test", { token: "admin", method: "POST", body: { search: false } })).json()).data;
+  assert.equal(writers.provider, "deepseek");
+  assert.equal(writers.search, null);
+  assert.deepEqual(calls, ["api.deepseek.com"]);
+  const all = (await (await request("/api/v1/admin/ai/test", { token: "admin", method: "POST", body: { search: true } })).json()).data;
+  assert.equal(all.ok, true);
+  assert.equal(all.search.provider, "serpapi");
+  assert.equal(all.search.sources, 1);
+  assert.doesNotMatch(JSON.stringify(all), /synthetic-private/);
 });

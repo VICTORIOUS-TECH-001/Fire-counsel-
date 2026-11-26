@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="./admin-workstation.css">
   <link rel="stylesheet" href="./integrations.css">
   <link rel="stylesheet" href="./ai-studio.css">
+  <link rel="stylesheet" href="./branding.css">
 </head>
 <body>
 <div class="fc-preloader" id="fc-preloader" role="status" aria-label="FIRE COUNSEL is loading">
@@ -22,7 +23,7 @@
 </div>
 <script src="./preloader.js"></script>
   <header class="admin-topbar">
-    <a class="admin-brand" href="./index.html"><img src="./assets/images/fire-counsel-brand.jpg" alt="" width="46" height="46"><span><strong>FIRE COUNSEL</strong><small>ADMIN STUDIO</small></span></a>
+    <a class="admin-brand fc-brand-lockup" href="./index.html"><img class="fc-brand-emblem" src="./assets/images/fire-counsel-flame.png" alt="" width="72" height="72"><span class="fc-brand-copy"><strong>FIRE COUNSEL</strong><small>ADMIN STUDIO</small></span></a>
     <div class="admin-top-actions"><span class="preview-chip"><i></i> ADMIN STUDIO</span><a class="preview-site" id="preview-site-top" href="./index.html?preview=1" target="fire-counsel-preview">Preview website changes ↗</a></div>
   </header>
   <main class="admin-layout">
@@ -234,16 +235,16 @@
       </section>
 
       <section class="admin-panel" id="panel-ai" aria-labelledby="ai-title" hidden>
-        <div class="admin-heading"><div><span class="eyebrow">GEMINI FIRST · GROQ &amp; OPENROUTER BACKUP · TAVILY SEARCH</span><h1 id="ai-title">AI studio settings.</h1><p>See which AI keys the server has, test the connection, and upload your private prompts. Keys are never typed here: they live in Render&rsquo;s Environment settings.</p></div><span class="panel-status" id="ai-panel-status">SIGN IN AS ADMIN</span></div>
+        <div class="admin-heading"><div><span class="eyebrow">INDEPENDENT WRITERS · TAVILY &amp; BRAVE ONLINE SEARCH</span><h1 id="ai-title">AI studio settings.</h1><p>See which AI keys the server has, test the connection, and upload your private prompts. Keys are never typed here: they live in Render&rsquo;s Environment settings.</p></div><span class="panel-status" id="ai-panel-status">SIGN IN AS ADMIN</span></div>
         <div class="fc-admin-grid">
           <section class="fc-admin-card" aria-labelledby="ai-providers-title">
             <span class="eyebrow">AI PROVIDERS</span><h2 id="ai-providers-title">Student AI connection status</h2>
             <p>These keys serve the student AI interface. The test below is an explicit student-service diagnostic and consumes a small amount of that service&rsquo;s quota. Admin document processing uses separate keys in <b>Upload documents → Counsel Working Station</b>.</p>
             <div id="ai-provider-status"><p>Sign in as an administrator to load the status.</p></div>
-            <div class="fc-row"><button class="button button-primary" id="ai-test-button" type="button" disabled>Test AI connection</button><label><input id="ai-test-search" type="checkbox"> also test web search</label></div>
+            <div class="fc-row"><button class="button button-primary" id="ai-test-button" type="button" disabled>Test AI connection</button><label><input id="ai-test-search" type="checkbox" checked> also test web search (uses provider quota)</label></div>
             <p class="fc-status" id="ai-test-result" role="status" aria-live="polite"></p>
             <div id="ai-test-models" class="fc-health-wrap"></div>
-            <p><strong>To add or change a key:</strong> open <a href="https://dashboard.render.com" target="_blank" rel="noopener">dashboard.render.com</a> → the web service this site runs on (<b id="ai-render-service">fire-counsel-2</b>) → <b>Environment</b> → add <code>GEMINI_API_KEY</code> (from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>), <code>GROQ_API_KEY</code> (from <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>, starts with <code>gsk_</code>), <code>OPENROUTER_API_KEY</code> (from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>) and <code>TAVILY_API_KEY</code> (from <a href="https://app.tavily.com" target="_blank" rel="noopener">app.tavily.com</a>; key prefixes can vary) → <b>Save and deploy</b>. If using an environment group, link it to this exact service and remove any blank/stale service-level overrides for these names. Confirm that the deployment becomes <b>Live</b>; saving keys on another service or only in GitHub does not configure this API.</p>
+            <p><strong>To add or change a key:</strong> open <a href="https://dashboard.render.com" target="_blank" rel="noopener">dashboard.render.com</a> → the web service this site runs on (<b id="ai-render-service">fire-counsel-2</b>) → <b>Environment</b> → add at least one writer key: <code>GEMINI_API_KEY</code> (from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>), <code>GROQ_API_KEY</code> (from <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>, starts with <code>gsk_</code>), <code>DEEPSEEK_API_KEY</code> (from <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener">DeepSeek API keys</a>), or <code>OPENROUTER_API_KEY</code> (from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>) and a search key: <code>TAVILY_API_KEY</code> (from <a href="https://app.tavily.com" target="_blank" rel="noopener">app.tavily.com</a>; key prefixes can vary) or <code>BRAVE_SEARCH_API_KEY</code> (from <a href="https://api-dashboard.search.brave.com" target="_blank" rel="noopener">Brave Search API</a>). You can also use <code>SERPAPI_API_KEY</code> from <a href="https://serpapi.com/manage-api-key" target="_blank" rel="noopener">SerpAPI</a>. Multiple search keys enable failover; unused providers are optional. DeepSeek API usage is billed; free search/AI plans have limits. Any configured fallback may consume its own quota or credit. Set <code>AI_WRITER_PROVIDER_ORDER=groq,deepseek,gemini,openrouter</code> to prefer Groq and <code>WEB_SEARCH_PROVIDER_ORDER=tavily,brave,serpapi,gemini</code> for retrieval. Keys need the provider's active API access/quota; installing the Brave browser is not enough. Then → <b>Save and deploy</b>. If using an environment group, link it to this exact service and remove any blank/stale service-level overrides for these names. Confirm that the deployment becomes <b>Live</b>; saving keys on another service or only in GitHub does not configure this API.</p>
           </section>
           <section class="fc-admin-card" aria-labelledby="ai-today-title">
             <span class="eyebrow">TODAY</span><h2 id="ai-today-title">AI use across all students</h2>

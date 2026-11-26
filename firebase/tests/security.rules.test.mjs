@@ -40,7 +40,7 @@ function googleContext(uid, claims = {}) {
 // browser writes are denied independently of payload shape or admin claims.
 function validSiteContent(uid) {
   return {
-    brand: { name: "FIRE COUNSEL", tagline: "Ignite your legal intelligence", markImage: "./assets/images/fire-counsel-brand.jpg", markAlt: "Brand" },
+    brand: { name: "FIRE COUNSEL", tagline: "Ignite your legal intelligence", markImage: "./assets/images/fire-counsel-flame.png", markAlt: "Brand" },
     navigation: [{ label: "Home", href: "#home" }],
     hero: {
       autoplayMs: 6500,

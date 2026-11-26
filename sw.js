@@ -1,14 +1,14 @@
-const CACHE_NAME = "fire-counsel-shell-v28";
+const CACHE_NAME = "fire-counsel-shell-v32";
 const APP_CACHE_PREFIX = "fire-counsel-shell-";
 const APP_SHELL = [
   "./", "./index.html", "./study.html", "./ai.html",
-  "./site.css", "./site.js", "./styles.css", "./app.js", "./integrations.css",
+  "./site.css", "./branding.css", "./site.js", "./styles.css", "./app.js", "./integrations.css",
   "./study-materials.mjs", "./research-search.mjs", "./student-profile.mjs", "./student-page.mjs", "./installation.mjs", "./request-scope.mjs", "./auth-gate.mjs",
   "./ai-studio.css", "./ai-page.css", "./ai-studio.mjs", "./ai-markdown.mjs", "./presence.mjs", "./pdf-reader.mjs",
   "./preloader.css", "./preloader.js", "./workspace.css", "./workspace.mjs", "./workspace-config.mjs",
   "./data/site-content.json", "./manifest.webmanifest",
   "./assets/fire-counsel-192.png", "./assets/fire-counsel-512.png",
-  "./assets/images/fire-counsel-brand.jpg", "./assets/images/pexels-law-judge.jpg", "./assets/images/pexels-law-student.jpg",
+  "./assets/images/fire-counsel-flame.png", "./assets/images/pexels-law-judge.jpg", "./assets/images/pexels-law-student.jpg",
   "./assets/images/workspace-hero.jpg", "./assets/images/workspace-quote.jpg"
 ];
 const SHELL_PATHS = new Set(APP_SHELL.map(path => new URL(path, self.location.href).pathname));

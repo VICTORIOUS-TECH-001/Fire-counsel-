@@ -34,7 +34,8 @@ services:
       - key: FIREBASE_SERVICE_ACCOUNT_JSON
         sync: false
       # --- Fire Counsel AI (keys never go in Git) ---
-      # Google AI Studio key: https://aistudio.google.com/apikey (main AI).
+      # Optional Gemini writer/grounding key: https://aistudio.google.com/apikey.
+      # At least one writer (Groq/DeepSeek/Gemini/OpenRouter) is needed for answers.
       - key: GEMINI_API_KEY
         sync: false
       # Separate ADMIN document resources (no fallback to the student key).
@@ -53,14 +54,41 @@ services:
       # only when Gemini is busy or out of free quota).
       - key: OPENROUTER_API_KEY
         sync: false
-      # Groq key: https://console.groq.com/keys (starts with gsk_). Fast free
-      # backup writer, tried after Gemini and before OpenRouter.
+      # Groq writer key: https://console.groq.com/keys (not xAI/Grok).
+      # This Blueprint prefers Groq; Gemini is not required for text answers.
       - key: GROQ_API_KEY
         sync: false
-      # Tavily key: https://app.tavily.com (starts with tvly-). Backup web
-      # search (1,000 free searches a month) when Gemini search is unavailable.
+      # Optional usage-billed DeepSeek writer: https://platform.deepseek.com/api_keys
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      # Independent search: Tavily -> Brave -> SerpAPI -> Gemini grounding.
+      # Configure at least one search key; multiple keys enable independent failover.
+      # API access and quota are separate from the writer/hosting plan.
       - key: TAVILY_API_KEY
         sync: false
+      # Brave Search API key (not the Brave browser):
+      # https://api-dashboard.search.brave.com
+      - key: BRAVE_SEARCH_API_KEY
+        sync: false
+      # Optional SerpAPI: https://serpapi.com/manage-api-key
+      - key: SERPAPI_API_KEY
+        sync: false
+      - key: DEEPSEEK_MODELS
+        value: deepseek-flash
+      - key: AI_TIMEOUT_MS
+        value: "240000"
+      - key: AI_WRITER_PROVIDER_TIMEOUT_MS
+        value: "60000"
+      - key: AI_WRITER_PROVIDER_ORDER
+        value: groq,deepseek,gemini,openrouter
+      - key: WEB_SEARCH_PROVIDER_ORDER
+        value: tavily,brave,serpapi,gemini
+      - key: WEB_SEARCH_TIMEOUT_MS
+        value: "45000"
+      - key: WEB_SEARCH_PROVIDER_TIMEOUT_MS
+        value: "12000"
+      - key: AI_RESEARCH_CACHE_MINUTES
+        value: "0"
       # Comma-separated emails that may press "Make me admin" once in the
       # Admin Studio (the email must be verified). Example: you@gmail.com
       - key: ADMIN_EMAILS
@@ -68,8 +96,10 @@ services:
       # Daily allowances reset at midnight in this time zone.
       - key: AI_TIMEZONE
         value: Africa/Lagos
-      # Optional overrides (leave unset to use the built-in free-tier defaults):
-      #   GEMINI_MODELS         writer models, tried in order
-      #   GEMINI_SEARCH_MODELS  models with Google Search (free tier: gemini-2.5-flash-lite)
-      #   OPENROUTER_MODELS     backup models (default openrouter/free)
+      # Optional model overrides: choose IDs supported by the actual account.
+      #   GROQ_MODELS, DEEPSEEK_MODELS, GEMINI_MODELS, GEMINI_SEARCH_MODELS, OPENROUTER_MODELS
+      #   GROQ_TOKENS_PER_MINUTE (conservative default 8000; verify account limit)
+      #   TAVILY_SEARCH_DEPTH, TAVILY_MAX_RESULTS, BRAVE_MAX_RESULTS, SERPAPI_MAX_RESULTS
       #   AI_TIMEOUT_MS, AI_MAX_CASES_PER_RUN, AI_MAX_CONCURRENT_JOBS
+      # Orders set priority, not exclusion; unlisted defaults are appended and
+      # providers without keys are skipped. See DEPLOYMENT.md section 5.

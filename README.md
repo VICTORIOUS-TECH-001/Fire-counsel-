@@ -4,7 +4,7 @@
 
 **Local tests are not live-project approval.** Firebase and Neon are not configured in this checkout. Read [STATUS.md](STATUS.md) for the latest test results, integration limits, and remaining release gates. Render Free remains **disposable staging only**, never a place for real student data, prompts or payments.
 
-**Owner setup:** [Google-only access, admin usage and the exact Neon secret/migration steps](DEPLOYMENT.md).
+**Owner setup:** [Google-only access, admin usage and Neon steps](DEPLOYMENT.md), plus [Multi-AI/RAG/search setup and diagnostics](DEPLOYMENT.md#5-groqtavily-still-show-false-after-saving-keys).
 
 ## Run the app safely
 
@@ -48,6 +48,15 @@ python3 tools/dev_server.py --port 8082 --api-port 4002
 
 **Do not use `python3 -m http.server` from this repository.** It can expose `.env`, Git metadata, backend source and installed dependencies. The supplied helpers serve only frontend files/assets and proxy `/api/*`. They are development tools, not production servers. Production hosting must publish only frontend assets and provide an authenticated, same-origin API proxy.
 
+## AI answers and online search
+
+- **Writer:** Groq, DeepSeek, Gemini or OpenRouter. **Retrieval:** Tavily → Brave Search → SerpAPI → Gemini grounding by default. Groq/DeepSeek + Tavily/Brave/SerpAPI can answer text questions without Gemini; a text writer alone does not enable online search in this app. Each service needs its own server-side API credential and usable quota.
+- Copy `backend/.env.example` to the ignored `backend/.env` for local setup, or configure the actual deployed API service. The examples prefer Groq via `AI_WRITER_PROVIDER_ORDER=groq,deepseek,gemini,openrouter`; priorities for retrieval are independently configurable. Never put these keys in a frontend file, localStorage, Git or chat.
+- Selected online search must produce source URLs; if all retrieval fails, the request fails clearly instead of silently writing from memory. Failed jobs do not count against the student's daily allowance. Students can explicitly turn off Web search for a non-web answer. Answers show the retrieval provider/time and label optional reuse (off by default).
+- `/api/health` and KEY ADDED mean **presence**, not working authentication. The Google/admin-protected connection test reports actual provider/model/search failures and spends provider quota when selected. Source excerpts/link badges do not establish that a legal holding or quotation is correct.
+- Writer failover preserves the same library/source evidence, has total/per-provider deadlines and circuit cooldowns, and rejects unsupported files instead of dropping them. DeepSeek is usage-billed; free tiers are limited. See [the connector architecture, key list and current free-access notes](backend/AI_CONNECTORS.md).
+- See [the exact deployment checklist](DEPLOYMENT.md#5-groqtavily-still-show-false-after-saving-keys). No new AI schema migration is needed for this repair, but existing Firebase/Neon/AI tables and Premium/admin controls still apply. Automated tests use fixtures, not live provider keys or fetched legal materials.
+
 ## Repeatable checks
 
 ```bash
@@ -89,7 +98,7 @@ The Firebase development toolchain still has known moderate advisories and inher
 No live credentials are needed for automated tests; first-time app access requires configured Google sign-in. Before any live integration, review the existing Firebase project and Neon schema; use disposable staging fixtures, never real student work.
 
 1. Copy `backend/.env.example` to the ignored `backend/.env`. Supply `DATABASE_URL`, `FIREBASE_PROJECT_ID`, and matching `FIREBASE_SERVICE_ACCOUNT_JSON` privately. Do not paste values in chat or commit them. Database connections enforce TLS certificate/hostname validation.
-2. Put the Firebase **Web** `apiKey` in `firebase/firebase-config.mjs` (Project settings → Your apps → Config). That file is what the sign-in page loads, including on the published site. The other `fire-counsel` fields are already filled in. A Web API key is public app identification, not an admin credential. Never put a service-account key, OAuth client secret, or Gemini key there. Google sign-in is already implemented on `/auth.html`; it stays hidden until this key is real. Add the site hostname under Authentication → Settings → Authorized domains, keep the Google provider enabled with a support email, and if the Google Cloud OAuth consent screen is in Testing, add the Google account as a test user.
+2. Put the Firebase **Web** `apiKey` in `firebase/firebase-config.mjs` (Project settings → Your apps → Config). That file is what the sign-in page loads, including on the published site. The other `fire-counsel` fields are already filled in. A Web API key is public app identification, not an admin credential. Never put a service-account key, OAuth client secret, or AI/search provider key there. Google sign-in is already implemented on `/auth.html`; it stays hidden until this key is real. Add the site hostname under Authentication → Settings → Authorized domains, keep the Google provider enabled with a support email, and if the Google Cloud OAuth consent screen is in Testing, add the Google account as a test user.
 3. Enable Google and disable other sign-in providers after checking existing administrator account linking/UID continuity. Verify authorized domains, App Check, deployed rules and the intended administrator UID/claim in the actual Firebase project. A Google account, an email address or a browser-supplied role does not grant administrator permission.
 4. Pass local Firestore/Storage emulator tests and review existing deployed rules before considering any deployment. Proposed rules are not deployed by this repository's tests.
 5. Review `backend/migrations/001_student_profiles.sql` against the actual Neon schema and manually apply it only to disposable staging. Keep `STUDENT_PROFILES_ENABLED=false` until ready, then enable and test profile/installation authorization. No migration runs at startup. Optional trusted proxy IPs/CIDRs require a separate ingress/header review; the default ignores forwarded IPs.
@@ -117,7 +126,7 @@ Never paste provider keys into a static page, localStorage, site JSON, Firestore
 - Firebase supplies Google sign-in and the Firestore homepage/student-page channel. Current website photos and uploaded documents are stored in Neon, not Firebase Storage. The separate Storage rules remain available for owner review; this workstation does not enable Storage uploads.
 - AI access is admin-granted Premium, with server-enforced per-feature daily quotas and per-account overrides. There is no payment checkout or automatic paid-plan activation.
 - Archived questions must be exact verified questions, not generated variants. New practice scenarios must be separately labelled and grounded in approved material.
-- Nigeria was selected, but additional jurisdictions and school-approved source domains remain to be specified. External legal-web fallback stays off. During testing it stays off even if a domain is named later: the owner supplies the materials, and a missing source is reported as not found. See [Testing materials](#testing-materials--owner-supplied-only).
+- Nigeria remains the default research context. Online research is now an explicit AI-studio feature; school-approved domain allowlisting and additional jurisdiction controls are not implemented. Approved-library search stays separate from external search. Automated legal-material tests still use only supplied/synthetic evidence, report missing support and never fetch public legal materials. See [Testing materials](#testing-materials--owner-supplied-only).
 - Paystack and the supplied ₦2,000 price remain future choices; paid-plan duration and activation are unresolved and disabled.
 - A one-browser-installation-per-profile policy is implemented behind the staging setup gate. A different installation cannot reuse the existing profile; there is no automatic transfer or self-service recovery. IP changes do not create an account. A PWA cannot reliably identify physical hardware, and the marker can be cleared/copied; do not describe this as physical-device attestation. Review the lockout consequences before real-user rollout.
 
@@ -125,7 +134,7 @@ Brand artwork, photograph credits and source links are in [assets/images/README.
 
 ## Testing materials — owner supplied only
 
-This stage only records the testing rule. It does not add a fetcher, copy files from another repository, or change IndexedDB, Neon, Firebase, or the student-profile installation marker.
+This rule governs test evidence, including the new online-search regressions: use synthetic provider replies or owner-supplied material, never real student work or fetched legal content. The provider adapters do not authorize copying files from other repositories or changing the existing IndexedDB/installation policies. Live provider authentication and quota checks are separate owner-operated deployment steps.
 
 - Do not fetch, scrape, or search the public web for notes, cases, statutes, or past questions while this app is being tested.
 - The owner will give each test item, with its course name and type: note, case, statute, exact past question, or rubric.

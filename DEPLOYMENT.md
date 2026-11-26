@@ -67,19 +67,65 @@ Live prerequisites: matching Firebase Admin credentials with user-list access, t
 
 ## 5. Groq/Tavily still show `false` after saving keys
 
-`/api/health` checks **environment-variable presence in the running API process**, not whether Groq/Tavily accepted a credential. A nonempty unprefixed Tavily key is accepted by this code (with a format warning); it is not silently classified as missing. Groq deliberately refuses an xAI `xai-` credential because that belongs to a different provider.
+### Writers and online search are separate
+
+| Job | Supported services | Needed server setting |
+| --- | --- | --- |
+| Write an answer | Groq, DeepSeek, Gemini, OpenRouter | At least one of `GROQ_API_KEY`, `DEEPSEEK_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY` |
+| Retrieve online sources | Tavily, Brave Search, SerpAPI, Gemini grounding | `TAVILY_API_KEY`, `BRAVE_SEARCH_API_KEY` and/or `SERPAPI_API_KEY`; Gemini grounding is another fallback only if that account/model supports it |
+
+**Recommended for this repair:** Groq/DeepSeek for text answers, Tavily for retrieval and Brave/SerpAPI as independent retrieval fallbacks. Gemini is **not required** for that combination. Groq alone does **not** search the web; Tavily/Brave/SerpAPI alone do **not** generate answers. The Brave browser is not the Brave Search API. No key, free quota, paid plan or live model entitlement is supplied by the code.
+
+Set these **non-secret** options on the API service (the supplied local, Render and Oracle examples prefer Groq):
+
+```dotenv
+AI_WRITER_PROVIDER_ORDER=groq,deepseek,gemini,openrouter
+DEEPSEEK_MODELS=deepseek-flash
+AI_TIMEOUT_MS=240000
+AI_WRITER_PROVIDER_TIMEOUT_MS=60000
+WEB_SEARCH_PROVIDER_ORDER=tavily,brave,serpapi,gemini
+WEB_SEARCH_TIMEOUT_MS=45000
+WEB_SEARCH_PROVIDER_TIMEOUT_MS=12000
+AI_RESEARCH_CACHE_MINUTES=0
+```
+
+With no writer-order override the code retains `gemini,groq,deepseek,openrouter`; the default search order is `tavily,brave,serpapi,gemini`. Ordering settings change priority, not exclusion: omitted recognised providers are appended and providers without keys are skipped. To disable a provider, remove its server credential. The total search budget defaults to 45 seconds (configurable 1–120 s); each provider attempt defaults to 12 seconds (1–60 s, limited by the remaining total). Failed/unavailable services cool down in this server process; an explicit admin test probes them again. Writers now share one total deadline (default 240 s, shorter chat budgets win), a per-provider cap (default 60 s) and fair time shares for models/fallbacks. Cooling circuits are not bypassed when all writers are down. A writer switch reuses the same retrieved evidence instead of repeating search. See [the connector architecture and cost guide](backend/AI_CONNECTORS.md).
+
+Optional account-specific settings: `GROQ_MODELS`, `DEEPSEEK_MODELS` (default `deepseek-flash`), `GEMINI_MODELS`, `GEMINI_SEARCH_MODELS`, `OPENROUTER_MODELS`, `GROQ_TOKENS_PER_MINUTE` (conservative default 8000, not a claim about your plan), `TAVILY_SEARCH_DEPTH=basic`, `TAVILY_MAX_RESULTS=8`, `BRAVE_MAX_RESULTS=8`, `SERPAPI_MAX_RESULTS=8`. Use the provider dashboard to confirm current model IDs, limits, API access and cost. The default Groq models and this DeepSeek connector accept text, **not photos/PDFs**; use extracted text or configure a writer/model supporting the file type. Scanned-document OCR remains a separate Gemini/OCR.space path.
+
+### Put credentials in the running API, not in the browser
 
 For the service currently identified as **`fire-counsel-2`**:
 
-1. Open [Render](https://dashboard.render.com/) → **fire-counsel-2 → Environment**. Set `GROQ_API_KEY` and `TAVILY_API_KEY` as **environment variables**, with only their respective key values. A key saved only in GitHub Actions, another service, or a secret file is not a variable in this process. This provider layer does not read arbitrary `/etc/secrets/` files.
-2. **A new environment group is not required.** If using an existing group, go to this service's **Linked Environment Groups**, select it and press **Link**. Merely creating/editing a group does not attach it. Even a project-environment-scoped group still needs linking.
-3. Check just these two names for duplicates. A service-level variable **always overrides** the same name in a group, including a stale/blank service value. Conflicting names in several groups have no guaranteed precedence. Keep one authoritative value for each key; do not delete unrelated settings/groups. These precedence rules are documented in [Render's guide](https://render.com/docs/configure-environment-variables#linking-a-group-to-a-service).
-4. Choose **Save and deploy** (a rebuild is optional for runtime secrets) or **Save, rebuild, and deploy**. Under **Events**, verify that the new deployment actually becomes **Live**. A failed build/deploy can leave the previous instance answering requests.
-5. After deploying this diagnostic code, open [the live health endpoint](https://fire-counsel-2.onrender.com/api/health). It includes `config_diagnostics_version: 1`, `render_service`, and `render_commit` when Render supplies a valid commit SHA. Compare that SHA with the successful live deployment. If the new version field is absent, this code is not serving that response yet.
-6. `ai_key_check.groq.state` and `.tavily.state` report the **canonical setting's** `missing`, `empty` or `present` status. `setup.groq_key` / `setup.tavily_key` also account for supported aliases. No values, key fragments or hashes are exposed. `present` is not proof of provider validity.
-7. Once presence is true, use **Admin → AI studio settings → Test AI connection**, including **also test web search**, to distinguish accepted credentials from provider authentication/quota errors. Never share the keys or raw environment output to debug this.
+1. Open [Render](https://dashboard.render.com/) → **fire-counsel-2 → Environment**. Privately set `GROQ_API_KEY` from [Groq](https://console.groq.com/keys), `TAVILY_API_KEY` from [Tavily](https://app.tavily.com), and, for independent failover, `BRAVE_SEARCH_API_KEY` from the [Brave Search API dashboard](https://api-dashboard.search.brave.com). Add `DEEPSEEK_API_KEY` from [DeepSeek](https://platform.deepseek.com/api_keys) for another text writer and/or `SERPAPI_API_KEY` from [SerpAPI](https://serpapi.com/manage-api-key) for another retrieval fallback. DeepSeek is usage-billed; free plans have limits and any configured fallback may consume credit. Keep unused provider keys blank/absent. Enter only the key value, not code, a URL, `NAME=`, or an xAI/Grok key. Groq rejects xAI `xai-` credentials. Nonempty unprefixed Tavily keys are accepted with a format warning; only an actual API test establishes validity.
+2. **A new environment group is not required.** If using an existing group, link it under this exact service's **Linked Environment Groups**. Merely creating/editing a group does not attach it. Even a project-environment-scoped group still needs linking.
+3. Check these exact names for duplicates. A service-level variable **overrides** the same name in a group, including a stale/blank service value; conflicting names in several groups have no guaranteed precedence. Keep one authoritative value for each key without deleting unrelated settings/groups. See [Render's guide](https://render.com/docs/configure-environment-variables#linking-a-group-to-a-service). Keys stored only in GitHub Actions, another service or `/etc/secrets/` files do not configure this process. This provider layer does not load key files.
+4. Deploy the reviewed **frontend and API** from the matching commit. Choose **Save and deploy** (or **Save, rebuild, and deploy**); a failed deployment can leave the previous instance serving requests. Confirm the intended deployment becomes **Live** in Events. For local development use the Git-ignored `backend/.env`; for an existing Oracle host edit `/etc/fire-counsel/app.env` privately and restart `fire-counsel` instead of changing Render.
+5. Open the running service's `/api/health` (currently [here](https://fire-counsel-2.onrender.com/api/health)). This code returns `config_diagnostics_version: 2`, `render_service` and `render_commit` when available. Compare the SHA with the successful Live deployment; rebuilding an old commit is not this repair.
+6. Inspect the secret-free flags: `setup.groq_key`, `setup.tavily_key`, `setup.brave_search_key`, `setup.deepseek_key`, `setup.serpapi_key`, `setup.ai_writer_key`, `setup.web_search_key`. `ai_key_check.groq.state`, `.tavily.state`, `.brave.state`, `.deepseek.state` and `.serpapi.state` describe each **canonical variable** as `missing`, `empty` or `present`. Supported aliases may make a setup flag true while its canonical name is missing. Prefer canonical names; no values, fragments, lengths or hashes are exposed.
+7. Sign in as the existing Google administrator → **AI studio settings → Test AI connection**, with **also test web search (uses provider quota)** checked. Confirm a writer row is healthy **and** at least one search row reports source results. It probes configured services, including fallbacks, in parallel; it consumes their API quota and can incur plan charges. Uncheck web search for a writer-only check. Search-only diagnostics work without a writer or Neon, but student AI jobs still require the normal Firebase, Neon, Premium/admin and usage checks.
+8. In the AI studio, leave **Web search** selected and test with a non-sensitive, owner-supplied topic. The answer shows the retrieval provider and time. If all searches fail, the request fails explicitly, does not call the final writer and does not count against the student's daily allowance. It never silently becomes an unsourced answer. A non-web answer requires explicitly turning the checkbox off. This code change needs no new database migration; the existing AI tables are still required.
 
-A `status: ok` response means the configured **database health check** succeeded. It does not test Firebase sign-in, deployed Firestore rules, provider authentication or group linkage. The repository's `render.yaml` declarations also do not prove that an already-created dashboard service received the values.
+`/api/health` reports **presence only**, not provider authentication or search health. Its top-level `status: ok` means the configured database check succeeded, not that Firebase, AI keys, quota or group linkage were verified. Likewise, KEY ADDED in the admin panel is not HEALTHY. A `render.yaml` declaration does not prove an already-created dashboard service received its variables.
+
+### Read the actual error before changing settings
+
+| Diagnostic | Owner action |
+| --- | --- |
+| Canonical state `missing` / `empty` | Check the exact API service, linked group, blank overrides and successful Live commit; redeploy after saving. |
+| `PROVIDER_AUTH` | Check the correct provider's key **and API/plan permissions** privately. A presence flag cannot validate it. |
+| `PROVIDER_QUOTA`, `PROVIDER_MONTHLY_QUOTA`, `SEARCH_QUOTA` | Check usage/reset time and current account entitlement. Independent search falls back automatically when configured. This repair never enables billing or buys credits. |
+| `MODEL_UNAVAILABLE` / `SEARCH_UNSUPPORTED` | Choose a supported writer/grounding model in the matching model setting; a writing model need not support search. |
+| `PROVIDER_TOO_LARGE` / `PROVIDER_OUTPUT_LIMIT` | Shorten the request, choose another supported model or match `GROQ_TOKENS_PER_MINUTE` to the actual account allowance. Do not raise it beyond the plan limit. |
+| `PROVIDER_TIMEOUT`, `PROVIDER_UNAVAILABLE`, `PROVIDER_INVALID_RESPONSE` | Bounded fallback handles slow/outage/malformed responses; review each provider row rather than repeatedly submitting a long job. |
+| `PROVIDER_SAFETY` | Explicit safety refusal: not routed around to another model. |
+| `SEARCH_NOT_CONFIGURED` / `SEARCH_NO_RESULTS` | Configure retrieval or revise the query. A fluent model answer without source URLs is not a successful search. |
+
+Search results are untrusted excerpts, not complete judgments or proof of a legal holding/quotation. Source badges describe reachability/topic mentions; open and check the primary authority yourself. Domain allowlisting is not implemented. Approved-library search in `/study.html` remains a separate, access-controlled Neon search; it does not call external providers.
+
+Research reuse is **off by default**. Optional `AI_RESEARCH_CACHE_MINUTES` enables bounded, account-scoped, in-memory reuse only for requests without attachments; failures are never cached and the answer retains the original retrieval time. It is not a cross-account legal-answer database or offline online-search capability.
+
+**Verification boundary:** automated API/browser tests use synthetic responses and owner-supplied material. They do not authenticate real Groq/DeepSeek/Tavily/Brave/SerpAPI keys, validate current provider quotas/models, fetch legal materials, change Render/Oracle settings or deploy anything. Keep provider keys and private environment output out of chat, Git, browser storage and site JSON.
 
 ## 6. Manually publish the Firebase rules
 
@@ -88,7 +134,7 @@ A Firestore `permission-denied` reply is an authorization/validation denial, not
 **Important: deploy the matching frontend and API before replacing the rules below. All homepage browser writes are deliberately denied, even for admins; the old client will not work with these rules.** This is an integrated application/API/rules repair, not a rules-only fix.
 
 1. Open [Firebase Console → fire-counsel](https://console.firebase.google.com/project/fire-counsel/overview). Back up the current Firestore and Storage rules and review paths used by any other apps in the project before replacing them. Tests never deploy rules.
-2. Deploy the reviewed fix from this branch/PR to the actual frontend and **fire-counsel-2** API service. Keep Render's Root Directory at the **repository root**, not `backend/`: the API imports `firebase/content-schema.mjs`. The supplied build/start commands remain `npm --prefix backend ci --omit=dev` and `npm --prefix backend start`. Verify the successful **Live** commit and `config_diagnostics_version: 1` at `/api/health`; rebuilding an older commit will not install this route. All browser calls use same-origin `/api/...`; a separately hosted frontend must keep its existing authenticated API proxy.
+2. Deploy the reviewed fix from this branch/PR to the actual frontend and **fire-counsel-2** API service. Keep Render's Root Directory at the **repository root**, not `backend/`: the API imports `firebase/content-schema.mjs`. The supplied build/start commands remain `npm --prefix backend ci --omit=dev` and `npm --prefix backend start`. Verify the successful **Live** commit and `config_diagnostics_version: 2` at `/api/health`; rebuilding an older commit will not install this route. All browser calls use same-origin `/api/...`; a separately hosted frontend must keep its existing authenticated API proxy.
 3. In Firebase **Build → Firestore Database**, select **`(default)` → Rules**. Replace the editor with the complete contents of [`firebase/firestore.rules`](firebase/firestore.rules), then **Publish**. The browser reads `siteContent/public` in this database; writes go through **POST `/api/v1/admin/site/firebase`**. Do not paste Storage rules here.
 4. Separately, only for Firebase Storage operations: open **Build → Storage → Rules** for **`fire-counsel.firebasestorage.app`**. Paste the complete [`firebase/storage.rules`](firebase/storage.rules), then **Publish**. Current admin photo uploads use Neon `/media/`, not Storage. Changing Storage rules/billing does not fix homepage publishing.
 5. Sign in at `/admin.html` with the intended **Google** administrator. If the account needs an admin claim, its verified email must be in Render's `ADMIN_EMAILS`; use **Make this account the administrator** in Admin sign-in. That protected endpoint grants the claim and refreshes the ID token. Merely listing an email or publishing rules does **not** add `admin: true`. Never put administrator emails or private keys into public rules to bypass this.

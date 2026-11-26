@@ -153,6 +153,9 @@ function apply(next) {
   setText("ws-brand-name", cfg.brand.name);
   setText("ws-brand-tagline", cfg.brand.tagline);
   setImage("ws-logo", cfg.brand.logo);
+  setText("ws-top-brand-name", cfg.brand.name);
+  setText("ws-top-brand-tagline", cfg.brand.tagline);
+  setImage("ws-top-logo", cfg.brand.logo);
   const search = $("#global-search");
   if (search) search.placeholder = cfg.search.placeholder;
 

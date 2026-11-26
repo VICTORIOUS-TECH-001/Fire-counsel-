@@ -100,7 +100,8 @@ export function createAiRouter({
       const allowance = await getAllowance(poolProvider(), req.user.uid, { env, isAdmin: req.user.admin });
       res.json({ data: {
         configured: config.configured,
-        web_search: config.gemini.configured || config.tavily.configured,
+        web_search: config.search.configured,
+        search_providers: config.search.order.filter((name) => config[name].configured),
         email_verified: req.user.emailVerified,
         admin: req.user.admin,
         allowance
@@ -264,7 +265,7 @@ export function createAiRouter({
         const deadline = new Promise((resolve) => { timer = setTimeout(resolve, jobDeadline(mode, env)); });
         try {
           onProgress(attachments.length ? "reading" : "library");
-          const studio = studioFactory({ db, env });
+          const studio = studioFactory({ db, env, researchCacheScope: req.user.uid });
           const work = Promise.resolve().then(() => studio.run(mode, { history, text, attachments, options, isAdmin: req.user.admin, onProgress, onPartial }));
           const result = await Promise.race([work, deadline.then(() => null)]);
           if (!result) {

@@ -7,8 +7,8 @@ Cost: **$0**. Oracle needs a real debit/credit card only to check who you are.
 ## Before you start (have these ready)
 
 1. Your **Neon connection string** (Neon → your project → **Connect** → copy).
-2. Your **Gemini key**: https://aistudio.google.com/apikey
-3. *(Optional)* your **OpenRouter key**: https://openrouter.ai/keys
+2. At least one **writer key**: [Groq](https://console.groq.com/keys) (preferred for text), [DeepSeek](https://platform.deepseek.com/api_keys) (usage-billed text connector), [Gemini](https://aistudio.google.com/apikey) or [OpenRouter](https://openrouter.ai/keys).
+3. For online retrieval: [Tavily](https://app.tavily.com) , [Brave Search API](https://api-dashboard.search.brave.com) and/or [SerpAPI](https://serpapi.com/manage-api-key). Multiple keys enable independent failover. API access/quota/cost are separate from the hosting plan; Groq alone does not search the web.
 4. Your **Firebase key file**: https://console.firebase.google.com/project/fire-counsel/settings/serviceaccounts/adminsdk → **Generate new private key** (sign in with the Google account that owns `fire-counsel`).
 5. The start script: https://raw.githubusercontent.com/VICTORIOUS-TECH-001/Fire-counsel-/main/deploy/oracle/oracle-start.sh
 
@@ -64,6 +64,8 @@ Open https://cloud.oracle.com/compute/instances/create
 
 https://console.firebase.google.com/project/fire-counsel/authentication/settings → **Authorized domains → Add domain** → `129-1-2-3.sslip.io` (your own).
 
+The health response should include `config_diagnostics_version: 2` after installing this repair. `setup.groq_key`, `setup.deepseek_key`, `setup.tavily_key`, `setup.brave_search_key` and `setup.serpapi_key` only report credential **presence**. Sign in as the Google administrator → **AI studio settings → Test AI connection**, with web search selected, to check real API authentication/quota and returned sources (this spends provider quota). See [the full search deployment/error guide](../../DEPLOYMENT.md#5-groqtavily-still-show-false-after-saving-keys). This repair requires no new migration, but existing AI tables are still needed.
+
 Then: run the Neon AI tables workflow once (https://github.com/VICTORIOUS-TECH-001/Fire-counsel-/actions/workflows/neon-migrate.yml → **Run workflow**), open `https://…sslip.io/admin.html`, sign in, tap **Make this account the administrator**, and upload your prompts.
 
 ## Updates
@@ -86,3 +88,5 @@ Useful: `cat /root/FIRE-COUNSEL-STATUS.txt` (setup result), `sudo tail -50 /var/
 ## Using your own domain later
 
 Point the domain's **A record** to the server IP, add `FC_DOMAIN=study.yourdomain.com` to `/etc/fire-counsel/app.env` as `FC_DOMAIN='study.yourdomain.com'`, then run `sudo bash /opt/fire-counsel/deploy/oracle/setup.sh` and add the domain in Firebase **Authorized domains**.
+
+For the independent retrieval/writer design, total/fair-share deadlines, `DEEPSEEK_MODELS`, limited free allowances and owner privacy/cost review, see [the multi-provider connector guide](../../backend/AI_CONNECTORS.md). No free hosting plan includes API credits.

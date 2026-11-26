@@ -97,6 +97,7 @@ export function buildEnv({ secrets = {}, firebase = "", previous = {}, host }) {
   const serviceAccount = firebase || secrets.FIREBASE_SERVICE_ACCOUNT_JSON || previous.FIREBASE_SERVICE_ACCOUNT_JSON || "";
   if (serviceAccount) settings.FIREBASE_SERVICE_ACCOUNT_JSON = serviceAccount;
   const missing = REQUIRED.filter((key) => !settings[key]);
+  if (![...WRITER_KEYS, "DEEPSEEK_KEY"].some((key) => settings[key])) missing.push("AI writer key (GROQ_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY or OPENROUTER_API_KEY)");
   if (!settings.FIREBASE_SERVICE_ACCOUNT_JSON) missing.push("FIREBASE key file");
   const text = "# FIRE COUNSEL private settings. Written by deploy/oracle/setup.sh — keep secret.\n" +
     Object.entries(settings).map(([key, value]) => `${key}='${value}'`).join("\n") + "\n";

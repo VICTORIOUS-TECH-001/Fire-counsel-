@@ -59,7 +59,7 @@ export const DESTINATIONS = [
 export const STUDENT_PAGES = ["dashboard", "ai-chat", "subjects", "library", "memory", "exams", "planner", "profile"];
 
 export const DEFAULT_WORKSPACE = Object.freeze({
-  brand: { name: "FIRE COUNSEL", tagline: "Study • Research • Excel", logo: "./assets/images/fire-counsel-brand.jpg" },
+  brand: { name: "FIRE COUNSEL", tagline: "Study • Research • Excel", logo: "./assets/images/fire-counsel-flame.png" },
   search: { placeholder: "Search cases, statutes, notes…" },
   welcome: {
     title: "Welcome to FIRE COUNSEL,",
@@ -153,6 +153,8 @@ export function safeLink(value, fallback = "#dashboard") {
 /** Same rules for pictures, plus uploaded admin photos (/media/...). */
 export function safeImage(value, fallback = "") {
   const link = String(value ?? "").trim();
+  // Translate the retired bundled mark in live/cached workspace settings.
+  if (/^(?:\.\/|\/)?assets\/images\/fire-counsel-brand\.jpg(?:[?#].*)?$/i.test(link)) return DEFAULT_WORKSPACE.brand.logo;
   if (/^\.?\/(?!\/)[^\s"'<>\\()]*\.(?:jpe?g|png|webp|svg)$/i.test(link)) return link;
   if (/^https:\/\/[^\s"'<>\\()]+$/i.test(link)) return link;
   return fallback;

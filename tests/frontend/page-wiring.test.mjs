@@ -40,6 +40,60 @@ for (const page of pages) {
   });
 }
 
+test("all six pages load shared side-aligned branding after their page styles, including static and dynamic footers", () => {
+  for (const page of pages) {
+    const head = read(page).split("</head>")[0];
+    const styles = [...head.matchAll(/<link\b[^>]*\brel="stylesheet"[^>]*>/g)].map(match => match[0]);
+    assert.match(styles.at(-1), /href="\.\/branding\.css"/, `${page}: branding rules are loaded last`);
+    assert.match(read(page), /fc-brand-lockup/, `${page}: the shared lockup is mounted`);
+  }
+  assert.match(read("site.js"), /footer-mark fc-brand-lockup/, "published JSON/footer rendering keeps the shared lockup");
+  assert.match(read("workspace.mjs"), /setImage\("ws-top-logo", cfg\.brand\.logo\)/, "mobile and sidebar logos use the same published setting");
+  for (const server of ["backend/src/website.js", "tools/dev_server.py"]) assert.match(read(server), /"branding\.css"/, `${server} serves the shared stylesheet`);
+});
+
+test("all page logos and PWA icons use the supplied flame instead of the retired gavel", () => {
+  const image = "./assets/images/fire-counsel-flame.png";
+  assert.ok(existsSync(resolve(root, image)));
+  assert.ok(!existsSync(resolve(root, "assets/images/fire-counsel-brand.jpg")), "the old artwork is removed");
+  for (const page of pages) {
+    const html = read(page);
+    assert.ok(html.includes(`src="${image}"`), `${page}: the supplied logo is mounted`);
+    assert.doesNotMatch(html, /fire-counsel-brand\.jpg/);
+  }
+  for (const size of [192, 512]) {
+    const icon = readFileSync(resolve(root, `assets/fire-counsel-${size}.png`));
+    assert.equal(icon.readUInt32BE(16), size);
+    assert.equal(icon.readUInt32BE(20), size);
+  }
+  assert.ok(read("sw.js").includes(image), "the new logo is included offline");
+  assert.doesNotMatch(read("sw.js"), /fire-counsel-brand\.jpg/, "no removed asset breaks shell installation");
+  assert.equal(JSON.parse(read("data/site-content.json")).brand.markImage, image);
+});
+
+test("cached workspace logo paths migrate without discarding customization", async () => {
+  const { mergeWorkspace, DEFAULT_WORKSPACE } = await import(resolve(root, "workspace-config.mjs"));
+  for (const logo of ["./assets/images/fire-counsel-brand.jpg", "/assets/images/fire-counsel-brand.jpg", "assets/images/fire-counsel-brand.jpg", "./assets/images/fire-counsel-brand.jpg?v=old"]) {
+    const cfg = mergeWorkspace({ brand: { name: "Class workspace", logo } });
+    assert.equal(cfg.brand.logo, DEFAULT_WORKSPACE.brand.logo);
+    assert.equal(cfg.brand.name, "Class workspace");
+  }
+  assert.equal(mergeWorkspace({ brand: { logo: "/media/custom.png" } }).brand.logo, "/media/custom.png");
+});
+
+test("AI welcome restores the original layout/animation without the requested status banners", () => {
+  const html = read("ai.html");
+  assert.doesNotMatch(html, /id="ai-search-status"/);
+  assert.doesNotMatch(read("ai-studio.mjs"), /Ready\. Choose a tool|Web search selected|search results are not legal verification/);
+  assert.match(html, /id="ai-status"[^>]*role="status"/, "actual API/auth/validation errors still have their live status region");
+  assert.match(html, /id="ai-web-search"[^>]*checked/, "removing the banner never disables source-required search");
+  assert.match(read("ai-page.css"), /fcLogoFlicker/);
+  assert.match(read("ai-page.css"), /prefers-reduced-motion:reduce/);
+  const study = read("study.html");
+  assert.ok(study.indexOf('id="student-nav"') < study.indexOf('id="ws-logo"'), "sidebar navigation precedes its logo");
+  assert.ok(study.indexOf('id="student-profile-link"') < study.indexOf('id="ws-top-logo"'), "the mobile profile row precedes branding");
+});
+
 test("every admin navigation item has exactly one panel, with one initially visible", () => {
   const html = read("admin.html");
   const panels = [...html.matchAll(/<section\b[^>]*id="panel-([^"]+)"[^>]*>/g)];
