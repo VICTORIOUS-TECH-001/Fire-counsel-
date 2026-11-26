@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="./home-learning.css">
   <link rel="stylesheet" href="./home-ai.css">
   <link rel="stylesheet" href="./home-case-video.css">
+  <link rel="stylesheet" href="./home-ending.css">
   <link rel="stylesheet" href="./branding.css">
 </head>
 <body class="home-streams">
@@ -135,10 +136,25 @@
       <div class="privacy-badge">✓</div><div><span class="eyebrow">PRIVACY BY DESIGN</span><h2>Your study work stays yours.</h2><p>Personal files, subjects, flashcards and focus progress stay in this browser. Optional sign-in uses Firebase Auth without uploading your study work. AI, cloud uploads and payments remain disabled.</p></div><a class="button button-light" href="./study.html#dashboard">Enter study space <span>↗</span></a>
     </section>
 
-    <section class="final-cta reveal"><div class="cta-orb"></div><span class="eyebrow">FIRE COUNSEL · IGNITE YOUR LEGAL INTELLIGENCE</span><h2>Ready to make your next<br><em>study session count?</em></h2><p>Open your local-first study space and start with one subject, one case or one focused session.</p><a class="button button-light" href="./study.html#dashboard">Open student workspace <span>↗</span></a></section>
+    <section class="final-cta home-ending" id="exam-ready" aria-labelledby="exam-ready-title" data-motion="paused">
+      <div class="ending-frame">
+        <div class="ending-inner">
+          <div class="ending-brand"><img src="./assets/images/fire-counsel-flame.png" alt="" width="28" height="34" loading="lazy"><span>FIRE COUNSEL</span></div>
+          <div class="ending-body">
+            <span class="eyebrow">IGNITE YOUR LEGAL INTELLIGENCE</span>
+            <h2 id="exam-ready-title"><span class="ending-word">Make</span> <span class="ending-word">You</span> <span class="ending-word">Exam</span> <span class="ending-word">Ready</span> <span class="ending-word">Note</span></h2>
+            <p id="exam-ready-intro">Open your local-first study space and start with one subject, one case or one focused session.</p>
+            <a class="button button-light ending-action" href="./study.html#dashboard">Open student workspace <span aria-hidden="true">↗</span></a>
+          </div>
+        </div>
+      </div>
+      <canvas class="ending-streams" id="exam-ready-streams" aria-hidden="true"></canvas>
+      <div class="ending-glow" aria-hidden="true"></div>
+    </section>
   </main>
 
-  <footer class="site-footer" id="site-footer">
+  <footer class="site-footer home-ending-footer" id="site-footer" data-motion="paused">
+    <div class="ending-footer-card">
     <div class="footer-main" id="footer-main">
       <div class="footer-brand"><a class="site-brand footer-mark fc-brand-lockup" href="#home"><span class="brand-image-wrap fc-brand-emblem"><img src="./assets/images/fire-counsel-flame.png" alt="" width="72" height="72" loading="lazy"></span><span class="brand-copy fc-brand-copy"><strong>FIRE COUNSEL</strong><small>Ignite your legal intelligence</small></span></a><p>A focused legal-learning space for clearer study, stronger recall and confident practice.</p></div>
       <div class="footer-column"><h3>Explore</h3><a href="#learning">Learning tools</a><a href="#cases">Case notes</a><a href="#articles">Articles</a></div>
@@ -147,6 +163,7 @@
     </div>
     <div class="footer-disclaimer" id="footer-disclaimer">FIRE COUNSEL is a study aid, not a law firm or a substitute for legal advice. Verify legal materials against authoritative sources.</div>
     <div class="footer-bottom"><span id="copyright-text">© 2026 FIRE COUNSEL. <br>  powered by <br> Victorious Tech Institute <br> All rights reserved.</span><a href="#home">Back to top ↑</a></div>
+    </div>
   </footer>
 
   <dialog class="article-dialog" id="article-dialog" aria-labelledby="dialog-title"><form method="dialog"><button class="dialog-close" aria-label="Close article">×</button></form><span class="eyebrow" id="dialog-category">STUDY NOTE</span><h2 id="dialog-title"></h2><p id="dialog-body"></p><button class="button button-dark" id="dialog-done" type="button">Close</button></dialog>
@@ -155,5 +172,6 @@
   <script type="module" src="./home-hero.mjs"></script>
   <script type="module" src="./home-ai.mjs"></script>
   <script type="module" src="./home-ai-access.mjs"></script>
+  <script type="module" src="./home-ending.mjs"></script>
 </body>
 </html>

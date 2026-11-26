@@ -27,7 +27,7 @@ test("website serves allowlisted pages, scripts and assets with popup-safe heade
   assert.equal(home.headers.get("cross-origin-opener-policy"), "same-origin-allow-popups");
   assert.equal(home.headers.get("cache-control"), "no-cache");
 
-  for (const [path, type] of [["/home-case-video.css", /css/], ["/home-case-video.mjs", /javascript/], ["/homepage-media.mjs", /javascript/], ["/home-hero.css", /css/], ["/home-learning.css", /css/], ["/home-ai.css", /css/], ["/home-ai.mjs", /javascript/], ["/home-ai-access.mjs", /javascript/], ["/home-hero.mjs", /javascript/], ["/homepage-copy.mjs", /javascript/], ["/admin-homepage.mjs", /javascript/], ["/branding.css", /css/], ["/study.html", /html/], ["/auth-page.mjs", /javascript/], ["/firebase/client.mjs", /javascript/], ["/data/site-content.json", /json/], ["/assets/fire-counsel-192.png", /png/], ["/sw.js", /javascript/]]) {
+  for (const [path, type] of [["/home-ending.css", /css/], ["/home-ending.mjs", /javascript/], ["/home-case-video.css", /css/], ["/home-case-video.mjs", /javascript/], ["/homepage-media.mjs", /javascript/], ["/home-hero.css", /css/], ["/home-learning.css", /css/], ["/home-ai.css", /css/], ["/home-ai.mjs", /javascript/], ["/home-ai-access.mjs", /javascript/], ["/home-hero.mjs", /javascript/], ["/homepage-copy.mjs", /javascript/], ["/admin-homepage.mjs", /javascript/], ["/branding.css", /css/], ["/study.html", /html/], ["/auth-page.mjs", /javascript/], ["/firebase/client.mjs", /javascript/], ["/data/site-content.json", /json/], ["/assets/fire-counsel-192.png", /png/], ["/sw.js", /javascript/]]) {
     const response = await fetch(`${base}${path}`);
     assert.equal(response.status, 200, path);
     assert.match(response.headers.get("content-type"), type, path);
