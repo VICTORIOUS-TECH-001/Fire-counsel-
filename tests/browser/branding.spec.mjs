@@ -39,7 +39,8 @@ async function sideLogo(page, imageSelector, areaSelector, copySelector) {
 
 test("homepage and dynamic footer logos keep the original side-by-side layout at every viewport", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator("#hero-slides .hero-slide")).toHaveCount(2);
+  await expect(page.locator("#learning-cards > *")).toHaveCount(4);
+  await expect(page.locator("#home h1")).toHaveText("Fire Counsel");
   for (const width of widths) {
     await page.setViewportSize({ width, height: 844 });
     await sideLogo(page, "#brand-image", ".site-header", "#brand-name");
@@ -216,7 +217,8 @@ test("older published/cached gavel paths resolve to the supplied flame without a
   await stubFirestore(page, { content: { ...bundled, brand: { ...bundled.brand, markImage: "./assets/images/fire-counsel-brand.jpg" }, workspace: { brand: { logo: "./assets/images/fire-counsel-brand.jpg" } } } });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await expect(page.locator("#hero-slides .hero-slide")).toHaveCount(2);
+  await expect(page.locator("#learning-cards > *")).toHaveCount(4);
+  await expect(page.locator("#home h1")).toHaveText("Fire Counsel");
   await sideLogo(page, "#brand-image", ".site-header", "#brand-name");
   await sideLogo(page, ".footer-mark img", "#site-footer", ".footer-mark strong");
   await page.goto("/study.html");

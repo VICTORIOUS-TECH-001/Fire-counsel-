@@ -33,8 +33,6 @@
     clearTimeout(toast.timer); toast.timer = setTimeout(() => node.classList.remove("show"), 2600);
   };
   let siteData = null;
-  let activeSlide = 0;
-  let carouselTimer = null;
 
   // Preview: the admin page that opened this tab sends its unsaved draft. Only
   // messages from this same site (the admin studio) are accepted; the draft is
@@ -72,7 +70,7 @@
       showPreviewBanner("Preview not received — this shows the live site. Open the preview from the admin page (Pages & JSON → Preview).");
     }
     // The admin studio publishes siteContent/public straight to Firestore, so
-    // live slide/content edits come from there first. The bundled JSON remains
+    // published content edits come from there first. The bundled JSON remains
     // the fallback for first deploy, offline, or an unconfigured Firebase
     // project. The Firestore attempt is time-boxed so a slow network can
     // never hold the homepage hostage.
@@ -92,68 +90,6 @@
     if (logo) { logo.src = photo(data.brand?.markImage); logo.alt = esc(data.brand?.markAlt || ""); }
     $("#brand-name").textContent = data.brand?.name || "FIRE COUNSEL";
     $("#brand-tagline").textContent = data.brand?.tagline || "Ignite your legal intelligence";
-  }
-  function renderHero(data) {
-    const holder = $("#hero-slides");
-    const slides = Array.isArray(data.hero?.slides) ? data.hero.slides : [];
-    if (!slides.length) return;
-    holder.innerHTML = slides.map((slide, index) => {
-      let word = 0;
-      const words = value => String(value ?? "").split(/(\s+)/).map(token => /\S/.test(token)
-        ? `<span class="hero-word" style="--word:${word++}">${esc(token)}</span>` : esc(token)).join("");
-      // Older published defaults must pick up the requested Sign up CTA too.
-      // Deliberately preserve administrator-authored labels/links instead of
-      // discarding customization or rewriting any stored Firestore content.
-      const oldDefault = ["Open student workspace", "Start studying"].includes(slide.primaryLabel)
-        && ["./study.html#dashboard", "/study.html#dashboard", "study.html#dashboard"].includes(slide.primaryHref);
-      const primaryLabel = oldDefault ? "Sign up" : slide.primaryLabel;
-      const primaryHref = oldDefault ? "./auth.html" : slide.primaryHref;
-      const body = String(slide.body ?? "").replace(/\s*[—–]\s*/g, ", ");
-      return `<article class="hero-slide ${index === 0 ? "is-active" : ""}" data-slide="${index}" role="group" aria-label="Slide ${index + 1} of ${slides.length}" aria-hidden="${index !== 0}">
-        <div class="hero-copy"><span class="eyebrow">${esc(slide.eyebrow)}</span><h1>${words(slide.title)}<br>\n<em>${words(slide.accent)}</em></h1><p>${esc(body)}</p><div class="hero-actions"><a class="button button-light hero-signup" href="${href(primaryHref)}">${esc(primaryLabel)}</a><a class="button button-ghost hero-secondary" href="${href(slide.secondaryHref)}">${esc(slide.secondaryLabel)}</a></div></div>
-      </article>`;
-    }).join("");
-    const dots = $("#hero-dots");
-    dots.innerHTML = slides.map((_, index) => `<button class="hero-dot ${index === 0 ? "is-active" : ""}" type="button" aria-label="Show slide ${index + 1}" aria-current="${index === 0 ? "true" : "false"}" data-slide-to="${index}"></button>`).join("");
-    [$("#slide-prev"), $("#slide-next")].forEach(button => { button.disabled = slides.length < 2; });
-    showSlide(0);
-    const interval = Number(data.hero?.autoplayMs);
-    initCarousel(Number.isFinite(interval) ? Math.max(4000, Math.min(interval, 15000)) : 6500);
-  }
-  function showSlide(index) {
-    const slides = $$(".hero-slide", $("#hero-slides"));
-    if (!slides.length) return;
-    activeSlide = (index + slides.length) % slides.length;
-    slides.forEach((slide, i) => {
-      slide.classList.toggle("is-active", i === activeSlide);
-      slide.setAttribute("aria-hidden", String(i !== activeSlide));
-    });
-    $$(".hero-dot").forEach((dot, i) => {
-      const on = i === activeSlide; dot.classList.toggle("is-active", on); dot.setAttribute("aria-current", String(on));
-    });
-    const count = $("#hero-count");
-    if (count) count.textContent = `${String(activeSlide + 1).padStart(2, "0")} / ${String(slides.length).padStart(2, "0")}`;
-  }
-  function initCarousel(interval) {
-    const frame = $(".hero-frame");
-    if (!frame) return;
-    $("#slide-prev").addEventListener("click", () => showSlide(activeSlide - 1));
-    $("#slide-next").addEventListener("click", () => showSlide(activeSlide + 1));
-    $("#hero-dots").addEventListener("click", event => {
-      const dot = event.target.closest("[data-slide-to]"); if (dot) showSlide(Number(dot.dataset.slideTo));
-    });
-    const motion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-    const stop = () => clearInterval(carouselTimer);
-    const start = () => {
-      stop();
-      if (motion?.matches || document.hidden) return;
-      carouselTimer = setInterval(() => showSlide(activeSlide + 1), interval);
-    };
-    frame.addEventListener("mouseenter", stop); frame.addEventListener("mouseleave", start);
-    frame.addEventListener("focusin", stop); frame.addEventListener("focusout", start);
-    document.addEventListener("visibilitychange", () => document.hidden ? stop() : start());
-    motion?.addEventListener("change", start);
-    start();
   }
   function renderQuickFacts(data) {
     $("#quickfacts-grid").innerHTML = (data.quickFacts || []).map(item => `<article><span>${esc(item.number)}</span><strong>${esc(item.label)}</strong><small>${esc(item.detail)}</small></article>`).join("");
@@ -242,7 +178,9 @@
   async function init() {
     try {
       siteData = await loadContent();
-      renderNavigation(siteData); renderHero(siteData); renderQuickFacts(siteData);
+      // The single branded hero is static HTML. Legacy CMS slides must not
+      // restore the retired carousel, photos, paragraphs or secondary CTA.
+      renderNavigation(siteData); renderQuickFacts(siteData);
       renderLearning(siteData); renderCaseNotes(siteData); renderArticles(siteData); renderResources(siteData); renderFooter(siteData);
       initArticleDialog(siteData);
     } catch (error) {

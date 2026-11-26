@@ -1,4 +1,4 @@
-const CACHE_NAME = "fire-counsel-shell-v33";
+const CACHE_NAME = "fire-counsel-shell-v34";
 const APP_CACHE_PREFIX = "fire-counsel-shell-";
 const APP_SHELL = [
   "./", "./index.html", "./study.html", "./ai.html",
@@ -8,7 +8,7 @@ const APP_SHELL = [
   "./preloader.css", "./preloader.js", "./workspace.css", "./workspace.mjs", "./workspace-config.mjs",
   "./data/site-content.json", "./manifest.webmanifest",
   "./assets/fire-counsel-192.png", "./assets/fire-counsel-512.png",
-  "./assets/images/fire-counsel-flame.png", "./assets/images/pexels-law-judge.jpg", "./assets/images/pexels-law-student.jpg",
+  "./assets/images/fire-counsel-flame.png", "./assets/images/pexels-law-judge.jpg",
   "./assets/images/workspace-hero.jpg", "./assets/images/workspace-quote.jpg"
 ];
 const SHELL_PATHS = new Set(APP_SHELL.map(path => new URL(path, self.location.href).pathname));
