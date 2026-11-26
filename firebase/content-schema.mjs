@@ -48,7 +48,7 @@ const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
 const CONTROL_CHARS_MULTILINE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 
 export const SITE_CONTENT_KEYS = Object.freeze(["brand", "navigation", "hero", "quickFacts", "learning", "caseNotes", "articles", "resources", "footer"]);
-export const SITE_CONTENT_OPTIONAL_KEYS = Object.freeze(["workspace"]);
+export const SITE_CONTENT_OPTIONAL_KEYS = Object.freeze(["workspace", "aiSpotlight"]);
 export const SLIDE_KEYS = Object.freeze(["eyebrow", "title", "accent", "body", "image", "imageAlt", "imageCredit", "primaryLabel", "primaryHref", "secondaryLabel", "secondaryHref"]);
 export const STUDENT_PAGE_KEYS = Object.freeze(["displayName", "headline", "bio", "links", "focusAreas", "published", "createdAt", "updatedAt"]);
 
@@ -135,7 +135,19 @@ export function validateSiteContent(content) {
 
   if (!isPlainObject(content.hero)) errors.push("hero must be an object.");
   else {
-    for (const key of Object.keys(content.hero)) if (!["slides", "autoplayMs"].includes(key)) errors.push(`hero.${key} is not a supported field.`);
+    for (const key of Object.keys(content.hero)) if (!["slides", "autoplayMs", "copy"].includes(key)) errors.push(`hero.${key} is not a supported field.`);
+    // Optional single-introduction copy, independent of the legacy slide
+    // archive. Both the browser preflight and protected API enforce this shape.
+    if ("copy" in content.hero) {
+      const copy = content.hero.copy;
+      if (!isPlainObject(copy) || Object.keys(copy).some(key => !["title", "tagline", "introduction"].includes(key))) {
+        errors.push("hero.copy needs only title, tagline and introduction text.");
+      } else {
+        if (!isText(copy.title, SITE_CONTENT_LIMITS.SHORT_TEXT) || !copy.title.trim()) errors.push("hero.copy.title must be non-empty text up to 120 characters.");
+        if (!isText(copy.tagline, SITE_CONTENT_LIMITS.SHORT_TEXT)) errors.push("hero.copy.tagline must be text up to 120 characters.");
+        if (!isText(copy.introduction, SITE_CONTENT_LIMITS.LONG_TEXT)) errors.push("hero.copy.introduction must be text up to 600 characters.");
+      }
+    }
     if ("autoplayMs" in content.hero && !(Number.isFinite(content.hero.autoplayMs) && content.hero.autoplayMs >= 4000 && content.hero.autoplayMs <= 15000)) {
       errors.push("hero.autoplayMs must be a number between 4000 and 15000.");
     }
@@ -143,6 +155,24 @@ export function validateSiteContent(content) {
       errors.push(`Keep between 1 and ${SITE_CONTENT_LIMITS.MAX_SLIDES} homepage slides.`);
     } else {
       content.hero.slides.forEach((slide, index) => checkSlide(slide, errors, `hero.slides[${index}]`));
+    }
+  }
+
+  // Optional, text-only AI promotion. Destinations/auth are application code,
+  // not editable content; old published documents retain the bundled words.
+  if ("aiSpotlight" in content) {
+    const copy = content.aiSpotlight;
+    const keys = ["title", "intro", "closing", "buttonLabel", "chips"];
+    if (!isPlainObject(copy) || Object.keys(copy).some(key => !keys.includes(key))) {
+      errors.push("aiSpotlight needs only title, intro, closing, buttonLabel and five chip labels.");
+    } else {
+      for (const [key, max] of [["title", 120], ["intro", 600], ["closing", 600], ["buttonLabel", 60]]) {
+        if (!isText(copy[key], max) || !copy[key].trim()) errors.push(`aiSpotlight.${key} must be non-empty text up to ${max} characters.`);
+      }
+      if (!Array.isArray(copy.chips) || copy.chips.length !== 5
+        || copy.chips.some(label => !isText(label, 36) || !label.trim())) {
+        errors.push("aiSpotlight.chips must contain five non-empty labels up to 36 characters each.");
+      }
     }
   }
 

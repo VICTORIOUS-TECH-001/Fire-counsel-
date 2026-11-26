@@ -66,10 +66,19 @@ test("learning controls support keyboard selection and reduced motion without mo
 });
 
 test("the wider title and reference-style learning split fit four viewports with a seamless join", async ({ page }) => {
+  await page.clock.install();
   await readyLearning(page);
+  // Drive the real first-visit preloader's 1100ms minimum + 650ms removal.
+  // Native headless timers can stop; do not hide it or sleep for screenshots.
+  await page.clock.runFor(1800);
   for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    // Resizing can expose the old inherited viewport font (182px on a
+    // 320px page) for one frame. Wait for the real responsive style before
+    // applying the unchanged, strict glyph bounds and one-line assertions.
+    await expect.poll(() => page.locator("#home .hero-word").first().evaluate(word => parseFloat(getComputedStyle(word).fontSize)),
+      { intervals: [100] }).toBeCloseTo(Math.min(182, Math.max(42, width * .135)), 2);
     await expectNoHorizontalOverflow(page);
     const hero = await page.locator("#home").boundingBox();
     const learning = await page.locator("#learning").boundingBox();
@@ -80,6 +89,11 @@ test("the wider title and reference-style learning split fit four viewports with
       return { x: box.x, right: box.right, width: box.width, height: box.height, lineHeight: parseFloat(getComputedStyle(element).lineHeight) };
     });
     expect(Math.abs(hero.y + hero.height - learning.y)).toBeLessThanOrEqual(1);
+    const signup = await page.locator("#home .hero-signup").boundingBox();
+    const nextWords = await page.locator("#learning .section-heading .eyebrow").boundingBox();
+    const gap = nextWords.y - signup.y - signup.height;
+    expect(gap).toBeGreaterThanOrEqual(100); // don't crowd Sign up
+    expect(gap).toBeLessThanOrEqual(165); // lift the old 170–214px gap
     expect(title.width).toBeGreaterThan(width * .72);
     expect(title.x).toBeGreaterThanOrEqual(16);
     expect(title.right).toBeLessThanOrEqual(width - 16);
@@ -137,6 +151,93 @@ test("static learning fallback retains all four working tool links and the new i
   await expect(page.locator("#learning-visual")).toBeHidden();
   await expect(page.locator("#case-image")).toHaveAttribute("src", bundled.caseNotes.image);
   await expectNoHorizontalOverflow(page);
+});
+
+test("mouse hover switches illustrations and moves the highlight without clicks or focus theft", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await readyLearning(page);
+  const signup = page.locator("#home .hero-signup");
+  await signup.focus();
+  const tabs = page.locator('#learning-cards [role="tab"]');
+  await page.evaluate(() => document.querySelector("#learning-cards").scrollIntoView({ block: "center", behavior: "instant" }));
+  const moveOver = async (tab, x = 30) => {
+    const bounds = await tab.boundingBox();
+    // Real mouse input at current bounds, without an actionability RAF wait
+    // that can stall on the accordion's live size/transform transitions.
+    await page.mouse.move(bounds.x + x, bounds.y + 24);
+  };
+  for (const index of [1, 2, 3, 0]) {
+    await moveOver(tabs.nth(index));
+    await expect(tabs.nth(index)).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator('.learning-pane:not([hidden]) h3')).toHaveText(bundled.learning.cards[index].title);
+    await expect(page.locator('#learning-cards [aria-selected="true"]')).toHaveCount(1);
+    await expect(signup).toBeFocused();
+  }
+  const first = tabs.first();
+  await moveOver(first, 30);
+  const readGlow = () => first.evaluate(tab => ({
+    x: tab.style.getPropertyValue("--pointer-x"),
+    background: getComputedStyle(tab, "::before").backgroundImage
+  }));
+  const before = await readGlow();
+  await moveOver(first, 160);
+  const after = await readGlow();
+  expect(before.x).not.toBe(after.x);
+  expect(before.background).not.toBe(after.background);
+  await expect(first).toHaveClass(/is-pointer-active/);
+  const motion = await page.locator('.learning-pane:not([hidden])').evaluate(pane => {
+    const animation = pane.getAnimations().find(item => item.animationName === "learningPaneIn");
+    if (!animation) return null;
+    // Inspect the actual CSS animation at explicit times, not a wall-clock
+    // sleep. This proves the selected preview moves, not just its tab colour.
+    animation.pause(); animation.currentTime = 0;
+    const start = getComputedStyle(pane).transform;
+    animation.currentTime = 800;
+    return { start, end: getComputedStyle(pane).transform };
+  });
+  expect(motion).not.toBeNull();
+  expect(motion.start).not.toBe(motion.end);
+  await page.mouse.move(0, 0);
+  await expect(page.locator("#learning-cards .is-pointer-active")).toHaveCount(0);
+  await expect(first).toHaveAttribute("aria-selected", "true");
+});
+
+test("hover does not replace a keyboard-focused tab or panel; reduced motion remains still", async ({ page }) => {
+  await readyLearning(page);
+  const tabs = page.locator('#learning-cards [role="tab"]');
+  await tabs.first().focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(tabs.nth(1)).toBeFocused();
+  await tabs.last().hover();
+  await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
+  await expect(tabs.nth(1)).toBeFocused();
+  const open = page.locator('.learning-pane:not([hidden]) .learning-open');
+  await open.focus();
+  await tabs.first().hover();
+  await expect(open).toBeVisible();
+  await expect(open).toBeFocused();
+  await expect(page.locator('.learning-pane:not([hidden]) .learning-badge')).toHaveCSS("animation-name", "none");
+  expect(await tabs.first().evaluate(tab => getComputedStyle(tab, "::before").display)).toBe("none");
+  await expect(tabs.first()).toHaveCSS("transform", "none");
+  // A deliberate click still selects while a panel has keyboard focus.
+  await tabs.last().click();
+  await expect(tabs.last()).toHaveAttribute("aria-selected", "true");
+});
+
+test.describe("touch learning controls", () => {
+  test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
+  test("tapping selects the panel, but touch pointer movement cannot act as hover", async ({ page }) => {
+    await readyLearning(page);
+    const tabs = page.locator('#learning-cards [role="tab"]');
+    await tabs.nth(2).tap();
+    await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
+    await tabs.last().dispatchEvent("pointerover", { pointerType: "touch", clientX: 100, clientY: 100 });
+    await tabs.last().dispatchEvent("pointermove", { pointerType: "touch", clientX: 110, clientY: 100 });
+    await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator('.learning-pane:not([hidden]) .learning-open')).toHaveAttribute("href", bundled.learning.cards[2].href);
+    await expect(page.locator("#learning-cards .is-pointer-active")).toHaveCount(0);
+    await expectNoHorizontalOverflow(page);
+  });
 });
 
 test("an empty published tools list does not break the rest of the homepage", async ({ page }) => {

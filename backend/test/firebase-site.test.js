@@ -6,6 +6,7 @@ import express from "express";
 import { createAdminSiteRouter } from "../src/routes/siteContent.js";
 import { createFirebaseTokenVerifier } from "../src/middleware/verifyFirebaseToken.js";
 import { DEFAULT_WORKSPACE } from "../../workspace-config.mjs";
+import { SITE_CONTENT_OPTIONAL_KEYS } from "../../firebase/content-schema.mjs";
 
 const SITE = JSON.parse(readFileSync(new URL("../../data/site-content.json", import.meta.url), "utf8"));
 const LIMITS = { eyebrow: 120, title: 120, accent: 120, body: 600, imageAlt: 200, imageCredit: 200, primaryLabel: 60, secondaryLabel: 60 };
@@ -108,7 +109,8 @@ test("server-side Firebase validation independently enforces every required fiel
   };
   for (const parts of [[], ["brand"], ["hero", "slides", 0], ["navigation", 0]]) {
     const section = parts.reduce((value, key) => value[key], SITE);
-    for (const key of Object.keys(section)) {
+    for (const key of Object.keys(section).filter(key => !(parts.length === 0 && SITE_CONTENT_OPTIONAL_KEYS.includes(key))
+      && !(parts.length === 1 && parts[0] === "hero" && key === "copy"))) {
       const content = structuredClone(SITE);
       const target = parts.reduce((value, part) => value[part], content);
       delete target[key];
@@ -137,6 +139,60 @@ test("server-side Firebase validation independently enforces every required fiel
     await rejected(content);
   }
   assert.deepEqual(api.counts(), { databaseCalls: 0, neonCalls: 0, configuredCalls: 0 });
+});
+
+test("the protected API accepts optional single-introduction copy and editable tool illustrations, but rejects malformed copy before storage", async t => {
+  const api = await serve(t);
+  const content = structuredClone(SITE);
+  content.hero.copy = { title: "A new title", tagline: "An edited tagline", introduction: "An edited opening paragraph." };
+  content.learning.previewLabel = "Our study tool preview";
+  content.learning.cards[0].linkLabel = "Study with clarity";
+  content.learning.cards[0].preview = { badge: "An edited study badge", labels: ["A custom table heading"] };
+  for (const copy of [null, [], {}, { ...content.hero.copy, extra: true }, { ...content.hero.copy, title: " " },
+    { ...content.hero.copy, title: "x".repeat(121) }, { ...content.hero.copy, tagline: 3 },
+    { ...content.hero.copy, tagline: "x".repeat(121) }, { ...content.hero.copy, introduction: "x".repeat(601) },
+    { ...content.hero.copy, introduction: "bad\ntext" }]) {
+    const response = await api.post({ ...content, hero: { ...content.hero, copy } });
+    assert.equal(response.status, 400, JSON.stringify(copy));
+    assert.equal((await response.json()).code, "VALIDATION_ERROR");
+  }
+  assert.deepEqual(api.writes, []);
+  assert.equal(api.counts().databaseCalls, 0);
+  assert.equal((await api.post(content)).status, 200);
+  assert.deepEqual(api.writes[0].hero.copy, content.hero.copy);
+  assert.deepEqual(api.writes[0].learning, content.learning);
+  delete content.hero.copy; // old documents stay valid, with no migration
+  assert.equal((await api.post(content)).status, 200);
+  assert.equal(api.writes[1].hero.copy, undefined);
+  assert.equal(api.counts().neonCalls, 0);
+});
+
+test("the protected API bounds optional AI words, forbids redirect fields and still publishes pre-AI documents", async t => {
+  const api = await serve(t);
+  const original = structuredClone(SITE.aiSpotlight);
+  const invalid = [null, [], {}, { ...original, href: "https://attacker.invalid" },
+    { ...original, chips: [] }, { ...original, chips: Array(6).fill("Study") },
+    { ...original, chips: ["Hacks", "Clarity", 1, "Statues", "Exam"] },
+    { ...original, chips: [" ", "Clarity", "Legislation", "Statues", "Exam"] },
+    { ...original, chips: ["x".repeat(37), "Clarity", "Legislation", "Statues", "Exam"] }];
+  for (const [key, max] of [["title", 120], ["intro", 600], ["closing", 600], ["buttonLabel", 60]]) {
+    for (const bad of [null, 1, {}, " ", "x".repeat(max + 1), "bad\ntext"]) invalid.push({ ...original, [key]: bad });
+  }
+  for (const aiSpotlight of invalid) {
+    const response = await api.post({ ...SITE, aiSpotlight });
+    assert.equal(response.status, 400, JSON.stringify(aiSpotlight));
+    assert.equal((await response.json()).code, "VALIDATION_ERROR");
+  }
+  assert.deepEqual(api.writes, []);
+  assert.equal(api.counts().databaseCalls, 0);
+  const maximum = { ...original, title: "x".repeat(120), intro: "x".repeat(600), closing: "x".repeat(600),
+    buttonLabel: "x".repeat(60), chips: Array(5).fill("x".repeat(36)) };
+  assert.equal((await api.post({ ...SITE, aiSpotlight: maximum })).status, 200);
+  assert.deepEqual(api.writes[0].aiSpotlight, maximum);
+  const old = structuredClone(SITE); delete old.aiSpotlight;
+  assert.equal((await api.post(old)).status, 200);
+  assert.equal(api.writes[1].aiSpotlight, undefined);
+  assert.equal(api.counts().neonCalls, 0);
 });
 
 test("server text validation keeps strict types, exact UTF-16 bounds and rejects control characters", async t => {

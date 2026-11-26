@@ -166,7 +166,7 @@ test("hero files are served and cached explicitly without changing private data 
   }
 });
 
-test("homepage has one fixed branded introduction, not a carousel or legacy slide copy", () => {
+test("homepage keeps one branded introduction and fixed Google entry, not a carousel or legacy slide copy", () => {
   const read = path => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
   const hero = read("index.html").match(/<section class="hero-section"[\s\S]*?<\/section>/)[0];
   const text = hero.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
@@ -174,7 +174,7 @@ test("homepage has one fixed branded introduction, not a carousel or legacy slid
   assert.equal((hero.match(/<a\s/g) || []).length, 1);
   assert.match(hero, /class="button button-light hero-signup" href="\.\/auth\.html"/);
   assert.doesNotMatch(hero, /<img|hero-slides?|hero-controls|hero-dots|slide-prev|slide-next|carousel|Explore study space|Organise notes/);
-  assert.doesNotMatch(read("site.js"), /renderHero|showSlide|initCarousel|carouselTimer|setInterval\(/);
+  assert.doesNotMatch(read("site.js"), /renderHero\(|showSlide|initCarousel|carouselTimer|setInterval\(/);
   assert.doesNotMatch(read("home-hero.css"), /hero-slide|hero-secondary|hero-controls/);
   assert.doesNotMatch(read("data/site-content.json"), /Organise notes, build personal case cards|pexels-law-student|Explore learning tools|See the study tools/);
   assert.doesNotMatch(read("sw.js"), /pexels-law-student/);

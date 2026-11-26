@@ -48,14 +48,28 @@ Document shape (enforced by the protected API using `firebase/content-schema.mjs
 | --- | --- |
 | `brand` | Map with exactly `name` (1–80 chars), `tagline`, `markImage`, `markAlt` (≤ 200). |
 | `navigation` | 1–8 maps of exactly `label` (1–60) and `href` (site-relative, `#anchor`, or `https://`). |
-| `hero.autoplayMs` | Optional number 4000–15000. |
-| `hero.slides` | 1–12 maps, each with exactly `eyebrow`, `title` (1–120), `accent`, `body` (≤ 600), `image`, `imageAlt`, `imageCredit` (≤ 200), `primaryLabel`, `primaryHref`, `secondaryLabel`, `secondaryHref`. |
+| `hero.copy` | Optional map with exactly `title` (non-blank, ≤ 120), `tagline` (≤ 120) and `introduction` (≤ 600). All three are plain text without control characters; tagline/introduction may be empty. This is the single public introduction, with no image, carousel or configurable CTA. |
+| `hero.autoplayMs` | Optional number 4000–15000, retained for legacy compatibility; the public homepage does not autoplay slides. |
+| `hero.slides` | Required compatibility/archive list of 1–12 maps, each with exactly `eyebrow`, `title` (1–120), `accent`, `body` (≤ 600), `image`, `imageAlt`, `imageCredit` (≤ 200), `primaryLabel`, `primaryHref`, `secondaryLabel`, `secondaryHref`. The single public introduction never renders this list or its photos/buttons. |
 | `quickFacts`, `learning`, `caseNotes`, `articles`, `resources`, `footer` | Present; type-checked (list/map). Deep caps are server-enforced: text ≤ 2,000 chars, lists ≤ 40 items, nesting ≤ 8 levels. |
 | `workspace` | Optional public map from the dashboard editor. Same Google/admin API requirement and server-enforced deep caps. |
+| `aiSpotlight` | Optional map with exactly `title` (non-blank, ≤ 120), `intro` and `closing` (non-blank, ≤ 600 each), `buttonLabel` (non-blank, ≤ 60), and `chips` (exactly five non-blank labels, ≤ 36 each). Plain text without control characters; no image, redirect, mode or authentication fields. |
 | `updatedAt` | API-owned `FieldValue.serverTimestamp()`; editor input cannot supply it. |
 | `updatedBy` | API-owned verified caller UID; editor input cannot supply it. |
 
 Image fields accept only: bundled `./assets/...` files, Neon `/media/<uuid>.(png|jpg|webp)` uploads, or download URLs from this project's own Storage bucket under `site/slides/`. Link fields never accept `javascript:`/`data:`. Slide photos still upload through the backend into Neon; Firebase Storage uploads stay disabled (see Slide images below).
+
+### Editing the homepage words
+
+In **Admin Studio → Pages & JSON → Introduction, learning & AI**, the text fields edit the same JSON draft as the existing editor. They cover `hero.copy`, the learning headings/introduction, each tool's title/description/number/link wording/destination, **Illustration words** (the floating badge and labels), and the **Fire Counsel AI section** (`aiSpotlight` title, introduction, closing, button wording and five orbit labels). These fields wait for server-verified administrator access and the initial live/draft load. Import, raw JSON editing, discard and version restore update the form too; invalid/incomplete JSON disables it rather than overwriting the draft. Editing fields does not save or publish anything automatically. Use the existing **Save draft → Preview → Publish** actions; unsaved preview still uses the same-origin popup exchange without storing the draft on the visitor page.
+
+Learning preview words live in `learning.previewLabel`, `learning.cards[i].linkLabel` and `learning.cards[i].preview.{badge,labels}`. They use the existing learning deep limits above; missing properties retain the original illustration words. Learning destinations are checked again by the public renderer, so an unsafe protocol becomes `#`, not an executable link. The illustration is not a student record or a performance report.
+
+Older published documents without `hero.copy` remain valid and show the owner's static **Fire Counsel** introduction, never legacy slide marketing copy. Editing a front-page field creates the explicit `hero.copy` map. **Sign up** stays fixed to the Google-only `./auth.html` entry, and the flame logo, photo archive and later homepage pictures are not changed by these fields. This optional text addition needs the matching frontend and API validator deployed together, but no Firestore/Storage rule change, database migration or live-content rewrite.
+
+Older documents without `aiSpotlight` also remain valid and show the owner's **Study Smart with Fire Counsel AI** heading and supplied two paragraphs. Editing an AI field creates the complete text-only map in the existing draft, never a second persistence channel. All AI destinations are fixed in application code to **`./ai.html`**. Normal activation lazily checks the restored session's actual Google token provider, then sends signed-out/non-Google visitors to **`./auth.html?next=ai.html`**. The auth page uses AI-specific continuation wording but retains existing profile onboarding and installation-denial checks. Unavailable/time-boxed auth checks, offline access, native modified/new-tab links and a script-failure fallback lead to the existing AI page gate; they do not authorize access in the homepage. Its prior Google/offline policy, API token/installation/Premium checks and all Firebase rules are unchanged. The five labels are general AI entry links, not unimplemented deep-linked feature modes. The supplied screenshot's **Statues** wording is retained and is editable here.
+
+The optional AI schema requires the matching public frontend, admin helper and API validator to be deployed together before publishing an AI copy map. It needs no database migration, live rewrite or new Firestore/Storage rule. No publication or deployment is performed by the local implementation.
 
 ## `studentPages/{uid}` — a student's own public page
 

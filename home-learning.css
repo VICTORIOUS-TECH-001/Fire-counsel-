@@ -4,10 +4,11 @@
 .home-streams .home-learning {
   max-width: none;
   margin: 0;
-  padding: clamp(56px, 7vw, 100px) 0 clamp(80px, 9vw, 130px);
+  padding: clamp(24px, 3vw, 44px) 0 clamp(80px, 9vw, 130px);
   border-radius: 0 0 28px 28px;
   background: #0a0820;
   color: #e9e8f6;
+  overflow-wrap: anywhere;
 }
 .home-learning .learning-inner {
   width: min(1120px, calc(100% - 48px));
@@ -72,6 +73,20 @@
   cursor: pointer;
   transition: background .5s, border-color .5s, color .4s, transform .4s var(--home-ease);
 }
+.home-learning .learning-tool::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(220px circle at var(--pointer-x, 50%) var(--pointer-y, 50%), rgba(104, 255, 210, .26), rgba(123, 108, 255, .08) 60%, transparent 100%);
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s;
+}
+.home-learning .learning-tool.is-pointer-active::before { opacity: 1; }
+.home-learning .learning-tool-heading,
+.home-learning .learning-tool-body { position: relative; z-index: 1; }
 .home-learning .learning-tool:hover {
   background: rgba(255, 255, 255, .05);
   transform: translateX(4px);
@@ -177,7 +192,7 @@
 }
 .home-learning .learning-table-row {
   display: grid;
-  grid-template-columns: 1.1fr 1fr;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
   gap: 12px;
   padding: 10px 12px;
   border-top: 1px solid rgba(160, 150, 255, .06);
@@ -263,6 +278,7 @@
   color: #c5c0dc;
   font-size: 12px;
 }
+.home-learning .learning-file span { min-width: 0; }
 .home-learning .learning-file i { color: #8e82da; font-size: 24px; font-style: normal; }
 .home-learning .learning-file:nth-child(2) { margin-left: 18px; }
 .home-learning .learning-file:nth-child(3) { margin-left: 36px; }
@@ -328,7 +344,10 @@
   .home-learning .learning-mini-bars i,
   .home-learning .learning-badge { animation: none; opacity: 1; transform: none; filter: none; }
   .home-learning .learning-tool,
+  .home-learning .learning-tool::before,
   .home-learning .learning-tool-body,
   .home-learning .learning-tool-body > span,
   .home-learning .learning-tool-progress { transition: none; }
+  .home-learning .learning-tool:hover { transform: none; }
+  .home-learning .learning-tool::before { display: none; }
 }
