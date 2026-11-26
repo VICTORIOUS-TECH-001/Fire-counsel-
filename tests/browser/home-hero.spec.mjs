@@ -7,25 +7,42 @@ const bundled = JSON.parse(readFileSync(new URL("../../data/site-content.json", 
 
 async function readyHome(page) {
   await page.goto("/");
-  await expect(page.locator("#hero-slides .hero-slide")).toHaveCount(bundled.hero.slides.length);
+  await expect(page.locator("#learning-cards > *")).toHaveCount(4);
 }
 
-test("the new hero keeps the FIRE COUNSEL copy and logo, with Sign up instead of a demo", async ({ page }) => {
-  await readyHome(page);
+async function expectSingleHero(page) {
   const hero = page.locator("#home");
-  const active = hero.locator(".hero-slide.is-active");
+  await expect(hero.locator("h1")).toHaveText("Fire Counsel");
+  await expect(hero.locator("h1")).toHaveCSS("font-weight", "800");
+  await expect(hero.locator(".hero-tagline")).toHaveText("Ignite your legal intelligence");
+  await expect(hero.locator("a")).toHaveCount(1);
+  await expect(hero.getByRole("link", { name: "Sign up", exact: true })).toHaveAttribute("href", "./auth.html");
+  await expect(hero).toHaveText("Fire Counsel Ignite your legal intelligence Sign up");
+  await expect(hero.locator('img, .eyebrow, .hero-slide, .hero-controls, .hero-secondary, [aria-roledescription="carousel"]')).toHaveCount(0);
+  await expect(page.locator("#slide-prev, #slide-next, #hero-dots, #hero-count")).toHaveCount(0);
+}
+
+function legacyContent() {
+  const content = structuredClone(bundled);
+  content.hero.autoplayMs = 4000;
+  content.hero.slides = [1, 2].map(index => ({
+    ...bundled.hero.slides[0],
+    title: `Old slide ${index}`, accent: "Do not restore <img src=x onerror=alert(1)>.",
+    body: "Organise notes, build personal case cards and practise deliberately. Your saved study files stay in this browser in this preview.",
+    image: `./assets/images/retired-slide-${index}.jpg`,
+    primaryLabel: "Open student workspace", primaryHref: "./study.html#dashboard",
+    secondaryLabel: "Explore study space", secondaryHref: "#learning"
+  }));
+  return content;
+}
+
+test("single hero shows bold Fire Counsel, its tagline and only Sign up", async ({ page }) => {
+  await readyHome(page);
+  await expectSingleHero(page);
   await expect(page.locator("#hero-streams")).toBeVisible();
-  await expect(active.locator("h1")).toContainText("Build legal clarity.");
-  await expect(active.locator("h1")).toContainText("Move with confidence.");
-  await expect(active.locator(".eyebrow")).toHaveText(bundled.hero.slides[0].eyebrow);
-  await expect(active.locator("p")).toHaveText("A focused home for your law courses, case recall and exam practice, designed to keep your own study work close to you.");
-  await expect(active.getByRole("link", { name: "Sign up", exact: true })).toHaveAttribute("href", "./auth.html");
-  await expect(active.getByRole("link", { name: "See the study tools", exact: true })).toHaveAttribute("href", "#learning");
   await expect(page.locator("#brand-name")).toHaveText("FIRE COUNSEL");
   await expect(page.locator("#brand-image")).toHaveAttribute("src", "./assets/images/fire-counsel-flame.png");
-  await expect(hero).not.toContainText(/Projexion|construction data|set up a demo|[—–]/i);
-  await expect(hero.locator("img, .dash, .dash-stage")).toHaveCount(0);
-  await expect(page.locator("#learning-cards > *")).toHaveCount(4);
+  await expect(page.locator("#case-image")).toHaveAttribute("src", bundled.caseNotes.image);
   await expect(page.locator("#case-intro")).toHaveText(bundled.caseNotes.intro);
   await expect(page.locator("#article-grid > *")).toHaveCount(bundled.articles.items.length);
   await expect(page.locator("#footer-disclaimer")).toHaveText(bundled.footer.disclaimer);
@@ -38,8 +55,8 @@ test("the reference background and centered hero fit 320, 390, 768 and 1440 pixe
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
     await expectNoHorizontalOverflow(page);
     const frame = await page.locator(".hero-frame").boundingBox();
-    const heading = await page.locator(".hero-slide.is-active h1").boundingBox();
-    const signup = await page.locator(".hero-slide.is-active .hero-signup").boundingBox();
+    const heading = await page.locator("#home h1").boundingBox();
+    const signup = await page.locator("#home .hero-signup").boundingBox();
     expect(frame.x).toBe(0);
     expect(frame.width).toBe(width);
     expect(Math.abs(heading.x + heading.width / 2 - width / 2)).toBeLessThanOrEqual(1);
@@ -65,28 +82,50 @@ test("the reference background and centered hero fit 320, 390, 768 and 1440 pixe
   }
 });
 
-test("old published hero defaults get Sign up, while custom text, safe links and carousel editing still work", async ({ page }) => {
-  const content = structuredClone(bundled);
-  Object.assign(content.hero.slides[0], {
-    primaryLabel: "Open student workspace", primaryHref: "./study.html#dashboard",
-    body: "A focused home for your law courses, case recall and exam practice — designed to keep your own study work close to you."
-  });
-  Object.assign(content.hero.slides[1], {
-    title: "Published study guidance", accent: "Keep <img src=x onerror=alert(1)> as text.",
-    primaryLabel: "Visit the legal links", primaryHref: "#resources"
-  });
+test("legacy published slides cannot restore deleted photos, text or carousel", async ({ page }) => {
+  const content = legacyContent();
+  content.learning.intro = "Published lower-page content still works.";
+  const retiredPhotos = [];
+  page.on("request", request => { if (request.url().includes("retired-slide-")) retiredPhotos.push(request.url()); });
+  await page.clock.install();
+  await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 1000);
   await stubFirestore(page, { content });
   await readyHome(page);
-  await expect(page.locator(".hero-slide.is-active .hero-signup")).toHaveText("Sign up");
-  await expect(page.locator(".hero-slide.is-active p")).not.toContainText("—");
-  await page.locator("#slide-next").click();
-  await expect(page.locator("#hero-count")).toHaveText("02 / 02");
-  await expect(page.locator(".hero-slide.is-active h1")).toContainText(content.hero.slides[1].title);
-  await expect(page.locator(".hero-slide.is-active h1")).toContainText(content.hero.slides[1].accent);
-  await expect(page.locator(".hero-slide.is-active .hero-signup")).toHaveText("Visit the legal links");
-  await expect(page.locator(".hero-slide.is-active .hero-signup")).toHaveAttribute("href", "#resources");
-  await expect(page.locator("#hero-slides img")).toHaveCount(0);
+  await expect(page.locator("#learning-intro")).toHaveText(content.learning.intro);
+  await expectSingleHero(page);
+  // Advance beyond several old autoplay intervals: no slide or CTA returns.
+  await page.clock.runFor(16000);
+  await expectSingleHero(page);
+  expect(retiredPhotos).toEqual([]);
   expect(await page.evaluate(() => window.__firestore.writes)).toEqual([]);
+});
+
+test("unsaved preview preserves other content without reviving the removed slides", async ({ page }) => {
+  const content = legacyContent();
+  content.learning.intro = "Unsaved lower-page preview remains available.";
+  await readyHome(page);
+  const opened = page.waitForEvent("popup");
+  await page.evaluate(content => {
+    const send = event => {
+      if (event.origin !== location.origin || event.data?.type !== "fire-counsel-preview-ready") return;
+      event.source.postMessage({ type: "fire-counsel-preview", content }, location.origin);
+      window.removeEventListener("message", send);
+    };
+    window.addEventListener("message", send);
+    window.open("/?preview=1", "single-hero-preview");
+  }, content);
+  const preview = await opened;
+  const errors = [];
+  preview.on("pageerror", error => errors.push(error.message));
+  try {
+    await expect(preview.locator("#preview-banner")).toContainText("PREVIEW");
+    await expect(preview.locator("#learning-intro")).toHaveText(content.learning.intro);
+    await expectSingleHero(preview);
+    await expect(preview.locator("#case-image")).toHaveAttribute("src", bundled.caseNotes.image);
+    expect(errors).toEqual([]);
+  } finally {
+    await preview.close();
+  }
 });
 
 test("light streams really animate, pause offscreen and respect changes to reduced motion", async ({ page }) => {
@@ -110,12 +149,12 @@ test("light streams really animate, pause offscreen and respect changes to reduc
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(canvas).toHaveAttribute("data-motion", "reduced");
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
-  await expect(page.locator(".hero-slide.is-active .hero-word").first()).toHaveCSS("animation-name", "none");
-  await expect(page.locator(".hero-slide.is-active .hero-word").first()).toHaveCSS("opacity", "1");
+  await expect(page.locator("#home .hero-word").first()).toHaveCSS("animation-name", "none");
+  await expect(page.locator("#home .hero-word").first()).toHaveCSS("opacity", "1");
   await expect(page.locator(".hero-glow")).toHaveCSS("animation-name", "none");
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await expect(canvas).toHaveAttribute("data-motion", "running");
-  await expect(page.locator(".hero-slide.is-active .hero-word").first()).toHaveCSS("animation-name", "homeWordIn");
+  await expect(page.locator("#home .hero-word").first()).toHaveCSS("animation-name", "homeWordIn");
 });
 
 test("actual canvas pixels travel upward along the template's converging paths", async ({ page }) => {
@@ -154,10 +193,9 @@ test("static hero fallback retains the brand, readable copy and Google-only Sign
   await page.setViewportSize({ width: 320, height: 844 });
   await page.goto("/");
   await expect(page.locator("#brand-name")).toHaveText("FIRE COUNSEL");
-  await expect(page.locator(".hero-slide.is-active h1")).toContainText("Build legal clarity.");
-  await expect(page.locator("#slide-next")).toBeDisabled();
+  await expectSingleHero(page);
   await expectNoHorizontalOverflow(page);
-  await page.locator(".hero-slide.is-active .hero-signup").click();
+  await page.locator("#home .hero-signup").click();
   await expect(page).toHaveURL(/\/auth\.html$/);
   await expect(page.locator("#google-signin-button")).toBeVisible();
   await expect(page.locator('input[type="email"], input[type="password"]')).toHaveCount(0);

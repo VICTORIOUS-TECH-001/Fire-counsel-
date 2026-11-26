@@ -34,7 +34,8 @@ test("the homepage renders a Firestore publish with required metadata instead of
   await stubFirestore(page, { content });
   await page.goto("/");
   await expect(page.locator("#brand-name")).toHaveText("Published Firebase Brand");
-  await expect(page.locator("#hero-slides .hero-slide")).toHaveCount(2);
+  await expect(page.locator("#learning-cards > *")).toHaveCount(4);
+  await expect(page.locator("#home h1")).toHaveText("Fire Counsel");
   expect(await page.evaluate(() => window.__firestore.document.updatedBy)).toBe("synthetic-admin");
 });
 

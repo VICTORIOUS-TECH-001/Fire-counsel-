@@ -2,7 +2,21 @@
 
 **Latest update:** 18 November 2026 (UTC), branch `arena/8d068f93-fire-counsel`
 
-## Homepage hero, step 1 — implemented locally; focused verification passed
+## Homepage hero correction — single introduction, no slideshow
+
+PR #36 was merged externally; this branch was fast-forwarded to `24347bc` before the owner's follow-up. The owner now explicitly wants the slideshow removed, with bold **Fire Counsel**, **Ignite your legal intelligence** underneath and **Sign up** as the only hero action. This supersedes the earlier carousel/custom-hero-copy requirement below. They clarified that only the **slide picture** should be removed, not the logo or other pictures.
+
+- Removed the public slide DOM, carousel role, arrows, dots, counter, autoplay code, secondary hero link, old eyebrow/body text and hero preview-status strip. The introduction is now static HTML with an 800-weight heading; legacy published or unsaved-preview slides cannot reintroduce the removed words, picture or buttons. Other CMS-driven page sections and the same-origin unsaved-preview exchange still work.
+- Preserved the exact `home-hero.mjs` upward animation and background/glow. **Every image file is untouched**; the original flame logo, header, lower homepage HTML (including the case picture) and all non-hero bundled content were audited unchanged. Only the retired slideshow-only student-photo precache entry was removed; shell cache is now **v34**.
+- The bundled hero keeps one non-rendered schema-compatibility record with the new title/tagline and existing logo path, no old paragraph or slide-photo references. This avoids changing admin publishing, the shared content validator or Firebase rules. No stored Firestore content was rewritten. Public rendering does not consume that legacy slides record.
+
+**Verification:** the new no-carousel/content regression failed before implementation, then hero units passed **9/9**. Fresh `npm test` passed: syntax **122** JavaScript modules plus Python tools, frontend **91/91**, proxy **14/14**, backend **253/253**, Firebase-local **13/13**. Targeted Chromium checks passed **13/13**, **1 worker / retries 0**, covering the single heading/tagline/CTA, actual upward pixels and motion lifecycle, four viewport widths, original logos and retained case image, old published content, unsaved preview, static fallback/Google-only entry, JSON sections and mobile navigation. Screenshots at 390/1440px were inspected; all four captures are in `.cache/single-hero-review/`. Preview port **4100** serves the corrected hero. `git diff --check` and protected-file/image scope checks passed. No arbitrary sleeps, skipped tests or whole-test retries were added.
+
+The entire browser suite was not rerun for this focused correction; the two earlier unchanged study-page failures remain unresolved/documented, not claimed fixed. Java-backed rules tests remain unrun (Java absent; rules unchanged). Logs: `.cache/single-hero-{red,local,browser}.log` (ignored). This correction is local branch work only: no new push, PR, merge, deployment, live Google sign-in or provider/data change was performed.
+
+## Previous homepage hero, step 1 (PR #36, merged externally)
+
+The following records the initial implementation before the owner's single-hero correction above. Its carousel behavior and verification totals are historical.
 
 Synchronized the active branch to externally merged PR #35 (`cee77ab`) before this homepage-only step. The owner supplied the complete reference HTML, `styles.css`, `main.js` and screenshot. Only the public masthead/hero is restyled; this is not a redesign of the rest of the homepage or the Studio.
 
