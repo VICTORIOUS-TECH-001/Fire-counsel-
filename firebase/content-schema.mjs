@@ -164,14 +164,14 @@ export function validateSiteContent(content) {
     const copy = content.aiSpotlight;
     const keys = ["title", "intro", "closing", "buttonLabel", "chips"];
     if (!isPlainObject(copy) || Object.keys(copy).some(key => !keys.includes(key))) {
-      errors.push("aiSpotlight needs only title, intro, closing, buttonLabel and five chip labels.");
+      errors.push("aiSpotlight needs only title, intro, closing, buttonLabel and six chip labels (or five legacy labels).");
     } else {
       for (const [key, max] of [["title", 120], ["intro", 600], ["closing", 600], ["buttonLabel", 60]]) {
         if (!isText(copy[key], max) || !copy[key].trim()) errors.push(`aiSpotlight.${key} must be non-empty text up to ${max} characters.`);
       }
-      if (!Array.isArray(copy.chips) || copy.chips.length !== 5
+      if (!Array.isArray(copy.chips) || ![5, 6].includes(copy.chips.length)
         || copy.chips.some(label => !isText(label, 36) || !label.trim())) {
-        errors.push("aiSpotlight.chips must contain five non-empty labels up to 36 characters each.");
+        errors.push("aiSpotlight.chips must contain six non-empty labels (or five legacy labels) up to 36 characters each.");
       }
     }
   }

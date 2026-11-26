@@ -51,10 +51,9 @@ export function mountHomeAI(scene, { host = globalThis.window, doc = globalThis.
   try { matrixContext = matrix?.getContext("2d"); starsContext = stars?.getContext("2d"); } catch { return null; }
   if (!matrixContext || !starsContext) return null;
   const motion = host.matchMedia?.("(prefers-reduced-motion: reduce)");
-  const pause = scene.querySelector("#home-ai-pause");
   const columns = createMatrixColumns(random), removers = [];
   let width = 0, height = 0, ratio = 0, points = [];
-  let disposed = false, pageActive = true, inView = !host.IntersectionObserver, userPaused = false;
+  let disposed = false, pageActive = true, inView = !host.IntersectionObserver;
   let frameId = null, lastFrame = null, elapsed = 0;
 
   // Warm a real source frame once, rather than leaving reduced motion or the
@@ -72,7 +71,7 @@ export function mountHomeAI(scene, { host = globalThis.window, doc = globalThis.
     points = createStars(width, height, random);
     drawStars(starsContext, points, width, height, elapsed);
   }
-  const shouldRun = () => !disposed && !userPaused && pageActive && inView && !doc.hidden
+  const shouldRun = () => !disposed && pageActive && inView && !doc.hidden
     && !motion?.matches && width > 0 && height > 0 && typeof host.requestAnimationFrame === "function";
   function stop() {
     if (frameId !== null) host.cancelAnimationFrame(frameId);
@@ -90,10 +89,6 @@ export function mountHomeAI(scene, { host = globalThis.window, doc = globalThis.
   function sync() {
     const running = shouldRun();
     scene.dataset.motion = disposed ? "stopped" : motion?.matches ? "reduced" : running ? "running" : "paused";
-    if (pause) {
-      pause.hidden = disposed || Boolean(motion?.matches) || typeof host.requestAnimationFrame !== "function";
-      pause.textContent = userPaused ? "Resume animation" : "Pause animation";
-    }
     if (running) { if (frameId === null) frameId = host.requestAnimationFrame(frame); }
     else stop();
   }
@@ -103,7 +98,6 @@ export function mountHomeAI(scene, { host = globalThis.window, doc = globalThis.
   }
   if (motion?.addEventListener) listen(motion, "change", sync);
   else if (motion?.addListener) { motion.addListener(sync); removers.push(() => motion.removeListener(sync)); }
-  if (pause?.addEventListener) listen(pause, "click", () => { userPaused = !userPaused; sync(); });
   listen(doc, "visibilitychange", sync);
   listen(host, "pagehide", () => { pageActive = false; sync(); });
   listen(host, "pageshow", () => { pageActive = true; measure(); sync(); });

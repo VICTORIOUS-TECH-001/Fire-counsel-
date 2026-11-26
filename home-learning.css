@@ -4,8 +4,9 @@
 .home-streams .home-learning {
   max-width: none;
   margin: 0;
-  padding: clamp(24px, 3vw, 44px) 0 clamp(80px, 9vw, 130px);
-  border-radius: 0 0 28px 28px;
+  padding: clamp(24px, 3vw, 44px) 0 clamp(24px, 4vw, 48px);
+  /* Join the next dark AI section without exposing the white page corners. */
+  border-radius: 0;
   background: #0a0820;
   color: #e9e8f6;
   overflow-wrap: anywhere;

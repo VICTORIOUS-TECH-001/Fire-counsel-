@@ -171,7 +171,7 @@ test("the protected API bounds optional AI words, forbids redirect fields and st
   const api = await serve(t);
   const original = structuredClone(SITE.aiSpotlight);
   const invalid = [null, [], {}, { ...original, href: "https://attacker.invalid" },
-    { ...original, chips: [] }, { ...original, chips: Array(6).fill("Study") },
+    { ...original, chips: [] }, { ...original, chips: Array(7).fill("Study") },
     { ...original, chips: ["Hacks", "Clarity", 1, "Statues", "Exam"] },
     { ...original, chips: [" ", "Clarity", "Legislation", "Statues", "Exam"] },
     { ...original, chips: ["x".repeat(37), "Clarity", "Legislation", "Statues", "Exam"] }];
@@ -186,12 +186,15 @@ test("the protected API bounds optional AI words, forbids redirect fields and st
   assert.deepEqual(api.writes, []);
   assert.equal(api.counts().databaseCalls, 0);
   const maximum = { ...original, title: "x".repeat(120), intro: "x".repeat(600), closing: "x".repeat(600),
-    buttonLabel: "x".repeat(60), chips: Array(5).fill("x".repeat(36)) };
+    buttonLabel: "x".repeat(60), chips: Array(6).fill("x".repeat(36)) };
   assert.equal((await api.post({ ...SITE, aiSpotlight: maximum })).status, 200);
   assert.deepEqual(api.writes[0].aiSpotlight, maximum);
+  const legacy = { ...original, chips: original.chips.slice(0, 5) };
+  assert.equal((await api.post({ ...SITE, aiSpotlight: legacy })).status, 200);
+  assert.deepEqual(api.writes[1].aiSpotlight, legacy, "legacy words are not rewritten in storage");
   const old = structuredClone(SITE); delete old.aiSpotlight;
   assert.equal((await api.post(old)).status, 200);
-  assert.equal(api.writes[1].aiSpotlight, undefined);
+  assert.equal(api.writes[2].aiSpotlight, undefined);
   assert.equal(api.counts().neonCalls, 0);
 });
 
