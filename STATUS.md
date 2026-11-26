@@ -2,7 +2,22 @@
 
 **Latest update:** 18 November 2026 (UTC), branch `arena/8d068f93-fire-counsel`
 
-## Upload reliability follow-up — repaired locally, not deployed
+## Render health-check 429 follow-up — repaired locally, not deployed
+
+After synchronizing this branch to externally merged PR #34 (`ec52943`), the user's Render **Events** screenshot explicitly identified **“HTTP health check failed with status code 429 while running your code.”** This establishes a health-probe throttle behind the observed unhealthy/restart events, not invalid AI keys, memory exhaustion or normal free-instance sleep. The source also placed `/healthz` after the ordinary **100 requests / 15 minutes / IP** limiter. The actual private dashboard Health Check Path has not been inspected; `render.yaml` already specifies `/healthz`.
+
+- Moved **only GET/HEAD `/healthz`** before body parsing and all traffic limiters. It returns uncached process liveness without Firebase, Neon or AI requests, while retaining Helmet and the exact-origin CORS policy. This prevents probes from consuming the ordinary API allowance or receiving its 429 after other traffic exhausts that allowance.
+- Kept `/api/health` as **rate-limited database readiness/setup diagnostics**, including truthful 503 replies when Neon is unavailable/unconfigured. Other paths/methods, failed-auth/admin-UID/provider-test allowances, Google/admin/Premium checks, upload/save protections, student credentials and offline behavior are unchanged. A caller-supplied health-check header cannot create an exemption.
+- **Red before the fix:** the new tests reproduced 429 at liveness probe **101**, and 429 for `/healthz` after exhausting the normal API allowance. **Green after the fix:** 200 consecutive GET/HEAD probes (including trailing slash/query variants in Render/website mode), all 100 ordinary protected-route requests still reaching authentication afterward, and healthy probes after ordinary request 101 is correctly throttled. Near-match paths, POST `/healthz` and `/api/health` remain limited. Existing and extended tests verify CORS, no-store/security headers, dependency independence and protected-route authentication.
+- Documented the API-only rollout and existing-service **Health Check Path: `/healthz`** check in [DEPLOYMENT.md](DEPLOYMENT.md#7-render-health-checks-returning-429), backend guides and Blueprint comments. Do not use `/api/health` as a restart probe or make readiness always healthy to conceal a dependency outage.
+
+**Fresh verification for this patch:** `npm test` passed — syntax **119** JavaScript modules plus Python tools, frontend **82/82**, proxy **14/14**, backend **253/253** (including nested cases), Firebase local **13/13**. The full Chromium suite passed **82/82** in one run (**1 worker / retries 0**, 7.2 minutes), including all **16** workstation/Classic scenarios. No arbitrary sleeps, skipped tests, reduced production limits or whole-test retries were used to obtain these passes. Logs: `.cache/health-probe-red.log`, `.cache/health-probe-green.log`, `.cache/health-probe-local-complete.log` and `.cache/health-probe-browser-complete.log` (ignored local artifacts). The Java-backed rules gate was not run; rules are unchanged and Java is absent.
+
+**Live boundary:** this patch is prepared for pull-request review, not a live-site fix. Opening its PR does not authorize merging or deployment. No merge or deployment has been performed for this patch; no Render/provider settings or keys, or live Firebase/Neon data, were changed. A reviewed API deployment and verification of the actual service's `/healthz` setting are still required. Restarts can interrupt requests and discard unsaved station RAM jobs, but this fix does not prove the exact origin of the screenshot's Cloudflare-test 503 or resolve/validate the separately reported `ADMIN_PROVIDER_UNAVAILABLE` from admin Gemini. Saved Neon documents and Classic originals are not deleted by restarting; download important ready unsaved station work before a deliberate redeploy.
+
+## Previous upload reliability repair (PR #34, merged externally)
+
+The following records the previous repair before the later Events screenshot identified health-check throttling. Its verification totals and deployment notes are historical; current patch results and boundaries are above.
 
 The user supplied **Admin AI configured / Neon ready**, a station **503 / Check progress**, and a Classic **429 while a JPG was already Reading**. Those screenshots do **not** identify the HTTP error's origin or prove Gemini quota. The branch was fast-forwarded to merged PR #33 (`3f9b48b`) before this follow-up. The earlier PR was merged externally; this assistant has not merged or deployed this repair.
 

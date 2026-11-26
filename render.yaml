@@ -11,6 +11,9 @@ services:
     # Repo root (not backend/) so the public website files are available.
     buildCommand: npm --prefix backend ci --omit=dev
     startCommand: npm --prefix backend start
+    # Process liveness only: this GET/HEAD route precedes API rate limits.
+    # Keep an existing dashboard service's Health Check Path set to /healthz;
+    # /api/health is rate-limited Neon/setup diagnostics, not the restart probe.
     healthCheckPath: /healthz
     autoDeploy: true
     envVars:

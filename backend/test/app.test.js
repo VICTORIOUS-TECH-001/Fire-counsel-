@@ -47,12 +47,14 @@ for (const outcome of [false, new Error("synthetic database outage")]) {
 
 test("CORS uses exact approved origins, not wildcard or suffix matches", async t => {
   const base = await serve(t, { env: { CORS_ORIGINS: "https://study.example, https://admin.example" } });
-  const good = await fetch(`${base}/api/health`, { headers: { Origin: "https://study.example" } });
-  assert.equal(good.headers.get("access-control-allow-origin"), "https://study.example");
-  for (const origin of ["https://study.example.attacker.invalid", "https://other.example", "null"]) {
-    const response = await fetch(`${base}/api/health`, { headers: { Origin: origin } });
-    assert.equal(response.status, 403);
-    assert.equal(response.headers.get("access-control-allow-origin"), null);
+  for (const path of ["/api/health", "/healthz"]) {
+    const good = await fetch(`${base}${path}`, { headers: { Origin: "https://study.example" } });
+    assert.equal(good.headers.get("access-control-allow-origin"), "https://study.example");
+    for (const origin of ["https://study.example.attacker.invalid", "https://other.example", "null"]) {
+      const response = await fetch(`${base}${path}`, { headers: { Origin: origin } });
+      assert.equal(response.status, 403);
+      assert.equal(response.headers.get("access-control-allow-origin"), null);
+    }
   }
 });
 
@@ -238,4 +240,59 @@ test("DeepSeek/SerpAPI health is presence-only, alias-aware and never includes c
   assert.equal(body.ai_key_check.serpapi.state, "missing");
   assert.deepEqual(body.web_search.provider_order, ["serpapi"]);
   assert.doesNotMatch(JSON.stringify(body), /synthetic-private|synthetic-db/);
+});
+
+test("repeated GET/HEAD liveness probes cannot consume the ordinary API request allowance", async t => {
+  let databaseChecks = 0;
+  const base = await serve(t, { env: { RENDER: "true", SERVE_WEBSITE: "true", DATABASE_URL: "synthetic-not-used" },
+    databaseCheck: () => { databaseChecks++; assert.fail("liveness must not contact Neon"); } });
+  // Exercise the real 100/15-minute production limiter, without sleeps or a
+  // reduced test-only limit. A five-second probe cadence exceeds 100 per window.
+  let response;
+  for (let index = 0; index < 200; index++) {
+    const method = index % 2 === 0 ? "GET" : "HEAD";
+    const path = index % 4 < 2 ? "/healthz" : "/healthz/";
+    response = await fetch(`${base}${path}?probe=${index}`, { method });
+    const text = await response.text();
+    assert.equal(response.status, 200, `liveness probe ${index + 1} must never be throttled`);
+    if (method === "GET") assert.deepEqual(JSON.parse(text), { service: "FIRE COUNSEL API", status: "ok" });
+    else assert.equal(text, "");
+  }
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(response.headers.get("ratelimit"), null);
+  assert.equal(response.headers.get("retry-after"), null);
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(response.headers.get("x-powered-by"), null);
+  assert.equal(databaseChecks, 0);
+  for (let index = 0; index < 100; index++) {
+    const response = await fetch(`${base}/api/v1/me`);
+    await response.text();
+    assert.equal(response.status, 401, `all 100 ordinary requests remain available after probes; request ${index + 1} still requires sign-in`);
+  }
+});
+
+test("liveness stays healthy after the API IP allowance is exhausted without exempting other routes or methods", async t => {
+  const base = await serve(t, { databaseCheck: () => assert.fail("liveness must not contact Neon") });
+  for (let index = 0; index < 100; index++) {
+    const response = await fetch(`${base}/api/v1/me`);
+    await response.text();
+    assert.equal(response.status, 401, `ordinary request ${index + 1} still requires authentication`);
+  }
+  const limited = await fetch(`${base}/api/v1/me`);
+  assert.equal(limited.status, 429);
+  assert.equal((await limited.json()).code, "API_RATE_LIMIT");
+  assert.ok(Number(limited.headers.get("retry-after")) > 0);
+
+  for (const method of ["GET", "HEAD"]) {
+    const response = await fetch(`${base}/healthz`, { method });
+    await response.text();
+    assert.equal(response.status, 200, `${method} /healthz must remain reachable during API throttling`);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    assert.equal(response.headers.get("ratelimit"), null);
+  }
+  for (const [method, path] of [["GET", "/api/v1/me"], ["GET", "/healthz/private"], ["POST", "/healthz"], ["GET", "/api/health"]]) {
+    const response = await fetch(`${base}${path}`, { method, headers: { "X-Health-Check": "true" } });
+    assert.equal(response.status, 429, `${method} ${path} must not inherit a health-probe exemption`);
+    assert.equal((await response.json()).code, "API_RATE_LIMIT");
+  }
 });
