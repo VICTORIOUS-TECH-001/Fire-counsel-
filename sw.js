@@ -1,8 +1,8 @@
-const CACHE_NAME = "fire-counsel-shell-v32";
+const CACHE_NAME = "fire-counsel-shell-v33";
 const APP_CACHE_PREFIX = "fire-counsel-shell-";
 const APP_SHELL = [
   "./", "./index.html", "./study.html", "./ai.html",
-  "./site.css", "./branding.css", "./site.js", "./styles.css", "./app.js", "./integrations.css",
+  "./site.css", "./home-hero.css", "./branding.css", "./site.js", "./home-hero.mjs", "./styles.css", "./app.js", "./integrations.css",
   "./study-materials.mjs", "./research-search.mjs", "./student-profile.mjs", "./student-page.mjs", "./installation.mjs", "./request-scope.mjs", "./auth-gate.mjs",
   "./ai-studio.css", "./ai-page.css", "./ai-studio.mjs", "./ai-markdown.mjs", "./presence.mjs", "./pdf-reader.mjs",
   "./preloader.css", "./preloader.js", "./workspace.css", "./workspace.mjs", "./workspace-config.mjs",

@@ -97,12 +97,25 @@
     const holder = $("#hero-slides");
     const slides = Array.isArray(data.hero?.slides) ? data.hero.slides : [];
     if (!slides.length) return;
-    holder.innerHTML = slides.map((slide, index) => `<article class="hero-slide ${index === 0 ? "is-active" : ""}" data-slide="${index}" role="group" aria-label="Slide ${index + 1} of ${slides.length}" aria-hidden="${index !== 0}">
-      <div class="hero-copy"><span class="eyebrow">${esc(slide.eyebrow)}</span><h1>${esc(slide.title)}<br><em>${esc(slide.accent)}</em></h1><p>${esc(slide.body)}</p><div class="hero-actions"><a class="button button-light" href="${href(slide.primaryHref)}">${esc(slide.primaryLabel)} <span>↗</span></a><a class="button button-ghost" href="${href(slide.secondaryHref)}">${esc(slide.secondaryLabel)}</a></div></div>
-      <figure class="hero-photo-wrap"><img class="hero-photo" src="${photo(slide.image)}" alt="${esc(slide.imageAlt)}" width="1100" height="1400" ${index ? 'loading="lazy"' : 'fetchpriority="high"'} decoding="async"><figcaption>${esc(slide.imageCredit)}</figcaption></figure>
-    </article>`).join("");
+    holder.innerHTML = slides.map((slide, index) => {
+      let word = 0;
+      const words = value => String(value ?? "").split(/(\s+)/).map(token => /\S/.test(token)
+        ? `<span class="hero-word" style="--word:${word++}">${esc(token)}</span>` : esc(token)).join("");
+      // Older published defaults must pick up the requested Sign up CTA too.
+      // Deliberately preserve administrator-authored labels/links instead of
+      // discarding customization or rewriting any stored Firestore content.
+      const oldDefault = ["Open student workspace", "Start studying"].includes(slide.primaryLabel)
+        && ["./study.html#dashboard", "/study.html#dashboard", "study.html#dashboard"].includes(slide.primaryHref);
+      const primaryLabel = oldDefault ? "Sign up" : slide.primaryLabel;
+      const primaryHref = oldDefault ? "./auth.html" : slide.primaryHref;
+      const body = String(slide.body ?? "").replace(/\s*[—–]\s*/g, ", ");
+      return `<article class="hero-slide ${index === 0 ? "is-active" : ""}" data-slide="${index}" role="group" aria-label="Slide ${index + 1} of ${slides.length}" aria-hidden="${index !== 0}">
+        <div class="hero-copy"><span class="eyebrow">${esc(slide.eyebrow)}</span><h1>${words(slide.title)}<br>\n<em>${words(slide.accent)}</em></h1><p>${esc(body)}</p><div class="hero-actions"><a class="button button-light hero-signup" href="${href(primaryHref)}">${esc(primaryLabel)}</a><a class="button button-ghost hero-secondary" href="${href(slide.secondaryHref)}">${esc(slide.secondaryLabel)}</a></div></div>
+      </article>`;
+    }).join("");
     const dots = $("#hero-dots");
     dots.innerHTML = slides.map((_, index) => `<button class="hero-dot ${index === 0 ? "is-active" : ""}" type="button" aria-label="Show slide ${index + 1}" aria-current="${index === 0 ? "true" : "false"}" data-slide-to="${index}"></button>`).join("");
+    [$("#slide-prev"), $("#slide-next")].forEach(button => { button.disabled = slides.length < 2; });
     showSlide(0);
     const interval = Number(data.hero?.autoplayMs);
     initCarousel(Number.isFinite(interval) ? Math.max(4000, Math.min(interval, 15000)) : 6500);
@@ -129,15 +142,17 @@
     $("#hero-dots").addEventListener("click", event => {
       const dot = event.target.closest("[data-slide-to]"); if (dot) showSlide(Number(dot.dataset.slideTo));
     });
+    const motion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
     const stop = () => clearInterval(carouselTimer);
     const start = () => {
       stop();
-      if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || document.hidden) return;
+      if (motion?.matches || document.hidden) return;
       carouselTimer = setInterval(() => showSlide(activeSlide + 1), interval);
     };
     frame.addEventListener("mouseenter", stop); frame.addEventListener("mouseleave", start);
     frame.addEventListener("focusin", stop); frame.addEventListener("focusout", start);
     document.addEventListener("visibilitychange", () => document.hidden ? stop() : start());
+    motion?.addEventListener("change", start);
     start();
   }
   function renderQuickFacts(data) {
