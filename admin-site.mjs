@@ -123,6 +123,13 @@ async function loadSite(mySession = session, after = "") {
     if (mySession !== session) return;
     if (after !== "publish") editorStatus(error.message, "error");
     if (error.code === "SITE_SCHEMA_NOT_READY") renderVersions([]);
+  } finally {
+    // Do not expose editable fallback fields while a newer live/draft load is
+    // still pending. The existing JSON editor remains the source of truth.
+    if (mySession === session && after !== "publish") {
+      editor.dataset.homepageReady = "true";
+      editor.dispatchEvent(new Event("input"));
+    }
   }
 }
 
@@ -287,6 +294,8 @@ $("#add-slide-files")?.addEventListener("click", async () => {
 function onAdminState(state) {
   session += 1;
   verified = state === "verified" && Boolean(authClient);
+  editor.dataset.homepageReady = "false";
+  editor.dispatchEvent(new Event("input"));
   setEnabled(verified);
   if (verified) loadSite(session);
 }

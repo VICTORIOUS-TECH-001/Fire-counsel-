@@ -17,7 +17,7 @@ MAX_PROXY_BODY = 26 * 1024 * 1024
 PUBLIC_FILES = {
     "index.html", "study.html", "admin.html", "auth.html", "ai.html", "student.html",
     "site.css", "home-hero.css", "home-learning.css", "styles.css", "admin.css", "auth.css", "integrations.css", "branding.css",
-    "site.js", "home-hero.mjs", "app.js", "admin.js", "sw.js", "manifest.webmanifest",
+    "site.js", "home-hero.mjs", "homepage-copy.mjs", "admin-homepage.mjs", "app.js", "admin.js", "sw.js", "manifest.webmanifest",
     "auth-page.mjs", "admin-auth.mjs", "admin-database.mjs",
     "study-materials.mjs", "research-search.mjs", "request-scope.mjs",
     "student-profile.mjs", "student-page.mjs", "student-page-view.mjs", "installation.mjs",

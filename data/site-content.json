@@ -13,6 +13,11 @@
     {"label": "Legal links", "href": "#resources"}
   ],
   "hero": {
+    "copy": {
+      "title": "Fire Counsel",
+      "tagline": "Ignite your legal intelligence",
+      "introduction": "Fire Counsel is more than a place to learn the law. It is the intelligence behind your success, empowering you to master the law, unlock your potential and become one of tomorrow's great legal minds."
+    },
     "slides": [
       {
         "eyebrow": "",

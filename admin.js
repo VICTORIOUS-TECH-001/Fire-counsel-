@@ -82,6 +82,7 @@
     try {
       const data = validate(JSON.parse(await file.text()));
       editor.value = JSON.stringify(data, null, 2);
+      editor.dispatchEvent(new Event("input"));
       renderSlideLibrary();
       setStatus(`Imported ${file.name} into the editor — not saved or published yet`, "is-ok");
     } catch (error) { setStatus(`Import failed: ${error.message}`, "is-error"); }
@@ -106,6 +107,7 @@
       if (!window.confirm("Remove this slide? It disappears from the live site only after you press Publish.")) return;
       data.hero.slides.splice(index, 1);
       editor.value = JSON.stringify(data, null, 2);
+      editor.dispatchEvent(new Event("input"));
       renderSlideLibrary();
       setSlideStatus("Slide removed. Press Save draft or Publish (Pages & JSON) to keep it.", "is-ok");
     } catch (_) { /* the JSON editor already shows its validation state */ }

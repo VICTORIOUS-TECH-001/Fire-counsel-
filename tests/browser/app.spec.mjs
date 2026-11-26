@@ -798,7 +798,7 @@ test("students can read a saved PDF in the built-in reader and close it with Bac
   await expect(page.locator(".reader-overlay")).toHaveCount(0);
 });
 
-test("admin previews a website draft, publishes to Firebase before Neon and restores the primary live document", async ({ page, context }) => {
+test("admin previews a website draft, publishes to Firebase before Neon and restores the primary live document", async ({ page }) => {
   await stubAuth(page, { user: admin });
   const base = await (await page.request.get("/data/site-content.json")).json();
   await stubFirestore(page, { content: base });
@@ -835,10 +835,16 @@ test("admin previews a website draft, publishes to Firebase before Neon and rest
   await page.locator("#save-draft").click();
   await expect(page.locator("#editor-status")).toContainText("Draft saved");
 
-  const [preview] = await Promise.all([context.waitForEvent("page"), page.locator("#preview-site").click()]);
+  // The context page event can expose about:blank before its deferred site
+  // script runs. Wait for this opener's actual popup/document, not a sleep or
+  // a longer content assertion deadline; foreground it in headless Chromium.
+  const [preview] = await Promise.all([page.waitForEvent("popup"), page.locator("#preview-site").click()]);
+  await preview.bringToFront();
+  await preview.waitForLoadState("domcontentloaded");
   await expect(preview.locator("#preview-banner")).toContainText("PREVIEW");
   await expect(preview.locator("body")).toContainText("Draft Brand Name");
   await preview.close();
+  await page.bringToFront();
 
   await page.locator("#publish-note").fill("New brand");
   await page.locator("#publish-site").click();

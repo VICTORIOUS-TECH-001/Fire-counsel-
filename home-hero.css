@@ -49,7 +49,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: clamp(146px, 17svh, 176px) 24px 34px;
+  padding: clamp(146px, 17svh, 176px) 24px 18px;
   border-radius: 0;
   background: #0a0820;
   box-shadow: none;
@@ -121,7 +121,9 @@
   font-weight: 800;
   line-height: 1.08;
   letter-spacing: -.055em;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 .home-streams .hero-word {
   display: inline-block;

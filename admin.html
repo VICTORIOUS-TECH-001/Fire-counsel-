@@ -210,7 +210,31 @@
 
       <section class="admin-panel" id="panel-content" aria-labelledby="content-title" hidden>
         <div class="admin-heading"><div><span class="eyebrow">PAGES · SECTIONS · FOOTER</span><h1 id="content-title">Edit site content.</h1><p>Edit the homepage text below. <b>Save draft</b> keeps your work (only admins see it), <b>Preview</b> opens the site with your changes, and <b>Publish</b> writes them live to Firebase for everyone.</p></div><span class="panel-status" id="site-publish-state">SIGN IN AS ADMIN TO PUBLISH</span></div>
-        <div class="editor-card"><div class="editor-toolbar"><div><strong>Website content JSON</strong><small>Homepage · navigation · slides · articles · case notes · legal links · footer</small></div><div class="editor-actions"><label class="button button-light file-button" for="json-import">Import JSON</label><input id="json-import" type="file" accept="application/json,.json" hidden><button class="button button-light" id="export-json" type="button">Download backup</button></div></div>
+        <section class="editor-card homepage-copy-editor" aria-labelledby="homepage-copy-title">
+          <span class="eyebrow">HOMEPAGE WORDS</span><h2 id="homepage-copy-title">Introduction &amp; learning tools</h2>
+          <p>Edit the words here without touching JSON. Changes update this editor only: use <b>Save draft</b>, <b>Preview</b> and <b>Publish</b> below when you are ready.</p>
+          <fieldset id="homepage-copy-fields" disabled>
+            <legend class="sr-only">Homepage copy</legend>
+            <h3>Front page</h3>
+            <div class="homepage-copy-grid">
+              <label>Page title<input id="home-copy-title" data-homepage-path="hero.copy.title" maxlength="120"></label>
+              <label>Tagline<input id="home-copy-tagline" data-homepage-path="hero.copy.tagline" maxlength="120"></label>
+              <label class="homepage-copy-wide">Small introduction paragraph<textarea id="home-copy-introduction" data-homepage-path="hero.copy.introduction" rows="4" maxlength="600"></textarea></label>
+            </div>
+            <p class="homepage-copy-note">The flame logo is not changed here. Sign up stays linked to the Google-only account page; editing words does not restore the old slideshow or pictures.</p>
+            <h3>Learning section</h3>
+            <div class="homepage-copy-grid">
+              <label>Small heading<input data-homepage-path="learning.eyebrow" maxlength="120"></label>
+              <label>Section title<input data-homepage-path="learning.title" maxlength="120"></label>
+              <label>Title, second line<input data-homepage-path="learning.accent" maxlength="120"></label>
+              <label>Preview caption<input data-homepage-path="learning.previewLabel" maxlength="120"></label>
+              <label class="homepage-copy-wide">Section introduction<textarea data-homepage-path="learning.intro" rows="3" maxlength="600"></textarea></label>
+            </div>
+            <div class="homepage-copy-tools" id="homepage-tool-fields"></div>
+          </fieldset>
+          <p class="homepage-copy-status" id="homepage-copy-status" role="status" aria-live="polite">Sign in as an administrator to edit these words.</p>
+        </section>
+        <div class="editor-card"><div class="editor-toolbar"><div><strong>Website content JSON</strong><small>Homepage · learning tools · navigation · articles · case notes · legal links · footer</small></div><div class="editor-actions"><label class="button button-light file-button" for="json-import">Import JSON</label><input id="json-import" type="file" accept="application/json,.json" hidden><button class="button button-light" id="export-json" type="button">Download backup</button></div></div>
           <label class="sr-only" for="json-editor">Edit the FIRE COUNSEL website content JSON</label><textarea class="json-editor" id="json-editor" spellcheck="false" aria-describedby="json-hint" placeholder="Loading site content…"></textarea>
           <div class="editor-footer"><span id="json-hint">Text is escaped before display. Do not paste passwords, provider API keys or student content.</span><span class="editor-status" id="editor-status" role="status" aria-live="polite">Loading…</span></div>
           <div class="editor-actions bottom-actions"><button class="button button-light button-disabled" id="save-draft" type="button" disabled aria-disabled="true">1 · Save draft</button><button class="button button-light" id="preview-site" type="button">2 · Preview ↗</button><label class="sr-only" for="publish-note">What changed (optional)</label><input id="publish-note" type="text" maxlength="200" placeholder="What changed? (optional)" disabled><button class="button button-primary button-disabled" id="publish-site" type="button" disabled aria-disabled="true">3 · Publish to live site</button><button class="button button-light button-disabled" id="clear-draft" type="button" disabled aria-disabled="true">Discard changes</button></div>
@@ -326,6 +350,7 @@
   <script type="module" src="./admin-courses.mjs"></script>
   <script type="module" src="./admin-workspace.mjs"></script>
   <script type="module" src="./admin-site.mjs"></script>
+  <script type="module" src="./admin-homepage.mjs"></script>
   <script type="module" src="./admin-uploads.mjs"></script>
   <script type="module" src="./admin-workstation.mjs"></script>
   <script type="module" src="./presence.mjs"></script>

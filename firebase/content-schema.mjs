@@ -135,7 +135,19 @@ export function validateSiteContent(content) {
 
   if (!isPlainObject(content.hero)) errors.push("hero must be an object.");
   else {
-    for (const key of Object.keys(content.hero)) if (!["slides", "autoplayMs"].includes(key)) errors.push(`hero.${key} is not a supported field.`);
+    for (const key of Object.keys(content.hero)) if (!["slides", "autoplayMs", "copy"].includes(key)) errors.push(`hero.${key} is not a supported field.`);
+    // Optional single-introduction copy, independent of the legacy slide
+    // archive. Both the browser preflight and protected API enforce this shape.
+    if ("copy" in content.hero) {
+      const copy = content.hero.copy;
+      if (!isPlainObject(copy) || Object.keys(copy).some(key => !["title", "tagline", "introduction"].includes(key))) {
+        errors.push("hero.copy needs only title, tagline and introduction text.");
+      } else {
+        if (!isText(copy.title, SITE_CONTENT_LIMITS.SHORT_TEXT) || !copy.title.trim()) errors.push("hero.copy.title must be non-empty text up to 120 characters.");
+        if (!isText(copy.tagline, SITE_CONTENT_LIMITS.SHORT_TEXT)) errors.push("hero.copy.tagline must be text up to 120 characters.");
+        if (!isText(copy.introduction, SITE_CONTENT_LIMITS.LONG_TEXT)) errors.push("hero.copy.introduction must be text up to 600 characters.");
+      }
+    }
     if ("autoplayMs" in content.hero && !(Number.isFinite(content.hero.autoplayMs) && content.hero.autoplayMs >= 4000 && content.hero.autoplayMs <= 15000)) {
       errors.push("hero.autoplayMs must be a number between 4000 and 15000.");
     }

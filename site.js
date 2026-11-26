@@ -33,6 +33,7 @@
     clearTimeout(toast.timer); toast.timer = setTimeout(() => node.classList.remove("show"), 2600);
   };
   let siteData = null;
+  let copyHelpers = null;
 
   // Preview: the admin page that opened this tab sends its unsaved draft. Only
   // messages from this same site (the admin studio) are accepted; the draft is
@@ -91,29 +92,42 @@
     $("#brand-name").textContent = data.brand?.name || "FIRE COUNSEL";
     $("#brand-tagline").textContent = data.brand?.tagline || "Ignite your legal intelligence";
   }
-  function learningArtwork(index) {
-    // These are labelled illustrations, never student data or performance
-    // claims. No study files, records or authenticated services are read.
+  function renderHeroCopy(data) {
+    const copy = copyHelpers.heroCopy(data);
+    const heading = $("#home h1");
+    if (heading.textContent !== copy.title) {
+      let word = 0;
+      heading.innerHTML = copy.title.split(/(\s+)/).map(token => /\S/.test(token)
+        ? `<span class="hero-word" style="--word:${word++}">${esc(token)}</span>` : esc(token)).join("");
+    }
+    const tagline = $("#home .hero-tagline"), introduction = $("#home .hero-introduction");
+    tagline.textContent = copy.tagline; tagline.hidden = !copy.tagline;
+    introduction.textContent = copy.introduction; introduction.hidden = !copy.introduction;
+    // Sign up remains the Google-only account entry; content edits never
+    // create extra hero buttons, slides or photos, or change that destination.
+  }
+  function learningArtwork(index, item) {
+    // Labelled illustrations only, never student files or performance claims.
+    const preview = copyHelpers.learningPreview(item, index), labels = preview.labels.map(esc);
     const check = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#2ee6a6"/><path d="m5.5 10.2 3 3 6-6.2" stroke="#06231a" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    const badges = ["Your study, better organised.", "Your notes, on this device.", "Build your own case cards.", "Practise at a steady pace."];
     let art;
     switch (index % 4) {
       case 1:
-        art = '<div class="learning-files"><div class="learning-file"><i>▤</i><span>PDFs</span></div><div class="learning-file"><i>▤</i><span>Personal notes</span></div><div class="learning-file"><i>▤</i><span>Saved on this device</span></div></div>';
+        art = '<div class="learning-files">' + labels.map(label => `<div class="learning-file"><i>▤</i><span>${label}</span></div>`).join("") + '</div>';
         break;
       case 2:
-        art = '<div class="learning-recall"><small>Case recall</small><span>Your own question</span><i></i><span>Your answer, ready to recall.</span></div>';
+        art = `<div class="learning-recall"><small>${labels[0]}</small><span>${labels[1]}</span><i></i><span>${labels[2]}</span></div>`;
         break;
       case 3:
-        art = '<div class="learning-focus"><div class="learning-focus-ring">↗</div><div class="learning-focus-steps"><span>Focus timer</span><span>Revision</span><span>A steady pace</span></div></div>';
+        art = '<div class="learning-focus"><div class="learning-focus-ring">↗</div><div class="learning-focus-steps">' + labels.map(label => `<span>${label}</span>`).join("") + '</div></div>';
         break;
       default: {
         const bars = [28, 40, 34, 46, 30, 36, 100, 52, 44, 60, 40, 34, 50, 38];
-        art = '<div class="learning-mini-table"><div class="learning-table-row"><span>Your study</span><span>Better organised</span></div><div class="learning-table-row"><span>Course choice</span><span>Selected course</span></div><div class="learning-table-row"><span>Subjects</span><span>One clear study space</span></div><div class="learning-table-row"><span>Personal notes</span><span>Keep organised</span></div><div class="learning-table-row"><span>Exam practice</span><span>A steady pace</span></div></div>'
+        art = '<div class="learning-mini-table">' + [0, 2, 4, 6, 8].map(i => `<div class="learning-table-row"><span>${labels[i]}</span><span>${labels[i + 1]}</span></div>`).join("") + '</div>'
           + '<div class="learning-mini-bars">' + bars.map((height, i) => `<i class="${i === 6 ? "is-highlight" : ""}" style="--bar:${height}%;--bar-index:${i}"></i>`).join("") + '</div>';
       }
     }
-    return `<div class="learning-art" aria-hidden="true">${art}<div class="learning-badge">${check}${badges[index % 4]}</div></div>`;
+    return `<div class="learning-art" aria-hidden="true">${art}<div class="learning-badge">${check}${esc(preview.badge)}</div></div>`;
   }
   function renderLearning(data) {
     const learning = data.learning || {};
@@ -133,7 +147,7 @@
     holder.setAttribute("aria-label", "Study tools");
     holder.setAttribute("aria-orientation", "vertical");
     holder.innerHTML = cards.map((item, index) => `<button class="learning-tool ${index === 0 ? "is-active" : ""}" id="learning-tab-${index}" data-learning-tab="${index}" type="button" role="tab" aria-label="${esc(item.title)}" aria-controls="learning-pane-${index}" aria-selected="${index === 0}" tabindex="${index === 0 ? "0" : "-1"}"><span class="learning-tool-heading"><span class="learning-tool-title">${esc(item.title)}</span><span class="learning-tool-number" aria-hidden="true">${esc(item.number || String(index + 1).padStart(2, "0"))}</span></span><span class="learning-tool-body"><span>${esc(item.text)}</span></span><i class="learning-tool-progress" aria-hidden="true"></i></button>`).join("");
-    visual.innerHTML = cards.map((item, index) => `<section class="learning-pane" id="learning-pane-${index}" role="tabpanel" aria-labelledby="learning-tab-${index}" tabindex="0" ${index ? "hidden" : ""}><span class="learning-preview-kicker">FIRE COUNSEL · TOOL PREVIEW</span><h3>${esc(item.title)}</h3>${learningArtwork(index)}<a class="learning-open" href="${href(item.href)}">Open ${esc(item.title)} <span aria-hidden="true">↗</span></a></section>`).join("");
+    visual.innerHTML = cards.map((item, index) => `<section class="learning-pane" id="learning-pane-${index}" role="tabpanel" aria-labelledby="learning-tab-${index}" tabindex="0" ${index ? "hidden" : ""}><span class="learning-preview-kicker">${esc(learning.previewLabel ?? "FIRE COUNSEL · TOOL PREVIEW")}</span><h3>${esc(item.title)}</h3>${learningArtwork(index, item)}<a class="learning-open" href="${href(item.href)}">${esc(item.linkLabel || `Open ${item.title || "study tool"}`)} <span aria-hidden="true">↗</span></a></section>`).join("");
     const tabs = $$('[role="tab"]', holder), panes = $$(".learning-pane", visual);
     function select(index, focus = false) {
       if (!Number.isInteger(index) || index < 0 || index >= tabs.length) return;
@@ -150,6 +164,26 @@
       const tab = event.target.closest("[data-learning-tab]");
       if (tab) select(Number(tab.dataset.learningTab));
     });
+    const hover = event => {
+      // Touch keeps native tap-to-select. Hover must not steal keyboard focus
+      // or hide a link/panel that a keyboard user is currently reading.
+      if (event.pointerType !== "mouse") return;
+      const focused = document.activeElement;
+      if ((holder.contains(focused) || visual.contains(focused)) && focused.matches(":focus-visible")) return;
+      const tab = event.target.closest("[data-learning-tab]");
+      if (!tab) return;
+      const bounds = tab.getBoundingClientRect();
+      tab.style.setProperty("--pointer-x", `${Math.round(event.clientX - bounds.left)}px`);
+      tab.style.setProperty("--pointer-y", `${Math.round(event.clientY - bounds.top)}px`);
+      tabs.forEach(other => other.classList.toggle("is-pointer-active", other === tab));
+      if (tab.getAttribute("aria-selected") !== "true") select(Number(tab.dataset.learningTab));
+    };
+    holder.addEventListener("pointerover", hover, { passive: true });
+    holder.addEventListener("pointermove", hover, { passive: true });
+    holder.addEventListener("pointerleave", () => tabs.forEach(tab => {
+      tab.classList.remove("is-pointer-active");
+      tab.style.removeProperty("--pointer-x"); tab.style.removeProperty("--pointer-y");
+    }));
     holder.addEventListener("keydown", event => {
       const tab = event.target.closest("[data-learning-tab]");
       if (!tab) return;
@@ -244,10 +278,9 @@
   }
   async function init() {
     try {
-      siteData = await loadContent();
-      // The single branded hero is static HTML. Legacy CMS slides must not
-      // restore the retired carousel, photos, paragraphs or secondary CTA.
-      renderNavigation(siteData);
+      [siteData, copyHelpers] = await Promise.all([loadContent(), import("./homepage-copy.mjs")]);
+      // Editable single-introduction copy, independent of legacy slide data.
+      renderNavigation(siteData); renderHeroCopy(siteData);
       renderLearning(siteData); renderCaseNotes(siteData); renderArticles(siteData); renderResources(siteData); renderFooter(siteData);
       initArticleDialog(siteData);
     } catch (error) {

@@ -25,6 +25,7 @@ async function expectSingleHero(page) {
 
 function legacyContent() {
   const content = structuredClone(bundled);
+  delete content.hero.copy; // real pre-copy published documents have no new field
   content.hero.autoplayMs = 4000;
   content.hero.slides = [1, 2].map(index => ({
     ...bundled.hero.slides[0],
