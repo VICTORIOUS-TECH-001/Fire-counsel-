@@ -154,6 +154,21 @@ If publication still fails, follow the **actual error code**, not another rules 
 
 Stored `updatedAt`/`updatedBy` metadata is removed **only on public reads**. Homepage, restore and workspace publishing share the same primary Firestore channel; homepage/workspace readers keep their Neon/bundled/offline fallbacks. A confirmed Firestore publish followed by an archive failure is reported as partial success, never as a rolled-back live change. Do not enable allow-all/test-mode rules. No rules, claims, Render settings or private credentials are deployed by local tests.
 
+## 7. Render health checks returning 429
+
+An Events entry such as **“HTTP health check failed with status code 429 while running your code”** means the platform's health request was throttled. This is not a Gemini/Cloudflare quota or rejected-key diagnostic. Repeated failed probes can make Render restart the instance, interrupt requests with 503s and discard temporary Working Station jobs.
+
+The previous `/healthz` handler ran **after** the ordinary **100 requests per 15 minutes / IP** middleware. The regression reproduces a 429 on probe **101** with the real default limit. The repair moves **only GET/HEAD `/healthz`** before body parsing and all traffic limiters, adds `Cache-Control: no-store`, and leaves the existing security headers/CORS policy in place. It makes no Firebase, Neon or AI-provider request. Other routes, mutations and the Google/admin protections retain their limits; a client-supplied health-check header grants no exemption.
+
+Owner rollout:
+
+1. Deploy the reviewed API health-route fix and confirm the intended **Live commit** contains it; an environment-only redeploy of older code does not install the repair. This repair has no frontend or migration changes. Download any ready unsaved station draft first: restarting/redeploying discards RAM jobs, but does not delete saved Neon documents or Classic originals.
+2. On **fire-counsel-2 → Settings → Health Check Path**, use exactly **`/healthz`** (a path, not a complete URL). Do **not** use `/api/health`, a protected API or a provider-test route. `render.yaml` already declares `/healthz`; an existing dashboard service still needs its actual setting checked rather than assumed to match the Blueprint.
+3. Check `/healthz` returns **200** and observe subsequent Events for health-check failures. Do not repeatedly upload documents or rotate credentials to work around a failing host probe. A liveness success proves only that the process can serve this route—not database readiness, provider authentication, quota or successful document processing.
+4. Once the service stays healthy, use the explicit **Test Admin Gemini** and **Test Cloudflare** buttons one at a time. A remaining `ADMIN_PROVIDER_UNAVAILABLE` still needs separate provider/connectivity investigation; this health fix does not validate either credential or guarantee OCR success.
+
+**Keep `/api/health` as human-facing database/setup diagnostics.** It still performs a Neon check, keeps the normal API request allowance, and correctly reports **503** when Neon is unavailable/unconfigured. Do not turn that into an always-200 response, remove general rate limits, weaken authentication, add paid resources or change keys merely to make Render's liveness probe pass. If Events show a different failure reason after this rollout, investigate that new evidence separately.
+
 ## 8. Counsel Working Station: separate admin document AI
 
 The new desk is **Admin Studio → Upload documents → Counsel Working Station**, next to the preserved **Classic upload** tab. Deploy the matching frontend **and API**. No new migration or student-profile flag is required when the existing document-library tables are already installed.

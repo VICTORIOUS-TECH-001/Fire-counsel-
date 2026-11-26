@@ -85,6 +85,15 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Fire-Counsel-Installation"]
   }));
+  // Render's process-liveness probe must run BEFORE body parsing and all
+  // traffic limiters. Otherwise repeated probes consume the 100/15-minute API
+  // allowance, return 429, and cause a healthy instance to be restarted. Keep
+  // this cheap GET/HEAD route independent of Firebase, Neon and AI providers.
+  app.get("/healthz", (_req, res) => {
+    res.set("Cache-Control", "no-store");
+    res.status(200).json({ service: "FIRE COUNSEL API", status: "ok" });
+  });
+
   // AI uploads (photos/PDFs as base64) need a larger body than other routes.
   app.use(["/api/v1/ai/messages", "/api/v1/admin/ai/extract", "/api/v1/admin/workstation/jobs"], express.json({ limit: "26mb" }));
   app.use(["/api/v1/admin/ai/prompts", "/api/v1/admin/ai/instructions"], express.json({ limit: "1mb" }));
@@ -116,12 +125,8 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
     handler: rateLimitReply("API_RATE_LIMIT", "API requests are temporarily limited. Wait for Retry-After; this is not a provider quota test.")
   }));
 
-  // Render's liveness probe must not require a live database or Firebase project.
-  // This makes a staging deployment bootable without enabling external writes.
-  app.get("/healthz", (_req, res) => {
-    res.status(200).json({ service: "FIRE COUNSEL API", status: "ok" });
-  });
-
+  // Human-facing database readiness/setup diagnostics, NOT the Render restart
+  // probe. This performs a Neon query and retains the normal API protections.
   app.get("/api/health", async (_req, res) => {
     let database = "not_configured";
     let databaseError;
