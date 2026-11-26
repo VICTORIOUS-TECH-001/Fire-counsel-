@@ -1,0 +1,246 @@
+/* The supplied matrix orb, scoped to the new homepage AI section. The hero,
+   learning tools, logo and existing AI application keep their own styles. */
+.home-streams .home-ai {
+  position: relative;
+  margin: 0;
+  padding: clamp(32px, 5vw, 72px) 0 clamp(64px, 8vw, 110px);
+  background: #0a0820;
+  color: #e9e8f6;
+  text-align: center;
+  overflow-wrap: anywhere;
+  scroll-margin-top: calc(var(--site-header-height, 100px) + 36px);
+}
+.home-ai .home-ai-heading {
+  width: min(820px, calc(100% - 48px));
+  margin: 0 auto;
+}
+.home-ai h2 {
+  margin: 0;
+  color: #f0eefc;
+  font-size: clamp(32px, 4.5vw, 54px);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -.035em;
+  text-wrap: balance;
+}
+.home-ai .home-ai-heading p {
+  max-width: 700px;
+  margin: 22px auto 0;
+  color: #aaa6c7;
+  font-size: 14px;
+  line-height: 1.85;
+}
+.home-ai .home-ai-heading .home-ai-closing { margin-top: 14px; color: #d1cde8; }
+.home-ai .home-ai-scene {
+  --ai-orbit-size: min(560px, calc(100vw - 124px));
+  position: relative;
+  isolation: isolate;
+  /* The scene is a viewport for counter-rotating layers. Contain their
+     intermediate transform bounds; visible links still fit independently. */
+  overflow: clip;
+  width: min(100%, 1060px);
+  height: calc(var(--ai-orbit-size) * 1.24 + 64px);
+  margin: 12px auto 0;
+}
+.home-ai .home-ai-scene::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 10%;
+  right: 10%;
+  bottom: 0;
+  height: 36%;
+  background: radial-gradient(ellipse at 50% 50%, rgba(87, 93, 212, .09), transparent 70%);
+  pointer-events: none;
+}
+.home-ai .home-ai-stars { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .5; pointer-events: none; }
+.home-ai .home-ai-wrap {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  width: var(--ai-orbit-size);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+}
+.home-ai .home-ai-track { position: absolute; inset: 0; border: 1px solid rgba(160, 150, 255, .12); border-radius: 50%; pointer-events: none; }
+.home-ai .home-ai-track-outer { inset: -10%; border-color: rgba(160, 150, 255, .045); }
+.home-ai .home-ai-orb { position: absolute; z-index: 1; inset: 16%; border-radius: 50%; }
+.home-ai .home-ai-halo {
+  position: absolute;
+  inset: -14%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, transparent 62%, rgba(70, 130, 255, .55) 76%, rgba(46, 230, 166, .18) 86%, transparent);
+  animation: homeAIPulse 4s ease-in-out infinite;
+  pointer-events: none;
+}
+.home-ai .home-ai-ring {
+  position: absolute;
+  inset: -3%;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, #2ee6a6, #3d7bff, #7b6cff, #3d7bff, #2ee6a6);
+  -webkit-mask: radial-gradient(farthest-side, transparent 85%, #000 87%, #000 93%, transparent 100%);
+  mask: radial-gradient(farthest-side, transparent 85%, #000 87%, #000 93%, transparent 100%);
+  filter: blur(2.5px);
+  animation: homeAIRing 8s linear infinite;
+  pointer-events: none;
+}
+.home-ai .home-ai-matrix,
+.home-ai .home-ai-shade,
+.home-ai .home-ai-core-link { position: absolute; inset: 6%; width: 88%; height: 88%; border-radius: 50%; }
+.home-ai .home-ai-matrix {
+  background: #020812;
+  opacity: .72;
+  pointer-events: none;
+}
+.home-ai .home-ai-shade { box-shadow: inset 0 0 40px 10px rgba(0, 8, 30, .95); pointer-events: none; }
+.home-ai .home-ai-core-link {
+  display: grid;
+  place-items: center;
+  background: radial-gradient(ellipse at 50% 72%, rgba(245, 123, 11, .045), transparent 40%);
+  -webkit-tap-highlight-color: transparent;
+}
+.home-ai .home-ai-core-link:focus-visible { outline: 3px solid #8ffff0; outline-offset: 6px; }
+.home-ai .home-ai-flame {
+  position: relative;
+  display: block;
+  width: clamp(38px, 7vw, 68px);
+  aspect-ratio: 4 / 5;
+  transform-origin: 50% 94%;
+  filter: drop-shadow(0 0 13px rgba(255, 118, 0, .35));
+  animation: homeAIBurn 1.6s ease-in-out infinite;
+}
+.home-ai .home-ai-flame svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.home-ai .home-ai-flame-inner { transform-origin: 33px 72px; animation: homeAIFlare .9s ease-in-out infinite alternate; }
+.home-ai .home-ai-ember {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  left: 35%;
+  bottom: 70%;
+  background: #ffcf6b;
+  border-radius: 50%;
+  opacity: 0;
+  box-shadow: 0 0 5px #ff8a25;
+  animation: homeAIEmber 2.2s ease-out infinite;
+}
+.home-ai .home-ai-ember:nth-of-type(2) { left: 66%; animation-delay: -.8s; }
+.home-ai .home-ai-ember:nth-of-type(3) { left: 48%; animation-delay: -1.5s; }
+/* Transform/counter-transform instead of a JS position timer: readable labels
+   orbit as in the reference, including browsers without @property support. */
+.home-ai .home-ai-orbit { position: absolute; z-index: 2; inset: 0; pointer-events: none; animation: homeAIOrbit 80s linear infinite; }
+.home-ai .home-ai-slot {
+  --phase: var(--start-angle);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform: rotate(var(--phase)) translateX(calc(var(--ai-orbit-size) * .52));
+}
+.home-ai .home-ai-chip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: max-content;
+  max-width: clamp(94px, 21vw, 144px);
+  min-height: 36px;
+  padding: 8px 15px;
+  border: 1px solid rgba(170, 160, 255, .2);
+  border-radius: 99px;
+  background: linear-gradient(165deg, rgba(43, 40, 65, .96), rgba(18, 17, 34, .96));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 8px 24px rgba(0, 0, 10, .5);
+  color: #e1dff2;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-decoration: none;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) rotate(calc(-1 * var(--phase)));
+  animation: homeAIUpright 80s linear infinite;
+}
+.home-ai .home-ai-chip::before { content: ""; position: absolute; inset: -5px; border-radius: inherit; }
+.home-ai .home-ai-chip:hover { border-color: rgba(127, 240, 221, .6); color: #fff; background: #25233e; }
+.home-ai .home-ai-chip:focus-visible { outline: 3px solid #8ffff0; outline-offset: 4px; color: #fff; }
+/* Freeze both orbit transforms together while a pointer/keyboard user aims. */
+.home-ai .home-ai-orbit:hover,
+.home-ai .home-ai-orbit:hover .home-ai-chip,
+.home-ai .home-ai-orbit:focus-within,
+.home-ai .home-ai-orbit:focus-within .home-ai-chip { animation-play-state: paused; }
+.home-ai .home-ai-scene:not([data-motion="running"]) *,
+.home-ai .home-ai-scene:not([data-motion="running"]) *::before,
+.home-ai .home-ai-scene:not([data-motion="running"]) *::after { animation-play-state: paused; }
+.home-ai .home-ai-pause {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid rgba(170, 160, 255, .16);
+  border-radius: 99px;
+  background: transparent;
+  color: #aaa6c7;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.home-ai .home-ai-pause:hover { color: #fff; border-color: #8c89b2; }
+.home-ai .home-ai-pause:focus-visible { outline: 3px solid #8ffff0; outline-offset: 4px; }
+.home-ai .home-ai-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  max-width: calc(100% - 48px);
+  min-height: 48px;
+  margin-top: 24px;
+  padding: 14px 24px;
+  border: 1px solid rgba(170, 160, 255, .25);
+  border-radius: 99px;
+  background: rgba(123, 108, 255, .08);
+  color: #eceafa;
+  font-size: 13px;
+  line-height: 1.4;
+  text-decoration: none;
+}
+.home-ai .home-ai-open:hover { border-color: #9f96e0; background: rgba(123, 108, 255, .16); }
+.home-ai .home-ai-open:focus-visible { outline: 3px solid #8ffff0; outline-offset: 5px; }
+.home-ai .home-ai-open span { min-width: 0; }
+.home-ai .home-ai-open i { flex: 0 0 auto; font-style: normal; }
+.home-ai #home-ai-entry-status { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+@keyframes homeAIRing { to { transform: rotate(360deg); } }
+@keyframes homeAIPulse { 50% { transform: scale(1.05); opacity: .75; } }
+@keyframes homeAIOrbit { to { transform: rotate(360deg); } }
+@keyframes homeAIUpright {
+  from { transform: translate(-50%, -50%) rotate(calc(-1 * var(--phase))); }
+  to { transform: translate(-50%, -50%) rotate(calc(-360deg - var(--phase))); }
+}
+@keyframes homeAIBurn {
+  0%, 100% { transform: scale(.97, 1) rotate(-1deg); }
+  22% { transform: scale(1.025, .96) rotate(1.5deg); }
+  48% { transform: scale(.96, 1.045) rotate(-1.5deg); }
+  73% { transform: scale(1.02, .98) rotate(.5deg); }
+}
+@keyframes homeAIFlare { to { transform: scale(.87, 1.07); opacity: .82; } }
+@keyframes homeAIEmber {
+  12% { opacity: .8; }
+  100% { transform: translate(8px, -38px) scale(.15); opacity: 0; }
+}
+@media (max-width: 600px) {
+  .home-ai .home-ai-heading { width: calc(100% - 40px); }
+  .home-ai .home-ai-heading p { font-size: 13px; line-height: 1.8; }
+  .home-ai .home-ai-scene { height: calc(var(--ai-orbit-size) * 1.24 + 104px); margin-top: 24px; }
+  .home-ai .home-ai-wrap { top: 45%; }
+  /* Even spacing on small screens keeps the pills apart for the entire orbit,
+     not just the opening frame. Desktop preserves the reference's grouping. */
+  .home-ai .home-ai-slot { --phase: calc(200deg + var(--chip-index) * 72deg); }
+  .home-ai .home-ai-chip { padding: 8px 12px; font-size: 10px; }
+  .home-ai .home-ai-shade { box-shadow: inset 0 0 20px 5px rgba(0, 8, 30, .95); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-ai *, .home-ai *::before, .home-ai *::after { animation: none !important; transition: none !important; }
+  .home-ai .home-ai-orbit { transform: none; }
+  .home-ai .home-ai-pause { display: none; }
+}

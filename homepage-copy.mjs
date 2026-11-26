@@ -5,6 +5,13 @@ export const DEFAULT_HERO_COPY = Object.freeze({
   tagline: "Ignite your legal intelligence",
   introduction: "Fire Counsel is more than a place to learn the law. It is the intelligence behind your success, empowering you to master the law, unlock your potential and become one of tomorrow's great legal minds."
 });
+export const DEFAULT_AI_COPY = Object.freeze({
+  title: "Study Smart with Fire Counsel AI",
+  intro: "Your personal AI legal study companion. Understand complex legal principles, simplify difficult cases, test your knowledge, discover relevant authorities, and prepare confidently for your law theory examinations. Learn faster, think critically, and study with the intelligence you need to succeed.",
+  closing: "Let Fire Counsel AI turn the way you study law into the way you master it.",
+  buttonLabel: "Open Fire Counsel AI",
+  chips: Object.freeze(["Hacks", "Clarity", "Legislation", "Statues", "Exam"])
+});
 const PREVIEWS = [
   { badge: "Your study, better organised.", labels: ["Your study", "Better organised", "Course choice", "Selected course", "Subjects", "One clear study space", "Personal notes", "Keep organised", "Exam practice", "A steady pace"] },
   { badge: "Your notes, on this device.", labels: ["PDFs", "Personal notes", "Saved on this device"] },
@@ -21,6 +28,16 @@ export function heroCopy(content) {
     title: typeof copy.title === "string" && copy.title.trim() ? copy.title : DEFAULT_HERO_COPY.title,
     tagline: typeof copy.tagline === "string" ? copy.tagline : DEFAULT_HERO_COPY.tagline,
     introduction: typeof copy.introduction === "string" ? copy.introduction : DEFAULT_HERO_COPY.introduction
+  };
+}
+
+export function aiCopy(content) {
+  const copy = object(content?.aiSpotlight) ? content.aiSpotlight : {};
+  return {
+    ...Object.fromEntries(["title", "intro", "closing", "buttonLabel"].map(key => [key,
+      typeof copy[key] === "string" && copy[key].trim() ? copy[key] : DEFAULT_AI_COPY[key]])),
+    chips: DEFAULT_AI_COPY.chips.map((text, index) =>
+      typeof copy.chips?.[index] === "string" && copy.chips[index].trim() ? copy.chips[index] : text)
   };
 }
 
@@ -43,6 +60,14 @@ export function updateHomepageCopy(content, path, value) {
   let match = /^hero\.copy\.(title|tagline|introduction)$/.exec(path);
   if (match) {
     result.hero.copy = { ...heroCopy(result), [match[1]]: text };
+    return result;
+  }
+  match = /^aiSpotlight\.(title|intro|closing|buttonLabel|chips\.([0-4]))$/.exec(path);
+  if (match) {
+    const copy = aiCopy(result);
+    if (match[2] !== undefined) copy.chips[Number(match[2])] = text;
+    else copy[match[1]] = text;
+    result.aiSpotlight = copy;
     return result;
   }
   match = /^learning\.(eyebrow|title|accent|intro|previewLabel)$/.exec(path);

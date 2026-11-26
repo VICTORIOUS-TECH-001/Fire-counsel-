@@ -211,7 +211,7 @@
       <section class="admin-panel" id="panel-content" aria-labelledby="content-title" hidden>
         <div class="admin-heading"><div><span class="eyebrow">PAGES · SECTIONS · FOOTER</span><h1 id="content-title">Edit site content.</h1><p>Edit the homepage text below. <b>Save draft</b> keeps your work (only admins see it), <b>Preview</b> opens the site with your changes, and <b>Publish</b> writes them live to Firebase for everyone.</p></div><span class="panel-status" id="site-publish-state">SIGN IN AS ADMIN TO PUBLISH</span></div>
         <section class="editor-card homepage-copy-editor" aria-labelledby="homepage-copy-title">
-          <span class="eyebrow">HOMEPAGE WORDS</span><h2 id="homepage-copy-title">Introduction &amp; learning tools</h2>
+          <span class="eyebrow">HOMEPAGE WORDS</span><h2 id="homepage-copy-title">Introduction, learning &amp; AI</h2>
           <p>Edit the words here without touching JSON. Changes update this editor only: use <b>Save draft</b>, <b>Preview</b> and <b>Publish</b> below when you are ready.</p>
           <fieldset id="homepage-copy-fields" disabled>
             <legend class="sr-only">Homepage copy</legend>
@@ -231,6 +231,19 @@
               <label class="homepage-copy-wide">Section introduction<textarea data-homepage-path="learning.intro" rows="3" maxlength="600"></textarea></label>
             </div>
             <div class="homepage-copy-tools" id="homepage-tool-fields"></div>
+            <h3>Fire Counsel AI section</h3>
+            <div class="homepage-copy-grid">
+              <label>AI section title<input data-homepage-path="aiSpotlight.title" maxlength="120"></label>
+              <label>AI button wording<input data-homepage-path="aiSpotlight.buttonLabel" maxlength="60"></label>
+              <label class="homepage-copy-wide">AI introduction<textarea data-homepage-path="aiSpotlight.intro" rows="4" maxlength="600"></textarea></label>
+              <label class="homepage-copy-wide">AI closing paragraph<textarea data-homepage-path="aiSpotlight.closing" rows="3" maxlength="600"></textarea></label>
+              <label>Orbit label 1<input data-homepage-path="aiSpotlight.chips.0" maxlength="36"></label>
+              <label>Orbit label 2<input data-homepage-path="aiSpotlight.chips.1" maxlength="36"></label>
+              <label>Orbit label 3<input data-homepage-path="aiSpotlight.chips.2" maxlength="36"></label>
+              <label>Orbit label 4<input data-homepage-path="aiSpotlight.chips.3" maxlength="36"></label>
+              <label>Orbit label 5<input data-homepage-path="aiSpotlight.chips.4" maxlength="36"></label>
+            </div>
+            <p class="homepage-copy-note">The flame, orbit labels and AI button all open ai.html after the Google sign-in check. These fields change words only, not access rules or destinations.</p>
           </fieldset>
           <p class="homepage-copy-status" id="homepage-copy-status" role="status" aria-live="polite">Sign in as an administrator to edit these words.</p>
         </section>

@@ -27,9 +27,12 @@ function safeNextUrl(value) {
 
 const nextUrl = safeNextUrl(requestedNext);
 const wantsAdmin = nextUrl.pathname.endsWith("/admin.html");
+const wantsAI = nextUrl.pathname.endsWith("/ai.html");
 let continueUrl = nextUrl;
 $("#manage-profile-link").hidden = wantsAdmin;
 if (wantsAdmin) $("#auth-intro").textContent = "Sign in to an existing administrator account with Google. The server must verify the Firebase admin claim; Google sign-in and profile creation never grant administrator permission.";
+
+if (wantsAI) $("#auth-intro").textContent = "Sign in with Google to open Fire Counsel AI. Your existing account and student profile checks still apply.";
 
 function setMessage(text, kind = "") {
   message.textContent = text;
@@ -109,7 +112,7 @@ async function verifyServerAccess(user) {
     if (!isCurrent()) return null;
     if (response.ok && body.data) {
       setMessage(`Signed in as ${userLabel}. Your student profile is ready.`, "ok");
-      return { label: "Continue to study", url: nextUrl };
+      return { label: wantsAI ? "Open Fire Counsel AI" : "Continue to study", url: nextUrl };
     }
     if (response.status === 404 && body.code === "PROFILE_NOT_CREATED") {
       setMessage(`Signed in as ${userLabel}. Confirm your prefilled student profile next. No course or payment is needed.`, "ok");
@@ -124,7 +127,7 @@ async function verifyServerAccess(user) {
     if (!isCurrent()) return null;
     setMessage(`Firebase sign-in succeeded for ${userLabel}, but its student profile could not be checked. ${error.message || "Local study remains available."}`, "error");
   }
-  return { label: "Continue to local study", url: nextUrl };
+  return { label: wantsAI ? "Open Fire Counsel AI" : "Continue to local study", url: nextUrl };
 }
 
 function showSignedIn(user) {

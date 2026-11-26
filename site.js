@@ -203,6 +203,20 @@
     } else visual.classList.add("is-in-view");
     holder.dataset.enhanced = "true";
   }
+  function renderAI(data) {
+    const copy = copyHelpers.aiCopy(data);
+    $("#home-ai-title").textContent = copy.title;
+    $("#home-ai-intro").textContent = copy.intro;
+    $("#home-ai-closing").textContent = copy.closing;
+    $("#home-ai-button-label").textContent = copy.buttonLabel;
+    $$("#home-ai .home-ai-chip").forEach((link, index) => {
+      link.textContent = copy.chips[index];
+      link.setAttribute("aria-label", `Open Fire Counsel AI: ${copy.chips[index]}`);
+    });
+    // Only words change: the live orbit is not rebuilt and JSON cannot alter
+    // its fixed, authenticated AI destination or execute markup.
+    $("#home-ai").dataset.content = "ready";
+  }
   function renderCaseNotes(data) {
     const item = data.caseNotes || {};
     $("#case-eyebrow").textContent = item.eyebrow || "CASE NOTES";
@@ -281,7 +295,7 @@
       [siteData, copyHelpers] = await Promise.all([loadContent(), import("./homepage-copy.mjs")]);
       // Editable single-introduction copy, independent of legacy slide data.
       renderNavigation(siteData); renderHeroCopy(siteData);
-      renderLearning(siteData); renderCaseNotes(siteData); renderArticles(siteData); renderResources(siteData); renderFooter(siteData);
+      renderLearning(siteData); renderAI(siteData); renderCaseNotes(siteData); renderArticles(siteData); renderResources(siteData); renderFooter(siteData);
       initArticleDialog(siteData);
     } catch (error) {
       console.error("FIRE COUNSEL website content could not be loaded.", error);

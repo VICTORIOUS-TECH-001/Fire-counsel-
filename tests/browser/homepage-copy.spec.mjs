@@ -54,6 +54,11 @@ test("plain-text homepage fields share the protected draft, unsaved preview and 
   await field(page, "learning.intro").fill("An introduction edited without touching JSON.");
   await field(page, "learning.cards.0.text").fill("A description written by the administrator.");
   await field(page, "learning.cards.0.linkLabel").fill("Choose your course");
+  await field(page, "aiSpotlight.title").fill("Study <b>law</b> with Fire Counsel AI");
+  await field(page, "aiSpotlight.intro").fill("An AI introduction edited in the shared draft.");
+  await field(page, "aiSpotlight.closing").fill("A closing paragraph from the administrator.");
+  await field(page, "aiSpotlight.buttonLabel").fill("Open our AI study companion");
+  await field(page, "aiSpotlight.chips.0").fill("Study ideas");
   await page.locator(".homepage-preview-copy > summary").first().click();
   await field(page, "learning.cards.0.preview.badge").fill("Organised by you <b>not bold</b>");
   await field(page, "learning.cards.0.preview.labels.2").fill("A custom course choice");
@@ -74,6 +79,8 @@ test("plain-text homepage fields share the protected draft, unsaved preview and 
   const errors = [];
   preview.on("pageerror", error => errors.push(error.message));
   try {
+    await preview.bringToFront();
+    await preview.waitForLoadState("domcontentloaded");
     await expect(preview.locator("#preview-banner")).toContainText("PREVIEW");
     await expect(preview.locator("#home .hero-introduction")).toHaveText(edited.hero.copy.introduction);
     await expect(preview.locator("#home .hero-tagline")).toHaveText(edited.hero.copy.tagline);
@@ -86,6 +93,13 @@ test("plain-text homepage fields share the protected draft, unsaved preview and 
     await expect(preview.locator("#home a")).toHaveAttribute("href", "./auth.html");
     await expect(preview.locator("#home img, #learning img, #learning b, #learning script")).toHaveCount(0);
     await expect(preview.locator("#case-image")).toHaveAttribute("src", bundled.caseNotes.image);
+    await expect(preview.locator("#home-ai-title")).toHaveText(edited.aiSpotlight.title);
+    await expect(preview.locator("#home-ai-intro")).toHaveText(edited.aiSpotlight.intro);
+    await expect(preview.locator("#home-ai-closing")).toHaveText(edited.aiSpotlight.closing);
+    await expect(preview.locator("#home-ai-button-label")).toHaveText(edited.aiSpotlight.buttonLabel);
+    await expect(preview.locator(".home-ai-chip").first()).toHaveText("Study ideas");
+    await expect(preview.locator("#home-ai b, #home-ai script")).toHaveCount(0);
+    await expect(preview.locator(".home-ai-open")).toHaveAttribute("href", "./ai.html");
     expect(errors).toEqual([]);
   } finally { await preview.close(); }
   expect(writes).toHaveLength(1, "previewing never publishes");
@@ -96,12 +110,15 @@ test("plain-text homepage fields share the protected draft, unsaved preview and 
   const published = await page.evaluate(() => window.__firestore.document);
   expect(published.hero.copy).toEqual(edited.hero.copy);
   expect(published.learning).toEqual(edited.learning);
+  expect(published.aiSpotlight).toEqual(edited.aiSpotlight);
   const visitor = await context.newPage();
   try {
     await stubFirestore(visitor, { content: published });
     await visitor.goto("/");
     await expect(visitor.locator("#home .hero-introduction")).toHaveText(edited.hero.copy.introduction);
     await expect(visitor.locator("#learning-pane-0 .learning-badge")).toHaveText(edited.learning.cards[0].preview.badge);
+    await expect(visitor.locator("#home-ai-title")).toHaveText(edited.aiSpotlight.title);
+    await expect(visitor.locator(".home-ai-chip").first()).toHaveText("Study ideas");
   } finally { await visitor.close(); }
 });
 
@@ -109,16 +126,20 @@ test("JSON edits, invalid JSON, import, discard and version restore keep the cop
   const version = structuredClone(bundled);
   version.hero.copy.title = "Restored introduction";
   version.learning.cards[0].text = "An older tool description.";
+  version.aiSpotlight.title = "Restored AI section";
   const writes = await studio(page, { version });
   await openEditor(page);
   const direct = structuredClone(bundled);
   direct.hero.copy.title = "Words from JSON";
   direct.learning.cards[0].text = "Words from the same JSON source.";
+  direct.aiSpotlight.intro = "AI words from the same JSON source.";
   await page.locator("#json-editor").fill(JSON.stringify(direct));
   await expect(field(page, "hero.copy.title")).toHaveValue(direct.hero.copy.title);
   await expect(field(page, "learning.cards.0.text")).toHaveValue(direct.learning.cards[0].text);
+  await expect(field(page, "aiSpotlight.intro")).toHaveValue(direct.aiSpotlight.intro);
   await page.locator("#json-editor").fill("{");
   await expect(field(page, "hero.copy.title")).toBeDisabled();
+  await expect(field(page, "aiSpotlight.title")).toBeDisabled();
   await expect(page.locator("#homepage-copy-status")).toContainText("Fix the JSON");
   await expect(page.locator("#json-editor")).toHaveValue("{");
   await page.locator("#json-editor").fill(JSON.stringify(direct));
@@ -127,18 +148,22 @@ test("JSON edits, invalid JSON, import, discard and version restore keep the cop
   const imported = structuredClone(bundled);
   imported.hero.copy.title = "Imported words";
   imported.learning.cards = imported.learning.cards.slice(0, 2);
+  imported.aiSpotlight.chips[4] = "Imported exam label";
   await page.locator("#json-import").setInputFiles({ name: "homepage-words.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(imported)) });
   await expect(field(page, "hero.copy.title")).toHaveValue(imported.hero.copy.title);
+  await expect(field(page, "aiSpotlight.chips.4")).toHaveValue("Imported exam label");
   await expect(page.locator(".homepage-copy-tool")).toHaveCount(2);
   expect((await draftContent(page)).learning.cards).toHaveLength(2);
   await page.locator("#clear-draft").click();
   await expect(field(page, "hero.copy.title")).toHaveValue(bundled.hero.copy.title);
   await expect(page.locator(".homepage-copy-tool")).toHaveCount(4);
+  await expect(field(page, "aiSpotlight.chips.4")).toHaveValue(bundled.aiSpotlight.chips[4]);
   expect(writes).toEqual([]);
   await page.locator("[data-restore-version]").click();
   await expect(page.locator("#editor-status")).toContainText("live again on Firebase");
   await expect(field(page, "hero.copy.title")).toHaveValue(version.hero.copy.title);
   await expect(field(page, "learning.cards.0.text")).toHaveValue(version.learning.cards[0].text);
+  await expect(field(page, "aiSpotlight.title")).toHaveValue("Restored AI section");
   expect(writes).toHaveLength(1);
   expect(writes[0].firebaseWrites).toBe(1);
 });
@@ -157,6 +182,7 @@ test("copy fields wait for the newer draft, retain typed words, fit mobile and l
     await requestStarted;
     await page.locator("[data-panel=content]").click();
     await expect(field(page, "hero.copy.title")).toBeDisabled();
+    await expect(field(page, "aiSpotlight.title")).toBeDisabled();
     release();
     await expect(field(page, "hero.copy.title")).toBeEnabled();
     await expect(field(page, "hero.copy.title")).toHaveValue(draft.hero.copy.title);
@@ -179,6 +205,7 @@ test("copy fields wait for the newer draft, retain typed words, fit mobile and l
     await expect(field(page, "hero.copy.title")).toHaveValue("A deliberate local edit");
     await page.locator("#admin-signout").click();
     await expect(field(page, "hero.copy.title")).toBeDisabled();
+    await expect(field(page, "aiSpotlight.title")).toBeDisabled();
     await expect(page.locator("#publish-site")).toBeDisabled();
     expect((await draftContent(page)).hero.copy.title).toBe("A deliberate local edit");
     expect(writes).toEqual([]);
@@ -205,6 +232,7 @@ test("a late draft response cannot replace the editor or re-enable fields after 
     await expect(page.locator("#json-editor")).not.toHaveValue(/A late unpublished draft/);
     await page.locator("[data-panel=content]").click();
     await expect(field(page, "hero.copy.title")).toBeDisabled();
+    await expect(field(page, "aiSpotlight.title")).toBeDisabled();
     await expect(page.locator("#publish-site")).toBeDisabled();
   } finally { release(); }
 });
@@ -215,10 +243,12 @@ test("signed-out and non-admin accounts cannot enable the new copy fields", asyn
   await page.goto("/admin.html");
   await page.locator("[data-panel=content]").click();
   await expect(field(page, "hero.copy.title")).toBeDisabled();
+  await expect(field(page, "aiSpotlight.title")).toBeDisabled();
   await expect(page.locator("#publish-site")).toBeDisabled();
   await page.evaluate(user => window.__auth.setUser(user), student);
   await expect(page.locator("#admin-auth-status")).toHaveAttribute("data-state", "denied");
   await expect(field(page, "hero.copy.title")).toBeDisabled();
+  await expect(field(page, "aiSpotlight.title")).toBeDisabled();
   await expect(page.locator("#publish-site")).toBeDisabled();
 });
 

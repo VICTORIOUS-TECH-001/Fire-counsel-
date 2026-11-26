@@ -1,7 +1,7 @@
 // A focused copy form over the existing Pages & JSON editor. This module
 // performs no persistence or network writes: admin-site.mjs owns the protected
 // Google/admin draft, preview, publish, reset and version-restore workflow.
-import { heroCopy, learningPreview, updateHomepageCopy } from "./homepage-copy.mjs";
+import { heroCopy, aiCopy, learningPreview, updateHomepageCopy } from "./homepage-copy.mjs";
 
 const editor = document.querySelector("#json-editor");
 const fields = document.querySelector("#homepage-copy-fields");
@@ -95,6 +95,9 @@ function sync() {
   buildTools(content.learning.cards);
   const values = new Map();
   for (const [key, value] of Object.entries(heroCopy(content))) values.set(`hero.copy.${key}`, value);
+  const ai = aiCopy(content);
+  for (const key of ["title", "intro", "closing", "buttonLabel"]) values.set(`aiSpotlight.${key}`, ai[key]);
+  ai.chips.forEach((text, index) => values.set(`aiSpotlight.chips.${index}`, text));
   for (const key of ["eyebrow", "title", "accent", "intro", "previewLabel"]) {
     values.set(`learning.${key}`, content.learning[key] ?? (key === "previewLabel" ? "FIRE COUNSEL · TOOL PREVIEW" : ""));
   }

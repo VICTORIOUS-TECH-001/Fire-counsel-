@@ -47,6 +47,13 @@
       {"number": "04", "title": "Exam practice", "text": "Use a focus timer and work through your revision at a steady pace.", "icon": "↗", "href": "./study.html#exams", "tone": "coral"}
     ]
   },
+  "aiSpotlight": {
+    "title": "Study Smart with Fire Counsel AI",
+    "intro": "Your personal AI legal study companion. Understand complex legal principles, simplify difficult cases, test your knowledge, discover relevant authorities, and prepare confidently for your law theory examinations. Learn faster, think critically, and study with the intelligence you need to succeed.",
+    "closing": "Let Fire Counsel AI turn the way you study law into the way you master it.",
+    "buttonLabel": "Open Fire Counsel AI",
+    "chips": ["Hacks", "Clarity", "Legislation", "Statues", "Exam"]
+  },
   "caseNotes": {
     "eyebrow": "CASE NOTES · CURATED LEARNING",
     "title": "A case note should show the reasoning",
