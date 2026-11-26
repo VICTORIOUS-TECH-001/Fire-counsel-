@@ -2,12 +2,12 @@
 
 **Latest update:** 26 November 2026 (UTC), branch `arena/6d373a78-fire-counsel`
 
-## Recovered orphaned casebook store (current)
+## Case and study materials store removed (current)
 
-- Review found two green commits on `arena/1268875a-fire-counsel` (`c659882`, `3ddbca0`) that were never merged: that branch was later reset to the `main` tip (`a8ebaa7`), orphaning the work. Both commits are cherry-picked unchanged onto this branch, so no content was rewritten.
-- Recovered: `Case and study materials/` — the dated/versioned store built from the owner-supplied Law of Contract textbook page 23 photograph: verbatim transcription, 7 cases + 1 statutory class (sections A–L, verification labels, tiered sources, separated secondary-source blocks), master JSON, hashed manifest, idempotent Neon SQL seeds, the 108-page `OFFER-casebook` PDF and the 9-page store-guide PDF — plus `tools/casebook/` (ReportLab typesetter, splitter, manifest builder), `tests/frontend/casebook.test.mjs`, and `npm run casebook` / `npm run test:casebook`.
+- The orphaned store commits on `arena/1268875a-fire-counsel` (`c659882`, `3ddbca0`) were briefly recovered onto this branch, then **deleted in full at the owner's request on 26 November 2026** — the owner does not need the store again. Do not re-recover it in a future session.
+- Removed: `Case and study materials/` (casebook + guide PDFs, cases, JSON, SQL seeds, source photo/transcription), `tools/casebook/`, `tests/frontend/casebook.test.mjs`, and the `casebook` / `test:casebook` npm scripts. The tree now matches `main` (`a8ebaa7`) except for this STATUS note. PR #32 is closed as superseded by this removal.
 - The brand-film commits on `arena/1915d568-fire-counsel` (`fd629d6` add, `c466607` remove) net to zero against `main` and are **not** restored: the later commit deliberately removed the ~16 MB binaries. Restoring them needs an explicit owner decision (Git LFS / Releases / external hosting vs. repo binaries).
-- **Verification:** `npm test` passes — syntax, frontend **86/86** (78 existing + 8 casebook), proxy **14/14**, backend **225/225**, Firebase local **13/13**. The historically intermittent profile responsive test (`profile editing and sign-out preserve local recall records…`) passed **1/1** locally. `git diff --check` passes. Root/backend audits report 0 vulnerabilities; Firebase dev tooling retains the documented 10 moderate advisories. Rules emulator gate not rerun (rule files unchanged). No live deployment, migration, provider call or credential change was performed.
+- **Verification:** `npm test` passes — syntax, frontend **78/78**, proxy **14/14**, backend **225/225**, Firebase local **13/13** (**330 local tests**). `git diff --check` passes. Root/backend audits report 0 vulnerabilities; Firebase dev tooling retains the documented 10 moderate advisories. No live deployment, migration, provider call or credential change was performed.
 
 ## Owner-requested flame logo and original side-aligned layouts (previous PR #31)
 
