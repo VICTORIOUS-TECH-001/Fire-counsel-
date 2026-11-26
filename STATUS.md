@@ -1,8 +1,15 @@
 # FIRE COUNSEL — status and verification report
 
-**Latest update:** 19 November 2026 (UTC), branch `arena/0e02f560-fire-counsel`
+**Latest update:** 26 November 2026 (UTC), branch `arena/6d373a78-fire-counsel`
 
-## Owner-requested flame logo and original side-aligned layouts (current)
+## Recovered orphaned casebook store (current)
+
+- Review found two green commits on `arena/1268875a-fire-counsel` (`c659882`, `3ddbca0`) that were never merged: that branch was later reset to the `main` tip (`a8ebaa7`), orphaning the work. Both commits are cherry-picked unchanged onto this branch, so no content was rewritten.
+- Recovered: `Case and study materials/` — the dated/versioned store built from the owner-supplied Law of Contract textbook page 23 photograph: verbatim transcription, 7 cases + 1 statutory class (sections A–L, verification labels, tiered sources, separated secondary-source blocks), master JSON, hashed manifest, idempotent Neon SQL seeds, the 108-page `OFFER-casebook` PDF and the 9-page store-guide PDF — plus `tools/casebook/` (ReportLab typesetter, splitter, manifest builder), `tests/frontend/casebook.test.mjs`, and `npm run casebook` / `npm run test:casebook`.
+- The brand-film commits on `arena/1915d568-fire-counsel` (`fd629d6` add, `c466607` remove) net to zero against `main` and are **not** restored: the later commit deliberately removed the ~16 MB binaries. Restoring them needs an explicit owner decision (Git LFS / Releases / external hosting vs. repo binaries).
+- **Verification:** `npm test` passes — syntax, frontend **86/86** (78 existing + 8 casebook), proxy **14/14**, backend **225/225**, Firebase local **13/13**. The historically intermittent profile responsive test (`profile editing and sign-out preserve local recall records…`) passed **1/1** locally. `git diff --check` passes. Root/backend audits report 0 vulnerabilities; Firebase dev tooling retains the documented 10 moderate advisories. Rules emulator gate not rerun (rule files unchanged). No live deployment, migration, provider call or credential change was performed.
+
+## Owner-requested flame logo and original side-aligned layouts (previous PR #31)
 
 - Replaced the old gavel artwork throughout all six page templates, static/dynamic footers, gates, favicon and both installed-app icon sizes with the owner's supplied flame-in-hexagon image. Trimmed only its surrounding black screenshot margin and made that exterior transparent. Removed the old image file. Legacy bundled-image references in published/cached content resolve locally to the new flame without a Firebase write; custom names/photos/logos remain supported.
 - The owner's latest instruction **supersedes centered branding**: restored compact, side-by-side logo/name layouts and left-side placement in public/admin headers, sign-in/student pages, gates, footers and the AI drawer. The workspace AI-card flame is beside its title again. Sidebar branding follows the navigation links; on mobile the navigation/profile row comes before the side-aligned brand and search box.
