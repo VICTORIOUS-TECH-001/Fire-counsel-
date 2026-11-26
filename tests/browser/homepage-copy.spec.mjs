@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { CASE_VIDEO_ORIGIN, DEFAULT_CASE_VIDEO_URL } from "../../homepage-media.mjs";
 import { test, expect, expectNoHorizontalOverflow, stubAuth, stubFirestore, admin, student, rowId, catalog, json } from "./fixtures.mjs";
 
 const bundled = JSON.parse(readFileSync(new URL("../../data/site-content.json", import.meta.url), "utf8"));
@@ -60,6 +61,7 @@ test("plain-text homepage fields share the protected draft, unsaved preview and 
   await field(page, "aiSpotlight.buttonLabel").fill("Open our AI study companion");
   await field(page, "aiSpotlight.chips.0").fill("Study ideas");
   await field(page, "aiSpotlight.chips.5").fill("Case decisions");
+  await field(page, "caseNotes.videoUrl").fill(`${CASE_VIDEO_ORIGIN}/preview.mp4`);
   await page.locator(".homepage-preview-copy > summary").first().click();
   await field(page, "learning.cards.0.preview.badge").fill("Organised by you <b>not bold</b>");
   await field(page, "learning.cards.0.preview.labels.2").fill("A custom course choice");
@@ -67,7 +69,7 @@ test("plain-text homepage fields share the protected draft, unsaved preview and 
   const edited = await draftContent(page);
   expect(edited.hero.copy.introduction).toBe("Learn with purpose and confidence.");
   expect(edited.hero.slides).toEqual(bundled.hero.slides);
-  expect(edited.caseNotes).toEqual(bundled.caseNotes);
+  expect(edited.caseNotes).toEqual({ ...bundled.caseNotes, videoUrl: `${CASE_VIDEO_ORIGIN}/preview.mp4` });
   expect(edited.brand).toEqual(bundled.brand);
   expect(writes).toEqual([]);
   expect(await page.evaluate(() => window.__firestore.writes)).toEqual([]);
@@ -113,6 +115,7 @@ test("plain-text homepage fields share the protected draft, unsaved preview and 
   expect(published.hero.copy).toEqual(edited.hero.copy);
   expect(published.learning).toEqual(edited.learning);
   expect(published.aiSpotlight).toEqual(edited.aiSpotlight);
+  expect(published.caseNotes).toEqual(edited.caseNotes);
   const visitor = await context.newPage();
   try {
     await stubFirestore(visitor, { content: published });
@@ -130,16 +133,19 @@ test("JSON edits, invalid JSON, import, discard and version restore keep the cop
   version.hero.copy.title = "Restored introduction";
   version.learning.cards[0].text = "An older tool description.";
   version.aiSpotlight.title = "Restored AI section";
+  delete version.caseNotes.videoUrl;
   const writes = await studio(page, { version });
   await openEditor(page);
   const direct = structuredClone(bundled);
   direct.hero.copy.title = "Words from JSON";
   direct.learning.cards[0].text = "Words from the same JSON source.";
   direct.aiSpotlight.intro = "AI words from the same JSON source.";
+  direct.caseNotes.videoUrl = `${CASE_VIDEO_ORIGIN}/json.mp4`;
   await page.locator("#json-editor").fill(JSON.stringify(direct));
   await expect(field(page, "hero.copy.title")).toHaveValue(direct.hero.copy.title);
   await expect(field(page, "learning.cards.0.text")).toHaveValue(direct.learning.cards[0].text);
   await expect(field(page, "aiSpotlight.intro")).toHaveValue(direct.aiSpotlight.intro);
+  await expect(field(page, "caseNotes.videoUrl")).toHaveValue(direct.caseNotes.videoUrl);
   await page.locator("#json-editor").fill("{");
   await expect(field(page, "hero.copy.title")).toBeDisabled();
   await expect(field(page, "aiSpotlight.title")).toBeDisabled();
@@ -152,21 +158,26 @@ test("JSON edits, invalid JSON, import, discard and version restore keep the cop
   imported.hero.copy.title = "Imported words";
   imported.learning.cards = imported.learning.cards.slice(0, 2);
   imported.aiSpotlight.chips[4] = "Imported exam label";
+  imported.caseNotes.videoUrl = "";
   await page.locator("#json-import").setInputFiles({ name: "homepage-words.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(imported)) });
   await expect(field(page, "hero.copy.title")).toHaveValue(imported.hero.copy.title);
   await expect(field(page, "aiSpotlight.chips.4")).toHaveValue("Imported exam label");
+  await expect(field(page, "caseNotes.videoUrl")).toHaveValue("");
   await expect(page.locator(".homepage-copy-tool")).toHaveCount(2);
   expect((await draftContent(page)).learning.cards).toHaveLength(2);
   await page.locator("#clear-draft").click();
   await expect(field(page, "hero.copy.title")).toHaveValue(bundled.hero.copy.title);
   await expect(page.locator(".homepage-copy-tool")).toHaveCount(4);
   await expect(field(page, "aiSpotlight.chips.4")).toHaveValue(bundled.aiSpotlight.chips[4]);
+  await expect(field(page, "caseNotes.videoUrl")).toHaveValue(DEFAULT_CASE_VIDEO_URL);
   expect(writes).toEqual([]);
   await page.locator("[data-restore-version]").click();
   await expect(page.locator("#editor-status")).toContainText("live again on Firebase");
   await expect(field(page, "hero.copy.title")).toHaveValue(version.hero.copy.title);
   await expect(field(page, "learning.cards.0.text")).toHaveValue(version.learning.cards[0].text);
   await expect(field(page, "aiSpotlight.title")).toHaveValue("Restored AI section");
+  await expect(field(page, "caseNotes.videoUrl")).toHaveValue(DEFAULT_CASE_VIDEO_URL);
+  expect(await page.evaluate(() => window.__firestore.document.caseNotes.videoUrl)).toBeUndefined();
   expect(writes).toHaveLength(1);
   expect(writes[0].firebaseWrites).toBe(1);
 });

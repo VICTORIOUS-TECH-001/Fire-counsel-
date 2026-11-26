@@ -1,5 +1,7 @@
 // Shared plain-text homepage copy. Public rendering and the Admin Studio use
 // the same static fallback; no slideshow, personal storage or network access.
+import { DEFAULT_CASE_VIDEO_URL } from "./homepage-media.mjs";
+
 export const DEFAULT_HERO_COPY = Object.freeze({
   title: "Fire Counsel",
   tagline: "Ignite your legal intelligence",
@@ -12,6 +14,7 @@ export const DEFAULT_AI_COPY = Object.freeze({
   buttonLabel: "Open Fire Counsel AI",
   chips: Object.freeze(["Hacks", "Clarity", "Legislation", "Statues", "Exam", "Cases"])
 });
+export { DEFAULT_CASE_VIDEO_URL };
 const PREVIEWS = [
   { badge: "Your study, better organised.", labels: ["Your study", "Better organised", "Course choice", "Selected course", "Subjects", "One clear study space", "Personal notes", "Keep organised", "Exam practice", "A steady pace"] },
   { badge: "Your notes, on this device.", labels: ["PDFs", "Personal notes", "Saved on this device"] },
@@ -55,8 +58,13 @@ export function learningPreview(item, index) {
 // brand artwork, auth settings or arbitrary other sections of the JSON draft.
 export function updateHomepageCopy(content, path, value) {
   if (typeof value !== "string") throw new TypeError("Invalid copy value.");
-  const text = value.replace(/\s+/g, " ").trim();
   const result = structuredClone(content);
+  if (path === "caseNotes.videoUrl" && object(result.caseNotes)) {
+    // Preserve encoded object names exactly; validation runs on preview/publish.
+    result.caseNotes.videoUrl = value.trim();
+    return result;
+  }
+  const text = value.replace(/\s+/g, " ").trim();
   let match = /^hero\.copy\.(title|tagline|introduction)$/.exec(path);
   if (match) {
     result.hero.copy = { ...heroCopy(result), [match[1]]: text };
