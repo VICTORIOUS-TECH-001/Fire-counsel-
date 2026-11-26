@@ -2,7 +2,25 @@
 
 **Latest update:** 18 November 2026 (UTC), branch `arena/8d068f93-fire-counsel`
 
-## Case-library R2 video — silent, inline, endlessly looping visual
+## Case-library follow-up — hidden controls, matching dark band and light overlay
+
+Synchronized this same branch to externally merged PR #41 (`768da47`) before applying the owner's follow-up. This supersedes the prior native-player-controls design, not the R2 source, panel placement or Admin configuration.
+
+- Removed native video controls entirely, including click/double-click/tap activation. The video is inert and pointer-transparent, stays hidden from assistive technology and keyboard navigation, and disables picture-in-picture/remote playback. An explicit blur guard covers media implementations that still accept programmatic focus on an inert video; the neighbouring case CTA remains focusable.
+- Matched the full-width case band and page gutters to the AI/learning midnight background **`#0a0820`**. Scoped light copy/button colours preserve readability. Removed only the case section's reveal animation so its background never fades into a light seam; the rounded 450px/320px media frame, stamp, copy and destinations remain.
+- Replaced the old darker image gradient with a subtle **5–14% violet/midnight overlay**, above the footage and below the stamp. The video remains fully opaque and clearly visible beneath this light wash.
+- Preserved silent, inline, native infinite looping, lazy loading, offscreen/hidden/page-cache pauses and reduced-motion/data-saving fallbacks. Autoplay rejection now keeps the original photograph, disables autoplay and is not retried during that mount; no fallback play button is shown. The exact owner R2 URL and protected optional `caseNotes.videoUrl` draft/validation flow are unchanged.
+- Refreshed the public shell cache to **v40**; external video bytes are still never cached. Hero, learning/AI behaviour and labels/destinations, later sections, auth/access policy, provider configuration, dependencies and rules are unchanged.
+
+**Fresh verification:** `npm test` passed — **135** JavaScript syntax checks plus Python tools; frontend **117/117**, proxy **14/14**, backend **256/256**, Firebase-local **13/13**. The final scoped Chromium run passed **22/22**, **1 worker / retries 0**: all **12** media cases, all **6** Admin-copy cases and **4** existing homepage/navigation, Google-only entry, actual offline PWA reload and primary-Firebase draft/preview/publish/restore workflows. New checks cover mouse hover/click/double-click, touch tap, focus prevention, controller-free autoplay rejection, exact background/zero-gap/full-width layout and ≥4.5:1 copy contrast at **320/390/768/1440px**, overlay strength/layering and continued native looping. The first media-only run passed 11/12 and exposed real programmatic video focus despite `inert`; the blur guard fixed it without weakening the assertion. Logs: `.cache/case-video-style-{red,unit,browser-first,browser-final,local-final}.log`; the initial failure capture is retained in `.cache/case-video-style-initial-failures/` (ignored).
+
+**Scope/visual audit:** desktop/mobile static-fallback captures in `.cache/case-video-style-review/` were inspected; no uncaught page errors. Nine preview endpoints returned **200**, including the current shell version and updated media code/styles. Restoring just the case section's reveal class and video attributes makes `index.html` byte-identical to the merged baseline; the service-worker change is version-only. No unrelated asset, source policy, copy or destination changed.
+
+**Boundary:** implementation and verification used local changes and the blank-provider preview. The owner's subsequent explicit pull-request request authorizes committing/pushing this verified follow-up for review only, not merging or deployment. No assistant PR merge, deployment, live content write or provider setting change was performed. Browser tests substitute the exact external media request with the existing **2,925-byte synthetic VP8 fixture**; they do not verify the owner's actual R2 bytes, availability, MIME/range/codec behaviour or Cloudflare settings. The full unrelated browser suite and Java-backed rules gate were not rerun (Java absent; rules unchanged).
+
+## Previous case-library R2 video (PR #41, merged externally)
+
+The following records the original integration and its historical verification. Commit `58f63b5` was pushed and PR #41 opened on explicit request, then merged externally as `768da47`. The native-control and autoplay-rejection behaviour below is superseded by the follow-up above.
 
 Synchronized this same branch to externally merged PR #40 (`e3cf49a`). The owner marked the case-library judge-picture panel and supplied a public R2 link, then corrected its truncated `.m` ending to the exact **`…with%2024.mp4`** URL now configured in `homepage-media.mjs` and bundled `caseNotes.videoUrl`.
 

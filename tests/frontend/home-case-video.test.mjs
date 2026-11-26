@@ -55,7 +55,8 @@ function harness({ reduced = false, saveData = false, rejection = false, source 
   const host = new EventTarget(), doc = new EventTarget(), motion = new EventTarget(), connection = new EventTarget();
   motion.matches = reduced; connection.saveData = saveData; doc.hidden = false;
   const attrs = new Map();
-  const video = Object.assign(new EventTarget(), { paused: true, plays: 0, loads: 0,
+  const video = Object.assign(new EventTarget(), { paused: true, plays: 0, loads: 0, blurs: 0,
+    blur() { this.blurs++; },
     setAttribute(key, value) { attrs.set(key, value); }, removeAttribute(key) { if (key === "src") delete this.src; attrs.delete(key); },
     load() { this.loads++; },
     pause() { if (this.paused) return; this.paused = true; this.dispatchEvent(new Event("pause")); },
@@ -103,7 +104,7 @@ test("reduced motion and data-saving use the original still image, including liv
   }
 });
 
-test("manual pause survives automatic lifecycle events; rejected autoplay and media failures degrade safely", async () => {
+test("external pause survives lifecycle events; blocked autoplay and media failures keep a controller-free fallback", async () => {
   const h = harness(); const control = h.mount(); h.host.observer.emit(true); await Promise.resolve();
   h.video.pause(); h.host.observer.emit(false); h.host.observer.emit(true);
   assert.equal(h.video.paused, true);
@@ -112,9 +113,29 @@ test("manual pause survives automatic lifecycle events; rejected autoplay and me
   h.host.observer.emit(false); h.host.observer.emit(true); assert.equal(h.video.paused, true);
   control.destroy();
   const blocked = harness({ rejection: true }); const other = blocked.mount(); blocked.host.observer.emit(true); await Promise.resolve();
-  assert.equal(blocked.container.dataset.videoState, "blocked"); assert.equal(blocked.video.controls, true); other.destroy();
+  assert.equal(blocked.container.dataset.videoState, "blocked"); assert.equal(blocked.video.controls, false); assert.equal(blocked.container.dataset.videoVisible, "false");
+  blocked.host.observer.emit(false); blocked.host.observer.emit(true);
+  assert.equal(blocked.container.dataset.videoState, "blocked"); assert.equal(blocked.video.plays, 1); other.destroy();
   const disabled = harness({ source: "https://evil.invalid/video.mp4" }); const off = disabled.mount(); disabled.host.observer.emit(true);
   assert.equal(disabled.video.src, undefined); assert.equal(disabled.container.dataset.videoState, "disabled"); off.destroy();
+});
+
+test("the video stays decorative, unfocusable and controller-free, even during active playback", async () => {
+  const h = harness(); const control = h.mount(); h.host.observer.emit(true); await Promise.resolve();
+  assert.equal(h.video.controls, false);
+  assert.equal(h.video.inert, true);
+  assert.equal(h.video.disablePictureInPicture, true);
+  assert.equal(h.video.disableRemotePlayback, true);
+  assert.equal(h.video.tabIndex, -1);
+  assert.equal(h.attrs.get("aria-hidden"), "true");
+  h.video.dispatchEvent(new Event("focus")); assert.equal(h.video.blurs, 1);
+  const tag = read("index.html").match(/<video[^>]+id="case-video"[^>]*>/)[0];
+  assert.doesNotMatch(tag, /\scontrols(?:\s|=|>)/);
+  assert.match(tag, /\sinert(?:\s|>)/);
+  assert.match(tag, /\sdisablepictureinpicture(?:\s|>)/);
+  assert.match(read("home-case-video.css"), /::-webkit-media-controls/);
+  assert.doesNotMatch(read("home-case-video.css"), /pointer-events:\s*auto/);
+  control.destroy();
 });
 
 test("case video assets are explicitly served and cached as code, never as a downloaded R2 media file", () => {

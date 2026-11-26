@@ -11,18 +11,20 @@ export function mountCaseVideo(container, { content, host = globalThis.window, d
   const source = caseVideoUrl(content), motion = host.matchMedia?.("(prefers-reduced-motion: reduce)");
   const connection = host.navigator?.connection, removers = [];
   let disposed = false, activePage = true, inView = !host.IntersectionObserver;
-  let attached = false, failed = false, userPaused = false, wantsPlayback = false, pending = false, revision = 0;
+  let attached = false, failed = false, blocked = false, userPaused = false, wantsPlayback = false, pending = false, revision = 0;
   video.muted = true; video.defaultMuted = true;
-  video.loop = true; video.playsInline = true; video.controls = true; video.preload = "none";
+  video.loop = true; video.playsInline = true; video.controls = false; video.preload = "none";
+  video.inert = true; video.disablePictureInPicture = true; video.disableRemotePlayback = true;
   video.poster = image.getAttribute("src");
 
   const visible = () => !disposed && activePage && inView && !doc.hidden;
-  const permitted = () => visible() && !motion?.matches && !connection?.saveData;
-  function state(value, show = attached && !failed && !motion?.matches && !connection?.saveData) {
+  const permitted = () => visible() && !failed && !blocked && !motion?.matches && !connection?.saveData;
+  function state(value, show = attached && !failed && !blocked && !motion?.matches && !connection?.saveData) {
     container.dataset.videoState = value;
     container.dataset.videoVisible = String(Boolean(show));
-    video.setAttribute("aria-hidden", String(!show));
-    video.tabIndex = show ? 0 : -1;
+    // This is decorative motion, not an interactive player, even while playing.
+    video.setAttribute("aria-hidden", "true");
+    video.tabIndex = -1;
     if (show) image.setAttribute("aria-hidden", "true");
     else image.removeAttribute("aria-hidden");
   }
@@ -32,7 +34,7 @@ export function mountCaseVideo(container, { content, host = globalThis.window, d
   }
   function sync() {
     if (disposed) return;
-    if (!source || failed) { pause(); state(failed ? "error" : "disabled", false); return; }
+    if (!source || failed || blocked) { pause(); state(failed ? "error" : blocked ? "blocked" : "disabled", false); return; }
     video.autoplay = !motion?.matches && !connection?.saveData;
     if (!permitted()) {
       pause();
@@ -46,8 +48,8 @@ export function mountCaseVideo(container, { content, host = globalThis.window, d
     if (pending || !video.paused) return;
     const current = ++revision;
     pending = true; wantsPlayback = true;
-    // A rejected autoplay is expected on some mobile/battery policies. Native
-    // controls allow a deliberate tap; never leave an unhandled rejection.
+    // Some mobile/battery policies block autoplay. Keep the photo rather than
+    // revealing a native play button or leaving an unhandled rejection.
     try {
       Promise.resolve(video.play()).then(() => {
         if (disposed || current !== revision) return;
@@ -55,14 +57,20 @@ export function mountCaseVideo(container, { content, host = globalThis.window, d
         if (!permitted()) { pause(); state("paused"); }
       }, () => {
         if (disposed || current !== revision) return;
-        pending = false; wantsPlayback = false; state("blocked");
+        rejectAutoplay();
       });
-    } catch { pending = false; wantsPlayback = false; state("blocked"); }
+    } catch { rejectAutoplay(); }
+  }
+  function rejectAutoplay() {
+    blocked = true; video.autoplay = false; pause(); state("blocked", false);
   }
   function listen(target, type, callback) {
     target?.addEventListener?.(type, callback);
     removers.push(() => target?.removeEventListener?.(type, callback));
   }
+  // A few media implementations still accept programmatic focus on an inert
+  // video. Never leave keyboard focus on this hidden, non-interactive surface.
+  listen(video, "focus", () => video.blur());
   listen(video, "playing", () => {
     if (!permitted()) { pause(); state("paused"); return; }
     userPaused = false; wantsPlayback = true; state("playing");
