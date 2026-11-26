@@ -19,12 +19,12 @@
         "eyebrow": "A FRESH WAY TO STUDY LAW",
         "title": "Build legal clarity.",
         "accent": "Move with confidence.",
-        "body": "A focused home for your law courses, case recall and exam practice — designed to keep your own study work close to you.",
+        "body": "A focused home for your law courses, case recall and exam practice, designed to keep your own study work close to you.",
         "image": "./assets/images/pexels-law-judge.jpg",
         "imageAlt": "A Black woman judge writing in a law library",
         "imageCredit": "Photo by Katrin Bolovtsova · Pexels",
-        "primaryLabel": "Open student workspace",
-        "primaryHref": "./study.html#dashboard",
+        "primaryLabel": "Sign up",
+        "primaryHref": "./auth.html",
         "secondaryLabel": "See the study tools",
         "secondaryHref": "#learning"
       },
@@ -36,8 +36,8 @@
         "image": "./assets/images/pexels-law-student.jpg",
         "imageAlt": "A student studying with books and a laptop in a library",
         "imageCredit": "Photo by Ludovic Delot · Pexels",
-        "primaryLabel": "Start studying",
-        "primaryHref": "./study.html#dashboard",
+        "primaryLabel": "Sign up",
+        "primaryHref": "./auth.html",
         "secondaryLabel": "Explore learning tools",
         "secondaryHref": "#learning"
       }
