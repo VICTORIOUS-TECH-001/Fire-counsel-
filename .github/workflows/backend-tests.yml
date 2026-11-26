@@ -6,6 +6,7 @@ on:
     paths:
       - "backend/**"
       - "app.js"
+      - "motion.js"
       - "index.html"
       - "styles.css"
       - "firebase-client.mjs"
@@ -47,6 +48,7 @@ jobs:
         run: |
           cd ..
           node --check app.js
+          node --check motion.js
           node --check firebase-client.mjs
           node --check config.js
           node --check sw.js
