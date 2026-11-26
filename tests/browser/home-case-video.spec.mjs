@@ -50,7 +50,7 @@ test("the supplied R2 clip autoplays muted and inline in the marked panel, then 
   await start(page);
   await expect(video).toHaveAttribute("src", DEFAULT_CASE_VIDEO_URL);
   const playback = await video.evaluate(element => ({ muted: element.muted, defaultMuted: element.defaultMuted, loop: element.loop, inline: element.playsInline, width: element.videoWidth, paused: element.paused, controls: element.controls }));
-  expect(playback).toEqual({ muted: true, defaultMuted: true, loop: true, inline: true, width: 64, paused: false, controls: true });
+  expect(playback).toEqual({ muted: true, defaultMuted: true, loop: true, inline: true, width: 64, paused: false, controls: false });
   await expect.poll(() => page.evaluate(() => window.__caseLoopCount), { intervals: [100] }).toBeGreaterThanOrEqual(2);
   expect(requests.length).toBeGreaterThan(0);
   expect(requests.every(item => item.url === DEFAULT_CASE_VIDEO_URL && item.method === "GET" && !item.headers.authorization)).toBe(true);
@@ -61,7 +61,7 @@ test("the supplied R2 clip autoplays muted and inline in the marked panel, then 
   expect(await page.evaluate(() => window.__firestore.writes)).toEqual([]);
 });
 
-test("the video keeps the same rounded media box, visible stamp and no overflow at four viewport widths", async ({ page }) => {
+test("the case band matches the AI background, keeps a light overlay and fits four viewport widths", async ({ page }) => {
   await home(page);
   await start(page);
   for (const width of [320, 390, 768, 1440]) {
@@ -74,6 +74,32 @@ test("the video keeps the same rounded media box, visible stamp and no overflow 
     });
     for (const key of ["dx", "dy", "dw", "dh"]) expect(Math.abs(bounds[key])).toBeLessThanOrEqual(.1);
     expect(bounds.radius).toBe("24px");
+    const theme = await page.locator("#cases").evaluate(section => {
+      const panel = section.querySelector(".case-image"), copy = section.querySelector(".case-copy"), ai = document.getElementById("home-ai");
+      const overlay = getComputedStyle(panel, "::after"), rect = section.getBoundingClientRect();
+      const luminance = color => {
+        const channels = color.match(/[\d.]+/g).slice(0, 3).map(Number).map(value => {
+          value /= 255; return value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4;
+        });
+        return .2126 * channels[0] + .7152 * channels[1] + .0722 * channels[2];
+      };
+      const bg = getComputedStyle(section).backgroundColor, background = luminance(bg);
+      return { bg, ai: getComputedStyle(ai).backgroundColor, left: rect.left, right: rect.right,
+        gap: rect.top - ai.getBoundingClientRect().bottom,
+        overlay: overlay.backgroundImage, layer: overlay.zIndex, pointer: overlay.pointerEvents,
+        contrasts: [...copy.querySelectorAll("h2, p, li, small")].map(element => {
+          const foreground = luminance(getComputedStyle(element).color);
+          return (Math.max(foreground, background) + .05) / (Math.min(foreground, background) + .05);
+        })
+      };
+    });
+    expect(theme.bg).toBe("rgb(10, 8, 32)"); expect(theme.ai).toBe(theme.bg);
+    expect(Math.abs(theme.left)).toBeLessThanOrEqual(.1); expect(Math.abs(theme.right - width)).toBeLessThanOrEqual(.1);
+    expect(Math.abs(theme.gap)).toBeLessThanOrEqual(.5);
+    expect(theme.overlay).toContain("rgba(123, 108, 255, 0.05)"); expect(theme.overlay).toContain("rgba(10, 8, 32, 0.14)");
+    expect(theme.layer).toBe("1"); expect(theme.pointer).toBe("none");
+    expect(theme.contrasts.every(value => value >= 4.5)).toBe(true);
+    await expect(page.locator("#case-video")).toHaveCSS("opacity", "1");
     await expect(page.locator("#case-status")).toBeVisible();
     await expectNoHorizontalOverflow(page);
   }
@@ -99,23 +125,78 @@ test("reduced motion and live data-saver changes leave the original photo and do
   await expect(page.locator("#case-image")).not.toHaveAttribute("aria-hidden");
 });
 
-test("real media pauses offscreen, resumes on return, and respects a deliberate native-control pause", async ({ page }) => {
+test("real media pauses offscreen, resumes on return, and stays out of the keyboard navigation", async ({ page }) => {
   await home(page); await start(page);
   const video = page.locator("#case-video");
   await page.locator("#resources").evaluate(element => element.scrollIntoView({ block: "start", behavior: "instant" }));
   await expect.poll(() => video.evaluate(element => element.paused), { intervals: [100] }).toBe(true);
   await reveal(page);
   await expect.poll(() => video.evaluate(element => element.paused), { intervals: [100] }).toBe(false);
-  // Native controls use the same media pause/play methods; the surrounding
-  // lifecycle must not undo the user's pause when they revisit the panel.
+  // An external/browser pause remains safe without exposing a hidden player UI.
   await video.evaluate(element => element.pause());
   await expect(page.locator("#cases .case-image")).toHaveAttribute("data-video-state", "paused");
   await page.locator("#resources").evaluate(element => element.scrollIntoView({ block: "start", behavior: "instant" }));
   await reveal(page);
   expect(await video.evaluate(element => element.paused)).toBe(true);
-  await video.focus(); await expect(video).toBeFocused();
+  await video.evaluate(element => element.focus()); await expect(video).not.toBeFocused();
+  await page.locator("#case-cta").focus(); await expect(page.locator("#case-cta")).toBeFocused();
   await video.evaluate(element => element.play());
   await expect(page.locator("#cases .case-image")).toHaveAttribute("data-video-state", "playing");
+});
+
+test("mouse hover, click and double-click cannot reveal media controls, pause playback or enter fullscreen", async ({ page }) => {
+  await home(page); await start(page);
+  const video = page.locator("#case-video");
+  await video.evaluate(element => {
+    window.__casePointerHits = 0; window.__caseLoopsAfterClick = 0;
+    for (const type of ["click", "dblclick", "contextmenu", "pointerdown"]) element.addEventListener(type, () => window.__casePointerHits++);
+    element.addEventListener("seeking", () => window.__caseLoopsAfterClick++);
+  });
+  const box = await page.locator("#cases .case-image").boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(video).not.toHaveAttribute("controls");
+  await expect(video).toHaveCSS("pointer-events", "none");
+  await expect(video).toHaveAttribute("aria-hidden", "true");
+  expect(await video.evaluate(element => ({ controls: element.controls, inert: element.inert, tab: element.tabIndex,
+    pip: element.disablePictureInPicture, remote: element.disableRemotePlayback, paused: element.paused })))
+    .toEqual({ controls: false, inert: true, tab: -1, pip: true, remote: true, paused: false });
+  expect(await page.evaluate(() => window.__casePointerHits)).toBe(0);
+  expect(await page.evaluate(() => document.fullscreenElement || document.pictureInPictureElement || null)).toBeNull();
+  await expect.poll(() => page.evaluate(() => window.__caseLoopsAfterClick), { intervals: [100] }).toBeGreaterThanOrEqual(2);
+});
+
+test("autoplay rejection keeps the photograph and never offers a native play button on click", async ({ page }) => {
+  await page.addInitScript(() => {
+    const play = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function (...args) {
+      return this.id === "case-video" ? Promise.reject(new DOMException("Autoplay blocked", "NotAllowedError")) : play.apply(this, args);
+    };
+  });
+  await home(page); await reveal(page); await page.emulateMedia({ reducedMotion: "no-preference" });
+  await expect.poll(() => page.locator("#cases .case-image").getAttribute("data-video-state"), { intervals: [100] }).toBe("blocked");
+  const box = await page.locator("#cases .case-image").boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page.locator("#case-video")).not.toHaveAttribute("controls");
+  await expect(page.locator("#case-video")).toHaveCSS("opacity", "0");
+  await expect(page.locator("#case-image")).not.toHaveAttribute("aria-hidden");
+  await expect(page.locator("#case-image")).toBeVisible();
+});
+
+test.describe("decorative video on touchscreens", () => {
+  test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
+  test("tapping the video panel cannot reveal playback controls or focus the video", async ({ page }) => {
+    await home(page); await start(page);
+    const box = await page.locator("#cases .case-image").boundingBox();
+    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+    const video = page.locator("#case-video");
+    await expect(video).not.toHaveAttribute("controls");
+    await expect(video).not.toBeFocused();
+    expect(await video.evaluate(element => ({ paused: element.paused, inert: element.inert, controls: element.controls })))
+      .toEqual({ paused: false, inert: true, controls: false });
+    expect(await page.evaluate(() => document.fullscreenElement || null)).toBeNull();
+  });
 });
 
 test("an unavailable R2 object restores the photo rather than leaving a broken or blank media panel", async ({ page }) => {
