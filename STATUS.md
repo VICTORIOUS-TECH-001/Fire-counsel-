@@ -2,7 +2,24 @@
 
 **Latest update:** 18 November 2026 (UTC), branch `arena/8d068f93-fire-counsel`
 
-## Homepage AI follow-up — seamless join, no pause button, six orbit labels
+## Case-library R2 video — silent, inline, endlessly looping visual
+
+Synchronized this same branch to externally merged PR #40 (`e3cf49a`). The owner marked the case-library judge-picture panel and supplied a public R2 link, then corrected its truncated `.m` ending to the exact **`…with%2024.mp4`** URL now configured in `homepage-media.mjs` and bundled `caseNotes.videoUrl`.
+
+- Added a native **autoplay / muted / loop / playsinline** video in that panel only. It fills the same rounded box without changing the stamp, case copy or CTA. The original judge photo/file remains as poster and failure/static fallback. Native controls retain deliberate pause/play and keyboard access; no AI pause-animation button was restored.
+- Video fetching starts in view, not at the top of the page. Offscreen, hidden-document and page-cache navigation states pause playback; reduced motion and data saving retain the still image. Autoplay rejection is caught and leaves native play controls; media/script failures keep the original photograph. No recurring JavaScript timer, R2 SDK, server video proxy, private credential or upload integration was added.
+- Added one **Case-library video** URL field under the existing Admin copy form. It shares the same draft, unsaved preview, save/publish/import/discard/version flow and Google/admin guards. The shared browser/API policy accepts only public HTTPS MP4/WebM objects in the supplied R2 origin, rejecting alternate hosts, credentials, unsafe protocols, queries/fragments and oversized/malformed values. Empty disables the video; absent fields gain the owner's default without live writes. The original image policy is unchanged.
+- Three public assets are explicitly allowlisted by both servers and included as code/styles in shell cache **v39**. External video bytes are not precached or runtime-cached. All original image files, hero/upward streams, learning/AI sections and access rules, other homepage content, student app, provider settings, dependencies and Firebase rules are untouched.
+
+**Fresh verification:** `npm test` passed — **135** JavaScript syntax checks plus Python tools; frontend **116/116**, proxy **14/14**, backend **256/256**, Firebase-local **13/13**. Focused unit/API/static-serving group passed **30/30**. Final Chromium video/Admin/existing-workflow run passed **19/19**, **1 worker / retries 0**, covering actual decoded-frame/native-loop progress without a replay click, muted inline playback, lazy loading, 320/390/768/1440px cropping/no overflow, offscreen/manual pause, live reduced-motion/data-saving changes, missing/disabled/edited URLs, 404/script fallbacks, no content writes on public browsing, Admin draft/preview/publish/import/restore/session locks, Google-only entry and real PWA offline reload.
+
+Browser tests replace only external media bytes with a **2,925-byte synthetic VP8 test pattern**; the exact owner URL and shared URL restrictions are independently asserted. They do **not** validate the actual R2 object's availability, MP4 codec, file contents or Cloudflare account settings. The first browser batch passed 13/15: two new `playing`-state assertions stalled on the renderer clock despite a decoded frame in the failure capture. Settling the actual preloader before freezing page timers, scrolling before enabling motion, and polling the unchanged state condition from the runner clock resolved this; the native media clock/loop keeps running. No sleeps, skipped tests, relaxed geometry/security bounds, enlarged timeouts or whole-test retries were added. Logs: `.cache/case-video-{red,unit-final,local-final,browser-first,browser-verified,browser-final}.log`; initial failures are retained in `.cache/case-video-initial-failures/` (ignored).
+
+**Boundary:** implementation and verification used local changes and the refreshed blank-provider preview on **4100**. The owner's subsequent explicit pull-request request authorizes committing/pushing this verified integration for review only, not merging or deployment. No assistant PR merge, deployment, live Firebase/Neon write, R2 upload, bucket/DNS change or provider call was performed. `r2.dev` remains the owner's development endpoint; production media-domain setup is separate. The full unrelated browser suite and Java-backed rules gate were not rerun (Java absent; rules unchanged). Match the frontend and API validator on deployment before publishing the optional video field.
+
+## Previous homepage AI follow-up — seamless join and six labels (PR #40, merged externally)
+
+The following records that implementation and its historical verification/publication boundary. Commit `035a273` was pushed and PR #40 opened on explicit request, then merged externally as `e3cf49a`.
 
 Synchronized this same branch to externally merged PR #39 (`6b5a4a5`) before the owner's screenshot follow-up.
 

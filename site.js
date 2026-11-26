@@ -226,6 +226,11 @@
     $("#case-status").textContent = item.status || "CURATION PENDING";
     $("#case-points").innerHTML = (item.points || []).map(point => `<li>${esc(point)}</li>`).join("");
     const image = $("#case-image"); image.src = photo(item.image); image.alt = esc(item.imageAlt || "Legal study");
+    // Optional enhancement only: failed scripts/media leave the original photo.
+    // The browser reads this public R2 URL directly, never through the API.
+    import("./home-case-video.mjs").then(({ mountCaseVideo }) => {
+      mountCaseVideo($("#cases .case-image"), { content: data });
+    }).catch(() => { /* the still image and all case links remain usable */ });
     const cta = $("#case-cta"); cta.href = href(item.ctaHref); cta.innerHTML = `${esc(item.ctaLabel || "Explore case notes")} <span>↗</span>`;
   }
   function renderArticles(data) {

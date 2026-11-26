@@ -7,6 +7,8 @@
 // owns metadata and writes with the Admin SDK. Keep student-page limits in
 // sync with firebase/firestore.rules; schema, API and emulator tests cover both.
 
+import { safeCaseVideoUrl } from "../homepage-media.mjs";
+
 export const SITE_CONTENT_LIMITS = Object.freeze({
   MAX_SLIDES: 12,
   MAX_NAVIGATION: 8,
@@ -179,6 +181,10 @@ export function validateSiteContent(content) {
   if (!Array.isArray(content.quickFacts)) errors.push("quickFacts must be a list.");
   for (const key of ["learning", "caseNotes", "articles", "resources", "footer"]) {
     if (!isPlainObject(content[key])) errors.push(`${key} must be an object.`);
+  }
+  if (isPlainObject(content.caseNotes) && "videoUrl" in content.caseNotes
+    && content.caseNotes.videoUrl !== "" && !safeCaseVideoUrl(content.caseNotes.videoUrl)) {
+    errors.push("caseNotes.videoUrl must be empty or a public HTTPS MP4/WebM URL in the configured R2 media bucket (up to 2000 characters).");
   }
   if ("workspace" in content && !isPlainObject(content.workspace)) errors.push("workspace must be an object.");
   // Deep safety caps for the shallowly-checked sections (text size, list size,

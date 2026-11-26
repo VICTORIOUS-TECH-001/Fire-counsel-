@@ -198,6 +198,28 @@ test("the protected API bounds optional AI words, forbids redirect fields and st
   assert.equal(api.counts().neonCalls, 0);
 });
 
+test("the protected API accepts only the configured public R2 case-video host and keeps old or disabled videos valid", async t => {
+  const api = await serve(t);
+  const source = SITE.caseNotes.videoUrl;
+  const origin = new URL(source).origin;
+  for (const videoUrl of [null, 1, {}, [], " ", "javascript:alert(1)", "https://evil.invalid/clip.mp4",
+    `${origin}.evil.invalid/clip.mp4`, source.replace("https://", "https://user:secret@"), `${source}?token=private`,
+    `${origin}/file.html`, `${origin}/bad%00.mp4`, `${origin}/${"x".repeat(2000)}.mp4`]) {
+    const response = await api.post({ ...SITE, caseNotes: { ...SITE.caseNotes, videoUrl } });
+    assert.equal(response.status, 400, JSON.stringify(videoUrl));
+    assert.equal((await response.json()).code, "VALIDATION_ERROR");
+  }
+  assert.equal(api.counts().databaseCalls, 0);
+  for (const videoUrl of [source, `${origin}/next.webm`, ""]) {
+    assert.equal((await api.post({ ...SITE, caseNotes: { ...SITE.caseNotes, videoUrl } })).status, 200);
+    assert.equal(api.writes.at(-1).caseNotes.videoUrl, videoUrl);
+  }
+  const old = structuredClone(SITE); delete old.caseNotes.videoUrl;
+  assert.equal((await api.post(old)).status, 200);
+  assert.equal(api.writes.at(-1).caseNotes.videoUrl, undefined, "display defaults are never silently written to storage");
+  assert.equal(api.counts().neonCalls, 0);
+});
+
 test("server text validation keeps strict types, exact UTF-16 bounds and rejects control characters", async t => {
   const api = await serve(t);
   for (const [key, limit] of Object.entries(LIMITS)) {
