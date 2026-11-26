@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MAX_PROXY_BODY = 26 * 1024 * 1024
 PUBLIC_FILES = {
     "index.html", "study.html", "admin.html", "auth.html", "ai.html", "student.html",
-    "site.css", "home-hero.css", "styles.css", "admin.css", "auth.css", "integrations.css", "branding.css",
+    "site.css", "home-hero.css", "home-learning.css", "styles.css", "admin.css", "auth.css", "integrations.css", "branding.css",
     "site.js", "home-hero.mjs", "app.js", "admin.js", "sw.js", "manifest.webmanifest",
     "auth-page.mjs", "admin-auth.mjs", "admin-database.mjs",
     "study-materials.mjs", "research-search.mjs", "request-scope.mjs",

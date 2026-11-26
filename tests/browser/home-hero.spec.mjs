@@ -17,7 +17,8 @@ async function expectSingleHero(page) {
   await expect(hero.locator(".hero-tagline")).toHaveText("Ignite your legal intelligence");
   await expect(hero.locator("a")).toHaveCount(1);
   await expect(hero.getByRole("link", { name: "Sign up", exact: true })).toHaveAttribute("href", "./auth.html");
-  await expect(hero).toHaveText("Fire Counsel Ignite your legal intelligence Sign up");
+  await expect(hero.locator(".hero-introduction")).toHaveText("Fire Counsel is more than a place to learn the law. It is the intelligence behind your success, empowering you to master the law, unlock your potential and become one of tomorrow's great legal minds.");
+  await expect(hero).toHaveText("Fire Counsel Ignite your legal intelligence Fire Counsel is more than a place to learn the law. It is the intelligence behind your success, empowering you to master the law, unlock your potential and become one of tomorrow's great legal minds. Sign up");
   await expect(hero.locator('img, .eyebrow, .hero-slide, .hero-controls, .hero-secondary, [aria-roledescription="carousel"]')).toHaveCount(0);
   await expect(page.locator("#slide-prev, #slide-next, #hero-dots, #hero-count")).toHaveCount(0);
 }

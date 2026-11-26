@@ -11,6 +11,7 @@
   <link rel="icon" href="./assets/fire-counsel-192.png" type="image/png">
   <link rel="stylesheet" href="./site.css">
   <link rel="stylesheet" href="./home-hero.css">
+  <link rel="stylesheet" href="./home-learning.css">
   <link rel="stylesheet" href="./branding.css">
 </head>
 <body class="home-streams">
@@ -45,18 +46,26 @@
         <div class="hero-copy">
           <h1><span class="hero-word" style="--word:0">Fire</span> <span class="hero-word" style="--word:1">Counsel</span></h1>
           <p class="hero-tagline">Ignite your legal intelligence</p>
+          <p class="hero-introduction">Fire Counsel is more than a place to learn the law. It is the intelligence behind your success, empowering you to master the law, unlock your potential and become one of tomorrow's great legal minds.</p>
           <div class="hero-actions"><a class="button button-light hero-signup" href="./auth.html">Sign up</a></div>
         </div>
         <div class="hero-trace" aria-hidden="true"><i></i></div>
       </div>
     </section>
 
-    <section class="quickfacts reveal" aria-label="Study principles"><div class="quickfacts-grid" id="quickfacts-grid"><article><span>01</span><strong>Stay focused</strong><small>A calm, organised study space</small></article><article><span>02</span><strong>Recall more</strong><small>Personal cards saved locally</small></article><article><span>03</span><strong>Practise well</strong><small>Tools for deliberate revision</small></article></div></section>
-
-    <section class="section learning-section reveal" id="learning">
-      <div class="section-heading"><div><span class="eyebrow">YOUR STUDY, BETTER ORGANISED</span><h2>Tools for the work<br><em>behind the law.</em></h2></div><p id="learning-intro">Everything has a place: course choice, personal notes, active recall and deliberate exam practice.</p></div>
-      <div class="feature-grid" id="learning-cards"></div>
-      <div class="section-end"><a class="text-link" href="./study.html#dashboard">Explore your student workspace <span>→</span></a><span class="micro-note">No personal file or answer is sent to a cloud service by this preview.</span></div>
+    <section class="section learning-section home-learning" id="learning" aria-labelledby="learning-title">
+      <div class="learning-inner">
+        <div class="section-heading"><div><span class="eyebrow">YOUR STUDY, BETTER ORGANISED</span><h2 id="learning-title">Tools for the work<br><em>behind the law.</em></h2></div><p id="learning-intro">Everything has a place: course choice, personal notes, active recall and deliberate exam practice.</p></div>
+        <div class="learning-split">
+          <div class="learning-tools" id="learning-cards">
+            <a class="learning-tool learning-tool-link is-active" href="./study.html#subjects" aria-label="Course study"><span class="learning-tool-heading"><span class="learning-tool-title">Course study</span><span class="learning-tool-number" aria-hidden="true">01</span></span><span class="learning-tool-body"><span>Keep subjects and your selected course in one clear study space.</span></span></a>
+            <a class="learning-tool learning-tool-link" href="./study.html#library" aria-label="Personal library"><span class="learning-tool-heading"><span class="learning-tool-title">Personal library</span><span class="learning-tool-number" aria-hidden="true">02</span></span><span class="learning-tool-body"><span>Save PDFs and notes locally on this device. Nothing is uploaded in this preview.</span></span></a>
+            <a class="learning-tool learning-tool-link" href="./study.html#memory" aria-label="Case recall"><span class="learning-tool-heading"><span class="learning-tool-title">Case recall</span><span class="learning-tool-number" aria-hidden="true">03</span></span><span class="learning-tool-body"><span>Build your own question-and-answer cards for active recall.</span></span></a>
+            <a class="learning-tool learning-tool-link" href="./study.html#exams" aria-label="Exam practice"><span class="learning-tool-heading"><span class="learning-tool-title">Exam practice</span><span class="learning-tool-number" aria-hidden="true">04</span></span><span class="learning-tool-body"><span>Use a focus timer and work through your revision at a steady pace.</span></span></a>
+          </div>
+          <div class="learning-visual" id="learning-visual" hidden></div>
+        </div>
+      </div>
     </section>
 
     <section class="case-section reveal" id="cases">
