@@ -26,9 +26,10 @@ Copy the start script (link 5 above) into a notes app:
 
 - After `ADMIN_EMAILS=`, type your email.
 - After `DATABASE_URL=`, paste the Neon connection string.
-- After `GEMINI_API_KEY=`, paste the Gemini key.
+- After `GEMINI_API_KEY=`, paste the **student AI** Gemini key.
+- For **Upload documents → Counsel Working Station**, fill `ADMIN_GEMINI_API_KEY=` with a different key (use a separate Google project for separate quota), and `ADMIN_CLOUDFLARE_ACCOUNT_ID=` / `ADMIN_CLOUDFLARE_API_TOKEN=` for Cloudflare Workers AI. These optional values never replace the student key. See [Working Station setup](../../backend/WORKSTATION.md).
 - After `OPENROUTER_API_KEY=`, paste the OpenRouter key (or leave it empty).
-- Optional: add a line `GROQ_API_KEY=` with your Groq key (starts with `gsk_`) and a line `TAVILY_API_KEY=` with your Tavily key (starts with `tvly-`).
+- Existing Groq/Tavily student-service settings, if needed, can be configured privately in `/etc/fire-counsel/app.env` after setup. Use `GROQ_API_KEY` / `TAVILY_API_KEY` with the full key issued by each service; a Tavily key is not required to start with `tvly-`. These are not Working Station credentials.
 - Replace the line `PASTE THE WHOLE FIREBASE KEY FILE HERE…` with the **whole** Firebase key file (from `{` to `}`).
 
 Do not change anything else, and never put the filled-in copy on GitHub.

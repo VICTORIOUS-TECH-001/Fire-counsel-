@@ -13,6 +13,10 @@ cat > /root/fire-counsel.secrets <<'FIRE_COUNSEL_SETTINGS'
 ADMIN_EMAILS=
 DATABASE_URL=
 GEMINI_API_KEY=
+# Optional admin-only document resources (different key/project from students).
+ADMIN_GEMINI_API_KEY=
+ADMIN_CLOUDFLARE_ACCOUNT_ID=
+ADMIN_CLOUDFLARE_API_TOKEN=
 OPENROUTER_API_KEY=
 # -------------------------------------------------------------------------
 FIRE_COUNSEL_SETTINGS

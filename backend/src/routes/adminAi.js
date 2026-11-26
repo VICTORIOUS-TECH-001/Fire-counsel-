@@ -10,6 +10,7 @@ import { INSTRUCTION_KEYS, clearInstructionCache, ensureInstructionsTable, parse
 import { FEATURES, getDefaultLimits, timezone, validateLimit } from "../services/ai/quota.js";
 import { validateAttachments } from "../services/ai/attachments.js";
 import { publicAiError } from "./ai.js";
+import { adminExtractionEnv, generateAdmin } from "../services/documents/adminProviders.js";
 import { DocumentError, extractDocument, pagesToText } from "../services/documents/extract.js";
 
 const UID_RE = /^[A-Za-z0-9_-]{1,128}$/;
@@ -284,7 +285,7 @@ export function createAdminAiRouter({
     try {
       const [file] = validateAttachments(req.body?.attachment ? [req.body.attachment] : []);
       if (!file) throw new AiError(400, "Choose a PDF, photo or text file.", "VALIDATION_ERROR");
-      const result = await extractDocument({ buffer: Buffer.from(file.data, "base64"), mimeType: file.mimeType, name: file.name }, { env, generate });
+      const result = await extractDocument({ buffer: Buffer.from(file.data, "base64"), mimeType: file.mimeType, name: file.name }, { env: adminExtractionEnv(env), generate: (request) => generateAdmin(request, { env, fetchImpl }) });
       res.json({ data: { text: pagesToText(result.pages), method: result.method, pages: result.pageCount, characters: result.characters, warnings: result.warnings, truncated: false } });
     } catch (error) {
       if (error instanceof DocumentError) return res.status(error.status).json({ error: error.message, code: error.code });

@@ -6,7 +6,7 @@ const $ = (selector) => document.querySelector(selector);
 const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[ch]);
 const PURPOSE_LABEL = { material: "Course material", case: "Case judgment", past_questions: "Past-question paper", material_version: "New version" };
 const STATUS_LABEL = { uploaded: "Waiting", processing: "Reading…", ready: "Check the text", saved: "Saved", failed: "Failed" };
-const METHOD_LABEL = { pdf_text: "PDF text (no AI needed)", docx: "Word file", text: "Text file", ocr_space: "OCR.space" };
+const METHOD_LABEL = { pdf_text: "PDF text (no AI needed)", docx: "Word file", text: "Text file", admin_workstation: "Reviewed in Counsel Working Station", ocr_space: "OCR.space" };
 
 let authClient = null;
 let verified = false;
@@ -99,7 +99,7 @@ async function loadUsage(mySession = session) {
     const { data } = await api("/api/v1/admin/documents/usage");
     if (mySession !== session) return;
     usage = data;
-    const ocr = data.ocr.ai ? "Scans and photos are read by your Gemini key." : data.ocr.ocr_space ? "Scans are read by OCR.space (small files only)." : "Scans and photos cannot be read until GEMINI_API_KEY is set in Render; digital PDFs and Word files work.";
+    const ocr = data.ocr.ai ? "Scans and photos use your separate admin Gemini key." : data.ocr.ocr_space ? "Scans are read by OCR.space (small files only)." : "Scans and photos cannot be read until ADMIN_GEMINI_API_KEY is set in Render; digital PDFs and Word files work.";
     setText("#upload-usage", `File storage: ${size(data.used_bytes)} of ${size(data.budget_bytes)} used (${data.files} file${data.files === 1 ? "" : "s"}). Up to ${size(data.max_file_bytes)} per file. ${ocr}`, data.used_bytes > data.budget_bytes * 0.9 ? "error" : "");
   } catch (error) {
     if (mySession === session) setText("#upload-usage", error.message, "error");
@@ -309,6 +309,7 @@ function onAdminState(state) {
 
 updateFields();
 document.addEventListener("fire-counsel:admin-state", (event) => onAdminState(event.detail?.state));
+document.addEventListener("fire-counsel:uploads-changed", () => { if (verified) { refresh(); loadUsage(); } });
 document.addEventListener("visibilitychange", () => { if (!document.hidden && verified && rows.some((row) => row.status === "processing" || row.status === "uploaded")) refresh(); });
 try {
   authClient = await import("./firebase/auth-client.mjs");

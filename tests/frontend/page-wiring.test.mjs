@@ -9,7 +9,7 @@ const pages = ["index.html", "study.html", "admin.html", "auth.html", "ai.html",
 const integrations = [
   ["study.html", ["study-materials.mjs", "research-search.mjs", "student-profile.mjs", "student-page.mjs", "presence.mjs", "workspace.mjs", "auth-gate.mjs"]],
   ["ai.html", ["ai-studio.mjs", "research-search.mjs", "presence.mjs", "auth-gate.mjs"]],
-  ["admin.html", ["admin-auth.mjs", "admin-database.mjs", "admin-ai.mjs", "admin-courses.mjs", "admin-workspace.mjs", "admin-site.mjs", "admin-uploads.mjs", "presence.mjs"]],
+  ["admin.html", ["admin-auth.mjs", "admin-database.mjs", "admin-ai.mjs", "admin-courses.mjs", "admin-workspace.mjs", "admin-site.mjs", "admin-uploads.mjs", "admin-workstation.mjs", "presence.mjs"]],
   ["auth.html", ["auth-page.mjs"]],
   ["student.html", ["student-page-view.mjs"]]
 ];
@@ -145,4 +145,19 @@ test("workspace settings keep only safe links and fall back to the built-in desi
   assert.match(menu, /id="course-nav-count" hidden>6</, "the course counter always exists");
   assert.deepEqual(custom.deadlines.items.map((item) => item.title), ["CBT"]);
   assert.deepEqual(custom.notices, ["Hi"]);
+});
+
+test("Counsel Working Station is mounted next to the preserved uploader, uses same-origin APIs and never caches admin documents", () => {
+  const html = read("admin.html"), source = read("admin-workstation.mjs");
+  for (const file of ["admin-workstation.mjs", "admin-workstation.css"]) {
+    assert.ok(html.includes(`./${file}`));
+    for (const server of ["backend/src/website.js", "tools/dev_server.py"]) assert.ok(read(server).includes(`"${file}"`));
+  }
+  for (const id of ["station-form", "station-output", "station-save-form", "station-approval", "station-incomplete", "classic-upload-panel", "upload-form", "upload-rows", "upload-viewer"]) assert.ok(html.includes(`id="${id}"`));
+  assert.match(source, /\/api\/v1\/admin\/workstation/);
+  assert.doesNotMatch(source, /generativelanguage\.googleapis|api\.cloudflare\.com|localStorage|sessionStorage|indexedDB|localhost|127\.0\.0\.1/);
+  assert.doesNotMatch(source, /innerHTML|insertAdjacentHTML/);
+  assert.match(html, /ADMIN_GEMINI_API_KEY/); assert.match(html, /ADMIN_CLOUDFLARE_API_TOKEN/);
+  assert.match(html, /different Gemini key from a separate Google project/);
+  assert.doesNotMatch(html, /id="(?:admin-gemini-key|cloudflare-token)"|type="password"/);
 });

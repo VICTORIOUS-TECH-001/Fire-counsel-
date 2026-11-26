@@ -98,3 +98,14 @@ test("re-running setup keeps earlier settings, reports what is missing, and the 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("Oracle settings keep new admin AI resources independent from the student key", () => {
+  const secrets = parseSecrets("GEMINI_API_KEY=student-key\nADMIN_GEMINI_API_KEY=admin-key\nADMIN_GEMINI_MODEL=admin-model\nADMIN_CLOUDFLARE_ACCOUNT_ID=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nADMIN_CLOUDFLARE_API_TOKEN=admin-cf-token\nADMIN_CLOUDFLARE_MODEL=@cf/meta/model\nADMIN_AI_TIMEOUT_MS=90000\n");
+  const { text } = buildEnv({ secrets, host: "study.example.com" });
+  const parsed = dotenv.parse(text);
+  assert.equal(parsed.GEMINI_API_KEY, "student-key");
+  assert.equal(parsed.ADMIN_GEMINI_API_KEY, "admin-key");
+  assert.equal(parsed.ADMIN_CLOUDFLARE_API_TOKEN, "admin-cf-token");
+  assert.equal(parsed.ADMIN_GEMINI_MODEL, "admin-model");
+  assert.throws(() => parseSecrets("ADMIN_CLOUDFLARE_API_TOKEN=bad value"), /spaces/);
+});

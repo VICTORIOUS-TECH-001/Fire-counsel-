@@ -107,3 +107,17 @@ If publication still fails, follow the **actual error code**, not another rules 
 | Student-page `permission-denied` | This unchanged direct-write flow needs deployed student-page rules, the same Google owner/admin, valid exact fields, and preserved `createdAt`. Confirm the selected project/database and any separately enforced App Check configuration. |
 
 Stored `updatedAt`/`updatedBy` metadata is removed **only on public reads**. Homepage, restore and workspace publishing share the same primary Firestore channel; homepage/workspace readers keep their Neon/bundled/offline fallbacks. A confirmed Firestore publish followed by an archive failure is reported as partial success, never as a rolled-back live change. Do not enable allow-all/test-mode rules. No rules, claims, Render settings or private credentials are deployed by local tests.
+
+## 8. Counsel Working Station: separate admin document AI
+
+The new desk is **Admin Studio → Upload documents → Counsel Working Station**, next to the preserved **Classic upload** tab. Deploy the matching frontend **and API**. No new migration or student-profile flag is required when the existing document-library tables are already installed.
+
+- Keep the old `GEMINI_API_KEY` for the student AI service.
+- Set a different `ADMIN_GEMINI_API_KEY` for admin processing/OCR, ideally from a **separate Google project** for independent quota. Two keys in one project can share limits. Optionally set `ADMIN_GEMINI_MODEL` to an available model (default `gemini-flash-latest`).
+- Set `ADMIN_CLOUDFLARE_ACCOUNT_ID` and `ADMIN_CLOUDFLARE_API_TOKEN` for Cloudflare **Workers AI REST inference**, optionally `ADMIN_CLOUDFLARE_MODEL`. Do not paste keys into the document chat or browser configuration.
+- Set these on the running API service, not just in GitHub. Save/deploy and confirm the Live commit. The station connection summary checks presence/readiness, not provider acceptance.
+- Test a disposable digital PDF: instruct → process → review/edit → download TXT. No document should enter Neon yet. Check the approval box and save; confirm a draft material/version/chunks in Neon and a TXT in Recent uploads. Then test an admin-key scan, follow-up correction, deliberate provider failure, unknown save outcome/retry, and a new version without deleting the old one.
+- Classic scan OCR and the older admin extraction helper now also require the admin Gemini key (or existing OCR.space fallback); they deliberately no longer spend the student key. The separate student-provider connection test is still an explicit diagnostic, not document processing.
+- Drafts are temporary, owner-scoped server memory with a one-hour access window and are lost on restart/redeploy. Download important work. New materials default to unpublished; publishing or adding to an already published material is an explicit review decision.
+
+Full setup, route/storage details, provider limits and privacy notes: [backend/WORKSTATION.md](backend/WORKSTATION.md). No Cloudflare/Gemini settings, database records or cloud deployments were changed by the local implementation/tests.

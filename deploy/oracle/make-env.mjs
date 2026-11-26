@@ -7,7 +7,7 @@
 import { readFileSync, writeFileSync, existsSync, renameSync, chmodSync } from "node:fs";
 
 const REQUIRED = ["DATABASE_URL", "GEMINI_API_KEY", "ADMIN_EMAILS"];
-const OPTIONAL = ["OPENROUTER_API_KEY", "FC_DOMAIN", "GEMINI_MODELS", "GEMINI_SEARCH_MODELS", "OPENROUTER_MODELS", "AI_TIMEZONE", "AI_MAX_CONCURRENT_JOBS"];
+const OPTIONAL = ["ADMIN_GEMINI_API_KEY", "ADMIN_GEMINI_MODEL", "ADMIN_CLOUDFLARE_ACCOUNT_ID", "ADMIN_CLOUDFLARE_API_TOKEN", "ADMIN_CLOUDFLARE_MODEL", "ADMIN_AI_TIMEOUT_MS", "OPENROUTER_API_KEY", "FC_DOMAIN", "GEMINI_MODELS", "GEMINI_SEARCH_MODELS", "OPENROUTER_MODELS", "AI_TIMEZONE", "AI_MAX_CONCURRENT_JOBS"];
 const ALLOWED = new Set([...REQUIRED, ...OPTIONAL, "FIREBASE_SERVICE_ACCOUNT_JSON"]);
 
 export function cleanValue(key, raw) {
@@ -30,7 +30,7 @@ export function cleanValue(key, raw) {
     value = emails.join(",");
   }
   if (key === "FC_DOMAIN" && !/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(value)) throw new Error("FC_DOMAIN must be a plain domain name such as study.example.com.");
-  if (/^(GEMINI|OPENROUTER)_API_KEY$/.test(key) && /\s/.test(value)) throw new Error(`${key} must not contain spaces.`);
+  if (/^(?:ADMIN_GEMINI_API_KEY|ADMIN_CLOUDFLARE_API_TOKEN|GEMINI_API_KEY|OPENROUTER_API_KEY)$/.test(key) && /\s/.test(value)) throw new Error(`${key} must not contain spaces.`);
   return value;
 }
 

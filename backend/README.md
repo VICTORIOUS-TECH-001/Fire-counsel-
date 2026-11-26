@@ -24,7 +24,7 @@ The backend is an Express API intended for a disposable Render Free staging depl
 7. Run `npm run check`, `npm test`, then `npm run dev`.
 8. In a separate repository-root terminal, run `npm run dev` (or `python3 tools/dev_server.py`) for the restricted frontend server and same-origin API proxy. Do not serve the repository with an unrestricted static directory server.
 
-Never put Firebase Admin credentials or a Gemini key in the browser, Git, Firestore documents or site JSON. Firebase Web configuration is intentionally browser-readable app identification, not an administrator credential; this project keeps its local Web configuration file Git-ignored by policy.
+Never put Firebase Admin credentials or a Gemini key in the browser, Git, Firestore documents or site JSON. Firebase Web configuration in the committed `firebase/firebase-config.mjs` is intentionally browser-readable app identification, not an administrator credential. Local `.env` and service-account files remain Git-ignored.
 
 ## Endpoints
 
@@ -52,10 +52,14 @@ Student and administrator sign-in are Firebase Auth client operations. The API v
 - The installation lock is enforced by profile, material and research routes; it is not physical-device identification, an IP lock, or a restriction on Firebase authentication itself. A changed IP is allowed; a different/lost marker is denied without automatic re-binding. No self-service transfer/recovery exists.
 - The most recent observed connection IP is security metadata, possibly a proxy/loopback address. Only explicitly trusted proxy IPs/CIDRs affect `req.ip`; do not trust browser JSON, arbitrary forwarding headers or external IP services.
 - Resolving an administrator actor never overwrites an existing chosen profile name/email from stale token fields.
-- No Gemini provider route, secret, quota persistence, administrative student-account adjustment, image-upload route or payment integration is enabled yet. Add those only after the project and provider authorization/terms are reviewed.
+- Student AI and admin document routes are implemented but require privately configured provider credentials and reviewed deployment. Student Gemini (`GEMINI_API_KEY`) is never a document-processing fallback. No live provider configuration or payment integration is enabled by source changes. See [Counsel Working Station](WORKSTATION.md) for the separate admin resources and approval-first document workflow.
 - Render Free is staging only. Do not upload real student data, prompts, payment credentials or production secrets there. A liveness response is not evidence that Firebase, PostgreSQL or Auth is connected.
 - Never commit `.env`, Firebase service-account files, database passwords or API keys.
 
 ## Firebase project review still required
 
 The supplied browser configuration identifies the `fire-counsel` web app and Storage bucket, but does not confirm Firestore database ID/location, enabled Auth providers, authorized domains, deployed rules, App Check or existing administrator claims. The client sign-in code is present but has not been verified against the live project. Review the Firebase Console settings before live Auth validation, writing to Firestore/Storage or deploying any rules. The proposed rules have passed the demo-project Firestore and Storage emulator tests in GitHub Actions; that does not review, change or verify the active project's rules. Deployment remains gated on live-project review and the documented dependency/security checks.
+
+## Counsel Working Station (additional admin document studio)
+
+`/api/v1/admin/workstation` provides protected status, background processing and explicit review approval alongside the retained `/api/v1/admin/documents` uploader. It uses Cloudflare Workers AI plus `ADMIN_GEMINI_API_KEY`, separate from the student service. Processing drafts stay temporary; approval writes the reviewed TXT/material/version/chunks transactionally to the existing Neon library. No new schema migration, profile flag, premium grant or Firebase rule is needed. See [WORKSTATION.md](WORKSTATION.md) for configuration, limits, version/publication semantics and the live-testing boundary.
