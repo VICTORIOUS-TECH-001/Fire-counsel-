@@ -24,17 +24,7 @@ The backend is an Express API intended for a disposable Render Free staging depl
 7. Run `npm run check`, `npm test`, then `npm run dev`.
 8. In a separate repository-root terminal, run `npm run dev` (or `python3 tools/dev_server.py`) for the restricted frontend server and same-origin API proxy. Do not serve the repository with an unrestricted static directory server.
 
-Never put Firebase Admin credentials or AI/search provider keys in the browser, Git, Firestore documents or site JSON. Firebase Web configuration is intentionally browser-readable app identification, not an administrator credential; this project keeps its local Web configuration file Git-ignored by policy.
-
-## AI writers and online search
-
-Online research and writing are independent. Set a writer key (`GROQ_API_KEY`, `DEEPSEEK_API_KEY`, `GEMINI_API_KEY` or `OPENROUTER_API_KEY`) and at least one search key (`TAVILY_API_KEY`, `BRAVE_SEARCH_API_KEY` or `SERPAPI_API_KEY`) privately. Groq/DeepSeek + Tavily/Brave/SerpAPI works for text without Gemini; a text writer by itself does not enable online retrieval in this app. API/model access, quotas and cost depend on each provider account.
-
-The local/Render/Oracle examples prefer `AI_WRITER_PROVIDER_ORDER=groq,deepseek,gemini,openrouter`; the code's unset default remains Gemini first. Retrieval defaults to `WEB_SEARCH_PROVIDER_ORDER=tavily,brave,serpapi,gemini`, with a 45-second total/12-second per-provider budget, cooldowns and explicit source-required failures. Orders change priority only, append omitted defaults and skip providers without keys. Tavily/Brave/SerpAPI excerpts go straight to the selected writer, without a second intermediate generation call. The default Groq models and this DeepSeek connector are text-only; they cannot replace Gemini/OCR.space for scanned-file OCR.
-
-Writers share a **single** total deadline (`AI_TIMEOUT_MS=240000`, shorter request budgets win), a per-provider cap (`AI_WRITER_PROVIDER_TIMEOUT_MS=60000`) and fair remaining-time shares across models/fallbacks. A stalled connection/body/stream cannot prevent the next connector from running. Explicit safety refusals are not bypassed. [Connector architecture, costs and failure rules](AI_CONNECTORS.md).
-
-Research reuse defaults off (`AI_RESEARCH_CACHE_MINUTES=0`); optional reuse is account-scoped, attachment-free and labelled with its original retrieval time. Source reachability checks do not prove legal correctness. No new database migration is added by this repair. Read [the deployment/diagnostics guide](../DEPLOYMENT.md#5-groqtavily-still-show-false-after-saving-keys) before any live test; `.env.example` lists the supported canonical settings. Keys stay on the backend, never in a static page or localStorage.
+Never put Firebase Admin credentials or a Gemini key in the browser, Git, Firestore documents or site JSON. Firebase Web configuration in the committed `firebase/firebase-config.mjs` is intentionally browser-readable app identification, not an administrator credential. Local `.env` and service-account files remain Git-ignored.
 
 ## Endpoints
 
@@ -64,10 +54,14 @@ Student and administrator sign-in are Firebase Auth client operations. The API v
 - The installation lock is enforced by profile, material and research routes; it is not physical-device identification, an IP lock, or a restriction on Firebase authentication itself. A changed IP is allowed; a different/lost marker is denied without automatic re-binding. No self-service transfer/recovery exists.
 - The most recent observed connection IP is security metadata, possibly a proxy/loopback address. Only explicitly trusted proxy IPs/CIDRs affect `req.ip`; do not trust browser JSON, arbitrary forwarding headers or external IP services.
 - Resolving an administrator actor never overwrites an existing chosen profile name/email from stale token fields.
-- AI jobs, private instructions, account usage/Premium controls and admin uploads exist behind server authorization. Review the provider/privacy terms, actual account limits, migrations and target project before enabling or testing with real data. No payment integration or automatic paid-plan activation is added.
+- Student AI and admin document routes are implemented but require privately configured provider credentials and reviewed deployment. Student Gemini (`GEMINI_API_KEY`) is never a document-processing fallback. No live provider configuration or payment integration is enabled by source changes. See [Counsel Working Station](WORKSTATION.md) for the separate admin resources and approval-first document workflow.
 - Render Free is staging only. Do not upload real student data, prompts, payment credentials or production secrets there. A liveness response is not evidence that Firebase, PostgreSQL or Auth is connected.
 - Never commit `.env`, Firebase service-account files, database passwords or API keys.
 
 ## Firebase project review still required
 
 The supplied browser configuration identifies the `fire-counsel` web app and Storage bucket, but does not confirm Firestore database ID/location, enabled Auth providers, authorized domains, deployed rules, App Check or existing administrator claims. The client sign-in code is present but has not been verified against the live project. Review the Firebase Console settings before live Auth validation, writing to Firestore/Storage or deploying any rules. The proposed rules have passed the demo-project Firestore and Storage emulator tests in GitHub Actions; that does not review, change or verify the active project's rules. Deployment remains gated on live-project review and the documented dependency/security checks.
+
+## Counsel Working Station (additional admin document studio)
+
+`/api/v1/admin/workstation` provides protected status, background processing and explicit review approval alongside the retained `/api/v1/admin/documents` uploader. It uses Cloudflare Workers AI plus `ADMIN_GEMINI_API_KEY`, separate from the student service. Processing drafts stay temporary; approval writes the reviewed TXT/material/version/chunks transactionally to the existing Neon library. No new schema migration, profile flag, premium grant or Firebase rule is needed. See [WORKSTATION.md](WORKSTATION.md) for configuration, limits, version/publication semantics and the live-testing boundary.

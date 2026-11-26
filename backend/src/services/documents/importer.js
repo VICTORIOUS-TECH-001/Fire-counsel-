@@ -10,9 +10,11 @@
 //                        existing case)
 //   past_questions    -> the paper is stored as a material, and the AI splits
 //                        it into past_questions rows for the question setter
+import { createHash } from "node:crypto";
 import { getPool } from "../../config/database.js";
 import { ensureAdminUser } from "../../routes/adminDatabase.js";
-import { generate as defaultGenerate, parseJsonReply } from "../ai/providers.js";
+import { parseJsonReply } from "../ai/providers.js";
+import { adminExtractionEnv, generateAdmin as defaultGenerate } from "./adminProviders.js";
 import { chunkPages, extractDocument, pagesToText, textToPages } from "./extract.js";
 
 const STALE_MINUTES = 20;
@@ -125,7 +127,7 @@ export function createDocumentImporter({
   }
 
   /** Saves extracted text into the library according to the upload purpose. */
-  async function saveToLibrary(row, fullText, aiInfo) {
+  async function saveToLibrary(row, fullText, aiInfo, transaction = null) {
     const options = row.options || {};
     const actor = options._actor || {};
     const pages = textToPages(fullText).filter((page) => page.text);
@@ -157,7 +159,7 @@ export function createDocumentImporter({
     }
 
     aiInfo.progress("Saving to Neon…");
-    return runTransaction(async (client) => {
+    const write = async (client) => {
       const actorId = await ensureAdminUser(client, actor);
       if (purpose === "material_version") {
         const material = await client.query("SELECT id, title FROM materials WHERE id = $1 FOR UPDATE", [options.material_id]);
@@ -219,7 +221,8 @@ export function createDocumentImporter({
         if (textValue(paper.instructions)) result.instructions = textValue(paper.instructions, 2_000);
       }
       return result;
-    });
+    };
+    return transaction ? write(transaction) : runTransaction(write);
   }
 
   async function processOne(id) {
@@ -239,7 +242,7 @@ export function createDocumentImporter({
         warnings.length = 0;
         const buffer = Buffer.isBuffer(row.data) ? row.data : Buffer.from(row.data || []);
         if (!buffer.length) throw new ImportError("The original file was deleted, so it cannot be read again.", "FILE_DELETED");
-        const extraction = await extract({ buffer, mimeType: row.mime_type, name: row.file_name }, { env, generate, fetchImpl, onProgress: (text) => setProgress(db, id, text) });
+        const extraction = await extract({ buffer, mimeType: row.mime_type, name: row.file_name }, { env: adminExtractionEnv(env), generate: (request) => gen(request), fetchImpl, onProgress: (text) => setProgress(db, id, text) });
         fullText = pagesToText(extraction.pages);
         warnings.push(...extraction.warnings);
         await db.query(
@@ -288,6 +291,39 @@ export function createDocumentImporter({
     enqueue(id) {
       if (!queue.includes(id)) queue.push(id);
       setImmediate(drain);
+    },
+    /** Atomic, idempotent approval from Counsel Working Station. The source
+     * PDF/chat stays temporary; only the reviewed TXT and its versions/chunks
+     * enter Neon. Material/version purposes never make another AI call. */
+    async saveReviewed({ id, actor, text, options, name, warnings = [] }) {
+      if (!["material", "material_version"].includes(options.purpose)) throw new ImportError("Choose a material or a new material version.", "VALIDATION_ERROR", 400);
+      if (!text?.trim() || text.length > MAX_TEXT) throw new ImportError("Review a nonempty document within the text limit.", "VALIDATION_ERROR", 400);
+      const buffer = Buffer.from(text, "utf8");
+      return runTransaction(async (client) => {
+        // Serializes budget checks and double approvals, including across API
+        // processes. No model/network request runs while this lock is held.
+        await client.query("LOCK TABLE uploaded_files IN SHARE ROW EXCLUSIVE MODE");
+        const previous = await client.query("SELECT uploaded_by, status, result FROM uploaded_files WHERE id = $1", [id]);
+        if (previous.rows.length) {
+          const row = previous.rows[0];
+          if (row.uploaded_by !== actor.uid || row.status !== "saved") throw new ImportError("That approval cannot be reused.", "APPROVAL_CONFLICT", 409);
+          return { upload_id: id, ...row.result, already_saved: true };
+        }
+        const budget = Math.max(Number(env.FILE_STORAGE_LIMIT_MB) || 350, 1) * 1024 * 1024;
+        const usage = await client.query(`SELECT (SELECT COALESCE(SUM(size_bytes), 0) FROM uploaded_files WHERE data IS NOT NULL)::bigint
+          + (SELECT COALESCE(SUM(size_bytes), 0) FROM site_images)::bigint AS used`);
+        if (Number(usage.rows[0].used) + buffer.length > budget) throw new ImportError("Neon file storage is full. Download the TXT and free space before saving.", "STORAGE_FULL", 507);
+        const storedOptions = { ...options, _actor: actor, source: "counsel_working_station" };
+        const inserted = await client.query(
+          `INSERT INTO uploaded_files (id, purpose, file_name, mime_type, size_bytes, sha256, data, status, method, extracted_text, characters, options, uploaded_by, uploaded_by_email)
+           VALUES ($1, $2, $3, 'text/plain', $4, $5, $6, 'ready', 'admin_workstation', $7, $8, $9::jsonb, $10, $11) RETURNING *`,
+          [id, options.purpose, name, buffer.length, createHash("sha256").update(buffer).digest("hex"), buffer, text, text.length, JSON.stringify(storedOptions), actor.uid, actor.email || null]);
+        const row = inserted.rows[0];
+        const result = await saveToLibrary(row, text, { warnings, progress: () => {} }, client);
+        await client.query(`UPDATE uploaded_files SET status = 'saved', progress = 'Reviewed text saved to the library', result = $2::jsonb,
+          warnings = $3::jsonb, finished_at = NOW(), updated_at = NOW() WHERE id = $1`, [id, JSON.stringify(result), JSON.stringify(warnings)]);
+        return { upload_id: id, ...result };
+      });
     },
     /** Saves (possibly edited) text of a "ready" upload into the library. */
     async saveReady(row, text) {

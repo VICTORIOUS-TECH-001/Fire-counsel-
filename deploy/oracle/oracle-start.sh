@@ -16,6 +16,10 @@ DATABASE_URL=
 GROQ_API_KEY=
 DEEPSEEK_API_KEY=
 GEMINI_API_KEY=
+# Optional admin-only document resources (different key/project from students).
+ADMIN_GEMINI_API_KEY=
+ADMIN_CLOUDFLARE_ACCOUNT_ID=
+ADMIN_CLOUDFLARE_API_TOKEN=
 OPENROUTER_API_KEY=
 # At least one independent search key is recommended; multiple keys enable failover.
 TAVILY_API_KEY=

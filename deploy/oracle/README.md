@@ -26,10 +26,10 @@ Copy the start script (link 5 above) into a notes app:
 
 - After `ADMIN_EMAILS=`, type your email.
 - After `DATABASE_URL=`, paste the Neon connection string.
-- Fill at least one writer line: `GROQ_API_KEY=`, `DEEPSEEK_API_KEY=`, `GEMINI_API_KEY=` or `OPENROUTER_API_KEY=`. Leave unused providers empty. Groq keys are not xAI/Grok keys.
-- Fill one or more of `TAVILY_API_KEY=`, `BRAVE_SEARCH_API_KEY=` and `SERPAPI_API_KEY=` for retrieval/failover. Groq + Tavily/Brave works without Gemini for text. Installing Brave's browser does not supply API access.
-- The template prefers `AI_WRITER_PROVIDER_ORDER=groq,deepseek,gemini,openrouter` and `WEB_SEARCH_PROVIDER_ORDER=tavily,brave,serpapi,gemini`. Orders only set priority; unset-key providers are skipped and omitted defaults are appended. Research reuse is off (`AI_RESEARCH_CACHE_MINUTES=0`).
-- `make-env.mjs` accepts/preserves these settings on reruns and reports a missing **writer key**, not a mandatory Gemini key. Optional model/timeout/token overrides are also supported; choose values permitted by the actual provider account. These Groq models and this DeepSeek connector cannot read photos/PDFs; OCR remains separate.
+- After `GEMINI_API_KEY=`, paste the **student AI** Gemini key.
+- For **Upload documents → Counsel Working Station**, fill `ADMIN_GEMINI_API_KEY=` with a different key (use a separate Google project for separate quota), and `ADMIN_CLOUDFLARE_ACCOUNT_ID=` / `ADMIN_CLOUDFLARE_API_TOKEN=` for Cloudflare Workers AI. These optional values never replace the student key. See [Working Station setup](../../backend/WORKSTATION.md).
+- After `OPENROUTER_API_KEY=`, paste the OpenRouter key (or leave it empty).
+- Existing Groq/Tavily student-service settings, if needed, can be configured privately in `/etc/fire-counsel/app.env` after setup. Use `GROQ_API_KEY` / `TAVILY_API_KEY` with the full key issued by each service; a Tavily key is not required to start with `tvly-`. These are not Working Station credentials.
 - Replace the line `PASTE THE WHOLE FIREBASE KEY FILE HERE…` with the **whole** Firebase key file (from `{` to `}`).
 
 Do not change anything else, and never put the filled-in copy on GitHub.

@@ -855,8 +855,9 @@ test("admin previews a website draft, publishes to Firebase before Neon and rest
   expect(calls.filter(call => call.path.endsWith("/publish")).map(call => call.firebaseWrites)).toEqual([1, 2]);
   expect(await page.evaluate(() => window.__firestore.document.brand.name)).toBe(base.brand.name);
 
-  // Upload documents: the file is sent as-is with its own type.
+  // The preserved Classic uploader still sends the original file as-is.
   await page.locator("[data-panel=uploads]").click();
+  await page.locator("#classic-upload-mode").click();
   await expect(page.locator("#upload-rows")).toContainText("Contract notes.pdf");
   await expect(page.locator("#upload-rows")).toContainText("9 searchable parts");
   await expect(page.locator("#upload-usage")).toContainText("Gemini");

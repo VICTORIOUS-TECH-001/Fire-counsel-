@@ -2,7 +2,7 @@
 //
 //  - Digital PDFs: read locally with pdf.js (Mozilla's free PDF library). No AI,
 //    no cost, any number of pages.
-//  - Scanned PDFs / photos: read by the Gemini key the site already has (AI OCR),
+//  - Scanned PDFs / photos: read by the caller's configured OCR provider,
 //    a few pages at a time. If the AI is unavailable, the free OCR.space API is
 //    used for small files (free plan: 1 MB, 3 PDF pages) when OCR_SPACE_API_KEY
 //    is set.
@@ -123,7 +123,7 @@ export function chunkPages(pages, maxChars = 3_500) {
 
 // ------------------------------------------------------------------ PDF
 
-export async function readPdfText(buffer) {
+export async function readPdfText(buffer, { maxPages = Infinity } = {}) {
   const task = getDocument({ data: new Uint8Array(buffer), isEvalSupported: false, disableFontFace: true, useSystemFonts: false, verbosity: 0 });
   let pdf;
   try {
@@ -134,6 +134,7 @@ export async function readPdfText(buffer) {
     throw new DocumentError(400, "This PDF is damaged or not a real PDF. Try saving it again and re-uploading.", "PDF_DAMAGED");
   }
   try {
+    if (pdf.numPages > maxPages) throw new DocumentError(413, `This PDF has more than ${maxPages} pages. Split it into smaller files for the working station.`, "DOCUMENT_TOO_LONG");
     const pages = [];
     for (let number = 1; number <= pdf.numPages; number++) {
       const page = await pdf.getPage(number);
@@ -222,10 +223,11 @@ export async function ocrSpace({ data, mimeType, name = "file" }, { key, fetchIm
 /**
  * @returns {{ pages: {page:number|null,text:string}[], pageCount:number|null, method:string, characters:number, warnings:string[] }}
  */
-export async function extractDocument({ buffer, mimeType, name = "document" }, { env = process.env, generate = defaultGenerate, fetchImpl = fetch, onProgress = () => {} } = {}) {
+export async function extractDocument({ buffer, mimeType, name = "document" }, { env = process.env, generate = defaultGenerate, fetchImpl = fetch, onProgress = () => {}, maxPages = Infinity } = {}) {
   const type = sniffType(buffer, name, mimeType);
   if (!type) throw new DocumentError(415, "Upload a PDF, Word (.docx), photo (JPG, PNG, WEBP) or .txt file.", "UNSUPPORTED_FILE");
   const ai = aiConfig(env).configured;
+  const keyName = env.DOCUMENT_AI_KEY_NAME === "ADMIN_GEMINI_API_KEY" ? "ADMIN_GEMINI_API_KEY" : "GEMINI_API_KEY";
   const ocrKey = String(env.OCR_SPACE_API_KEY || "").trim();
   const maxOcrPages = Math.min(Math.max(Number(env.DOCUMENT_OCR_MAX_PAGES) || 150, 1), 1000);
   const batchPages = Math.min(Math.max(Number(env.DOCUMENT_OCR_BATCH_PAGES) || 6, 1), 20);
@@ -234,9 +236,14 @@ export async function extractDocument({ buffer, mimeType, name = "document" }, {
     const kept = pages.map((page) => ({ page: page.page, text: clean(page.text) }));
     const characters = kept.reduce((sum, page) => sum + page.text.length, 0);
     if (!characters) throw new DocumentError(422, "No readable text was found in this file. If it is a photo or scan, make sure it is clear and the right way up.", "NO_TEXT");
+    if (type === "application/pdf" && pageCount) {
+      const present = new Set(kept.filter(page => page.text).map(page => page.page));
+      const missing = Array.from({ length: pageCount }, (_, index) => index + 1).filter(number => !present.has(number));
+      if (missing.length) warnings.push(`Page(s) ${missing.slice(0, 30).join(", ")}${missing.length > 30 ? " and more" : ""} could not be read. They may be blank or missing from the transcription; compare the original before saving.`);
+    }
     return { pages: kept, pageCount, method, characters, warnings };
   };
-  const notConfigured = () => new DocumentError(503, "This file is a scan or photo, so it needs OCR. Add GEMINI_API_KEY (free at https://aistudio.google.com/apikey) or OCR_SPACE_API_KEY (free at https://ocr.space/ocrapi) in Render, then retry.", "OCR_NOT_CONFIGURED");
+  const notConfigured = () => new DocumentError(503, `This file is a scan or photo, so it needs OCR. Add ${keyName} or OCR_SPACE_API_KEY in the server environment, then retry. Admin uploads never use the student Gemini key.`, "OCR_NOT_CONFIGURED");
 
   if (type === "text/plain") return finish([{ page: null, text: buffer.toString("utf8").replace(/^\uFEFF/, "") }], null, "text");
 
@@ -253,6 +260,7 @@ export async function extractDocument({ buffer, mimeType, name = "document" }, {
     if (ai) {
       try {
         const read = await aiTranscribe({ data: buffer, mimeType: type, name, firstPage: 1, count: 1 }, { env, generate });
+        if (read.truncated) warnings.push("The photo transcription may be cut short (the AI reply hit its length limit).");
         return finish(read.pages, 1, `ai_ocr:${read.provider}`);
       } catch (error) {
         if (!ocrKey) throw new DocumentError(502, `The AI could not read this photo right now (${error.message}). Try again later.`, "OCR_FAILED");
@@ -266,7 +274,7 @@ export async function extractDocument({ buffer, mimeType, name = "document" }, {
 
   // PDF
   onProgress("Reading the PDF text…");
-  const pages = await readPdfText(buffer);
+  const pages = await readPdfText(buffer, { maxPages });
   const pageCount = pages.length;
   const empty = pages.filter(isEmptyPage).map((page) => page.page);
   if (!empty.length) return finish(pages, pageCount, "pdf_text");
@@ -319,7 +327,7 @@ export async function extractDocument({ buffer, mimeType, name = "document" }, {
   }
   // OCR.space only
   if (buffer.length > OCR_SPACE_FREE_BYTES || pageCount > OCR_SPACE_FREE_PDF_PAGES) {
-    throw new DocumentError(413, "This scan is too big for the free OCR.space plan (1 MB and 3 pages). Add GEMINI_API_KEY in Render to read long scans, or split the PDF.", "OCR_FILE_TOO_LARGE");
+    throw new DocumentError(413, `This scan is too big for the free OCR.space plan (1 MB and 3 pages). Add ${keyName} in the server environment to read long scans, or split the PDF.`, "OCR_FILE_TOO_LARGE");
   }
   onProgress("Reading the scan with OCR.space…");
   const read = await ocrSpace({ data: buffer, mimeType: "application/pdf", name }, { key: ocrKey, fetchImpl });

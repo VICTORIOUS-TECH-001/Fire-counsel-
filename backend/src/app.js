@@ -18,6 +18,7 @@ import { describeProviders } from "./services/ai/providers.js";
 import { createPresenceRouter } from "./routes/presence.js";
 import { describePastedKey, firebaseAdminStatus, getFirebaseAuth } from "./config/firebaseAdmin.js";
 import { createAdminDocumentsRouter } from "./routes/adminDocuments.js";
+import { createAdminWorkstationRouter } from "./routes/adminWorkstation.js";
 import { createAdminSiteRouter, createPublicSiteHandlers } from "./routes/siteContent.js";
 
 // Emails allowed to give themselves the admin claim once (set ADMIN_EMAILS in
@@ -84,7 +85,7 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
     allowedHeaders: ["Content-Type", "Authorization", "X-Fire-Counsel-Installation"]
   }));
   // AI uploads (photos/PDFs as base64) need a larger body than other routes.
-  app.use(["/api/v1/ai/messages", "/api/v1/admin/ai/extract"], express.json({ limit: "26mb" }));
+  app.use(["/api/v1/ai/messages", "/api/v1/admin/ai/extract", "/api/v1/admin/workstation/jobs"], express.json({ limit: "26mb" }));
   app.use(["/api/v1/admin/ai/prompts", "/api/v1/admin/ai/instructions"], express.json({ limit: "1mb" }));
   app.use(express.json({ limit: "2mb" }));
   // AI, presence and admin routes poll often (job status, heartbeats, upload
@@ -232,6 +233,7 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
   app.use("/api/v1/presence", createPresenceRouter({ configured: () => Boolean(env.DATABASE_URL) }));
   app.use("/api/v1/ai", createAiRouter({ env, configured: () => Boolean(env.DATABASE_URL) }));
   app.use("/api/v1/admin/ai", createAdminAiRouter({ env, configured: () => Boolean(env.DATABASE_URL) }));
+  app.use("/api/v1/admin/workstation", createAdminWorkstationRouter({ env, configured: databaseConfigured }));
   app.use("/api/v1/admin/documents", createAdminDocumentsRouter({ env, configured: databaseConfigured }));
   app.use("/api/v1/admin/site", createAdminSiteRouter({ configured: databaseConfigured, onPublish: site.invalidate }));
 
@@ -257,7 +259,7 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
       return res.status(400).json({ error: "Request body must be valid JSON.", code: "INVALID_JSON" });
     }
     if (error.type === "entity.too.large") {
-      return res.status(413).json({ error: "Request body is too large (2 MiB for data, about 18 MB of files for AI chat uploads, 25 MB per document upload).", code: "BODY_TOO_LARGE" });
+      return res.status(413).json({ error: "Request body is too large (2 MiB for ordinary data, about 18 MB of files for AI chat, 8 MB for Working Station, 25 MB per Classic document upload).", code: "BODY_TOO_LARGE" });
     }
     console.error("Unhandled API error:", error);
     return res.status(500).json({ error: "An unexpected server error occurred." });

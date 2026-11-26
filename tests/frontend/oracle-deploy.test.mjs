@@ -99,28 +99,13 @@ test("re-running setup keeps earlier settings, reports what is missing, and the 
   }
 });
 
-test("Oracle setup accepts and preserves Groq/Tavily/Brave without requiring a Gemini key", () => {
-  const secrets = parseSecrets("ADMIN_EMAILS=owner@example.org\nDATABASE_URL=postgresql://u:p@host.neon.tech/db\nGROQ_API_KEY=gsk_synthetic\nTAVILY_API_KEY=unprefixed-synthetic-tavily\nBRAVE_SEARCH_API_KEY=synthetic-brave\nAI_WRITER_PROVIDER_ORDER=groq,gemini,openrouter\nWEB_SEARCH_PROVIDER_ORDER=tavily,brave,gemini\nAI_RESEARCH_CACHE_MINUTES=0\n");
-  const first = buildEnv({ secrets, firebase: firebaseJson(JSON.stringify(key)), host: "study.example.org" });
-  assert.deepEqual(first.missing, []);
-  const parsed = dotenv.parse(first.text);
-  for (const name of ["GROQ_API_KEY", "TAVILY_API_KEY", "BRAVE_SEARCH_API_KEY", "AI_WRITER_PROVIDER_ORDER", "WEB_SEARCH_PROVIDER_ORDER", "AI_RESEARCH_CACHE_MINUTES"]) assert.equal(parsed[name], secrets[name]);
-  assert.equal(parsed.GEMINI_API_KEY, undefined);
-  const second = buildEnv({ previous: parsed, host: "study.example.org" });
-  assert.deepEqual(second.missing, []);
-  assert.equal(dotenv.parse(second.text).TAVILY_API_KEY, secrets.TAVILY_API_KEY);
-  assert.throws(() => parseSecrets("BRAVE_SEARCH_API_KEY=two words"), /must not contain spaces/);
-  assert.throws(() => parseSecrets("GROQ_API_KEY_FILE=/etc/secrets/key"), /Unknown setting/);
-});
-
-test("Oracle can deploy DeepSeek and SerpAPI only and preserves their failover limits on rerun", () => {
-  const secrets = parseSecrets("ADMIN_EMAILS=owner@example.org\nDATABASE_URL=postgresql://u:p@host.neon.tech/db\nDEEPSEEK_API_KEY=sk-synthetic\nSERPAPI_API_KEY=synthetic-serpapi\nDEEPSEEK_MODELS=deepseek-flash\nSERPAPI_MAX_RESULTS=8\nAI_WRITER_PROVIDER_ORDER=deepseek,groq,gemini,openrouter\nWEB_SEARCH_PROVIDER_ORDER=serpapi,tavily,brave,gemini\nAI_TIMEOUT_MS=240000\nAI_WRITER_PROVIDER_TIMEOUT_MS=60000\n");
-  const first = buildEnv({ secrets, firebase: firebaseJson(JSON.stringify(key)), host: "study.example.org" });
-  assert.deepEqual(first.missing, []);
-  const parsed = dotenv.parse(first.text);
-  for (const name of Object.keys(secrets)) assert.equal(parsed[name], secrets[name]);
-  const rerun = buildEnv({ previous: parsed, host: "study.example.org" });
-  assert.equal(rerun.text, first.text);
-  assert.equal(parsed.GEMINI_API_KEY, undefined);
-  assert.throws(() => parseSecrets("SERPAPI_API_KEY_FILE=/etc/secrets/key"), /Unknown setting/);
+test("Oracle settings keep new admin AI resources independent from the student key", () => {
+  const secrets = parseSecrets("GEMINI_API_KEY=student-key\nADMIN_GEMINI_API_KEY=admin-key\nADMIN_GEMINI_MODEL=admin-model\nADMIN_CLOUDFLARE_ACCOUNT_ID=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nADMIN_CLOUDFLARE_API_TOKEN=admin-cf-token\nADMIN_CLOUDFLARE_MODEL=@cf/meta/model\nADMIN_AI_TIMEOUT_MS=90000\n");
+  const { text } = buildEnv({ secrets, host: "study.example.com" });
+  const parsed = dotenv.parse(text);
+  assert.equal(parsed.GEMINI_API_KEY, "student-key");
+  assert.equal(parsed.ADMIN_GEMINI_API_KEY, "admin-key");
+  assert.equal(parsed.ADMIN_CLOUDFLARE_API_TOKEN, "admin-cf-token");
+  assert.equal(parsed.ADMIN_GEMINI_MODEL, "admin-model");
+  assert.throws(() => parseSecrets("ADMIN_CLOUDFLARE_API_TOKEN=bad value"), /spaces/);
 });

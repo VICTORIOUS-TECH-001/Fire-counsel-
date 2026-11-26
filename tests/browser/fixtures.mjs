@@ -16,15 +16,15 @@ export const test = base.extend({
 export { expect };
 
 export async function expectNoHorizontalOverflow(page) {
-  // Resize and same-document navigation update viewport/styles on render frames.
-  // Wait on that actual browser condition instead of issuing timed CDP samples
-  // through expect.poll (which could time out without completing a measurement).
-  // No fixed sleep, clipping CSS, relaxed width threshold or whole-test retry.
-  // Headless Chromium may otherwise throttle render frames on an occluded tab.
+  // Resize can briefly expose the preceding layout. Poll the actual strict
+  // width condition IN the browser, not with repeated CDP evaluations. Headless
+  // Chromium can stop delivering animation frames even on a visible tab after
+  // resize; timer-driven conditional polling still observes the settled styles.
+  // No fixed sleep, clipping CSS, relaxed threshold/deadline or test retries.
   await page.bringToFront();
   try {
     const fits = await page.waitForFunction(() => document.documentElement.scrollWidth <= window.innerWidth,
-      null, { polling: "raf", timeout: 7_000 });
+      null, { polling: 100, timeout: 7_000 });
     await fits.dispose();
   } catch (error) {
     // Collect bounds once on failure; do not force layout on every descendant

@@ -38,8 +38,20 @@ services:
       # At least one writer (Groq/DeepSeek/Gemini/OpenRouter) is needed for answers.
       - key: GEMINI_API_KEY
         sync: false
-      # Optional OpenRouter writer: https://openrouter.ai/keys.
-      # Model availability, pricing and quotas depend on the account.
+      # Separate ADMIN document resources (no fallback to the student key).
+      # Use a different Google project when you need independent Gemini quota.
+      - key: ADMIN_GEMINI_API_KEY
+        sync: false
+      - key: ADMIN_GEMINI_MODEL
+        value: gemini-flash-latest
+      - key: ADMIN_CLOUDFLARE_ACCOUNT_ID
+        sync: false
+      - key: ADMIN_CLOUDFLARE_API_TOKEN
+        sync: false
+      - key: ADMIN_CLOUDFLARE_MODEL
+        value: "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+      # OpenRouter key: https://openrouter.ai/keys (free backup models, used
+      # only when Gemini is busy or out of free quota).
       - key: OPENROUTER_API_KEY
         sync: false
       # Groq writer key: https://console.groq.com/keys (not xAI/Grok).

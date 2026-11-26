@@ -8,6 +8,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { chunkPages, extractDocument, needsOcr, ocrSpace, pagesToText, readPdfText, sniffType, splitMarkedPages, textToPages } from "../src/services/documents/extract.js";
 import { createDocumentImporter } from "../src/services/documents/importer.js";
 import { createAdminDocumentsRouter } from "../src/routes/adminDocuments.js";
+import { createAdminWorkstationRouter } from "../src/routes/adminWorkstation.js";
+import { createWorkstation } from "../src/services/documents/workstation.js";
 import { createAdminSiteRouter, createPublicSiteHandlers, validateSiteContent } from "../src/routes/siteContent.js";
 import { ensureAdminUser } from "../src/routes/adminDatabase.js";
 import { createStudio, librarySearchTerms } from "../src/services/ai/studio.js";
@@ -82,7 +84,8 @@ beforeEach(async () => {
 
 async function serve(t, router, mount) {
   const app = express();
-  app.use(express.json());
+  // Match the production JSON data limit, including reviewed Unicode TXT.
+  app.use(express.json({ limit: "2mb" }));
   app.use(mount, router);
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -99,6 +102,7 @@ test("digital PDFs are read locally, page by page, without AI", async () => {
   assert.equal(sniffType(pdf, "anything.bin"), "application/pdf");
   const pages = await readPdfText(pdf);
   assert.equal(pages.length, 2);
+  await assert.rejects(readPdfText(pdf, { maxPages: 1 }), { code: "DOCUMENT_TOO_LONG" });
   assert.match(pages[0].text, /Donoghue v Stevenson \[1932\] AC 562/);
   assert.equal(needsOcr(pages), false);
   const result = await extractDocument({ buffer: pdf, mimeType: "application/pdf", name: "cases.pdf" }, { env: {}, generate: async () => { throw new Error("AI must not be called"); } });
@@ -123,6 +127,25 @@ test("scanned PDFs go to AI OCR in page batches, and say clearly when no OCR is 
   await assert.rejects(
     extractDocument({ buffer: scan, mimeType: "application/pdf", name: "scan.pdf" }, { env: {}, generate: async () => { throw new Error("no key"); } }),
     (error) => error.code === "OCR_NOT_CONFIGURED" && /GEMINI_API_KEY/.test(error.message));
+});
+
+test("an OCR batch that silently omits a PDF page stays incomplete in Working Station", async () => {
+  const scan = await makePdf([null, null]);
+  const station = createWorkstation({
+    env: { ADMIN_GEMINI_API_KEY: "admin-ocr", GEMINI_API_KEY: "student-only" },
+    generate: async request => {
+      assert.equal(request.messages[0].attachments[0].mimeType, "application/pdf");
+      return { text: "[Page 1]\nOnly the first page was transcribed, despite a normal finish reason.", provider: "gemini", model: "test", truncated: false };
+    }
+  });
+  const job = station.start(ADMIN.uid, { operation: "extract", attachment: { name: "two-pages.pdf", mimeType: "application/pdf", data: scan.toString("base64") } });
+  await station.idle();
+  const done = station.get(job.id, ADMIN.uid);
+  assert.equal(done.status, "ready", done.error?.message);
+  assert.equal(done.result.pages, 2);
+  assert.equal(done.result.truncated, true);
+  assert.ok(done.result.warnings.some(warning => /Page\(s\) 2 could not be read/.test(warning)));
+  await assert.rejects(station.save(job.id, ADMIN.uid, { approved: true }, () => assert.fail()), { code: "INCOMPLETE_REVIEW_REQUIRED" });
 });
 
 test("a PDF with some scanned pages keeps its text pages and only sends the scans to the AI", async () => {
@@ -427,4 +450,81 @@ test("on Render each visitor gets their own rate-limit bucket; forged headers ar
   // A visitor forges an address; Render's proxy (private hop) appends the real one.
   const body = await (await fetch(`http://127.0.0.1:${server.address().port}/ip`, { headers: { "X-Forwarded-For": "9.9.9.9, 41.58.1.2, 10.1.2.3" } })).json();
   assert.equal(body.ip, "41.58.1.2");
+});
+
+// ------------------------------------------------------------------ Counsel Working Station approvals
+
+const stationPost = body => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+async function stationSetup(t, { env = {}, generate } = {}) {
+  const station = createWorkstation({ env, generate });
+  const importer = createDocumentImporter({ poolProvider: () => pool, env, generate: () => assert.fail("approval must never start another AI call") });
+  const router = createAdminWorkstationRouter({ poolProvider: () => pool, verifyToken: allow, configured: () => true, env, workstation: station, importer });
+  const base = await serve(t, router, "/api/v1/admin/workstation");
+  async function process(body) {
+    const response = await fetch(`${base}/jobs`, stationPost(body));
+    assert.equal(response.status, 202);
+    const { data } = await response.json(); await station.idle();
+    return (await (await fetch(`${base}/jobs/${data.id}`)).json()).data;
+  }
+  return { base, station, process };
+}
+
+test("Working Station reads a PDF and only an explicit approval atomically stores the reviewed TXT, version and page chunks", async t => {
+  const { courseId } = await seedCourse();
+  let calls = 0;
+  const { base, process } = await stationSetup(t, { generate: async query => {
+    calls++;
+    assert.equal((await pool.query("SELECT COUNT(*)::int AS n FROM uploaded_files")).rows[0].n, 0, "processing stores no original file or unapproved text");
+    assert.match(query.messages[0].text, /Correct OCR/);
+    return { text: "[Page 1]\nAI corrected text for administrator review.", provider: "cloudflare", model: "test" };
+  } });
+  const pdf = await makePdf(["This is a sufficiently long source PDF page with a digital text layer and a legal citation [1932] AC 562."]);
+  const done = await process({ operation: "correct", instructions: "Correct OCR", attachment: { name: "source.pdf", mimeType: "application/pdf", data: pdf.toString("base64") } });
+  assert.equal(done.status, "ready"); assert.match(done.result.source_text, /\[1932\] AC 562/);
+  assert.equal((await pool.query("SELECT COUNT(*)::int AS n FROM materials")).rows[0].n, 0);
+  const body = { approved: true, text: "[Page 1]\nHuman-reviewed final text with [1932] AC 562.", title: "Reviewed judgment", course_id: courseId, material_type: "case_material", publish: false };
+  assert.equal((await fetch(`${base}/jobs/${done.id}/save`, stationPost({ ...body, approved: false }))).status, 400);
+  const [first, second] = await Promise.all([fetch(`${base}/jobs/${done.id}/save`, stationPost(body)), fetch(`${base}/jobs/${done.id}/save`, stationPost(body))]);
+  assert.equal(first.status, 200); assert.equal(second.status, 200);
+  const saved = (await first.json()).data;
+  assert.equal(saved.version_number, 1); assert.equal(calls, 1);
+  const { rows: [file] } = await pool.query("SELECT * FROM uploaded_files");
+  assert.equal(file.id, done.id); assert.equal(file.file_name, "Reviewed judgment.txt");
+  assert.equal(file.mime_type, "text/plain"); assert.equal(Buffer.from(file.data).toString("utf8"), body.text);
+  assert.equal(file.status, "saved"); assert.equal(file.extracted_text, body.text);
+  assert.equal(JSON.stringify(file.options).includes("Correct OCR"), false, "chat instructions are not persisted");
+  const { rows: [material] } = await pool.query("SELECT * FROM materials");
+  assert.equal(material.publication_status, "draft"); assert.equal(material.approval_status, "pending"); assert.equal(material.course_id, courseId);
+  assert.equal((await pool.query("SELECT extracted_text FROM material_versions")).rows[0].extracted_text, body.text);
+  const { rows: [chunk] } = await pool.query("SELECT page_number, content FROM material_chunks");
+  assert.equal(chunk.page_number, 1); assert.match(chunk.content, /Human-reviewed/);
+  assert.equal((await fetch(`${base}/jobs/${done.id}/save`, stationPost(body))).status, 200);
+  assert.equal((await pool.query("SELECT COUNT(*)::int AS n FROM uploaded_files")).rows[0].n, 1);
+});
+
+test("Working Station preserves earlier material versions, and a failed approval rolls back every write", async t => {
+  const { base, process } = await stationSetup(t);
+  const first = await process({ operation: "extract", text: "[Page 1]\nOriginal preserved text." });
+  const body = { approved: true, text: first.result.text, title: "Course notes", publish: true };
+  const created = (await (await fetch(`${base}/jobs/${first.id}/save`, stationPost(body))).json()).data;
+  const next = await process({ operation: "extract", text: "[Page 1]\nUpdated reviewed text." });
+  const saved = await fetch(`${base}/jobs/${next.id}/save`, stationPost({ ...body, text: next.result.text, purpose: "material_version", material_id: created.material_id }));
+  assert.equal(saved.status, 200); assert.equal((await saved.json()).data.version_number, 2);
+  const { rows } = await pool.query("SELECT version_number, extracted_text FROM material_versions WHERE material_id = $1 ORDER BY version_number", [created.material_id]);
+  assert.deepEqual(rows.map(row => row.extracted_text), [first.result.text, next.result.text]);
+  assert.equal((await pool.query("SELECT COUNT(*)::int AS n FROM materials")).rows[0].n, 1);
+  const rejected = await process({ operation: "extract", text: "This draft should not enter the database." });
+  const invalid = await fetch(`${base}/jobs/${rejected.id}/save`, stationPost({ ...body, text: rejected.result.text, course_id: "11111111-1111-4111-8111-111111111111" }));
+  assert.equal(invalid.status, 404);
+  assert.equal((await pool.query("SELECT COUNT(*)::int AS n FROM uploaded_files WHERE id = $1", [rejected.id])).rows[0].n, 0, "upload insert rolled back with the failed library write");
+  assert.equal((await (await fetch(`${base}/jobs/${rejected.id}`)).json()).data.status, "ready", "draft remains available for corrected approval");
+});
+
+test("Working Station enforces the existing Neon storage budget before approval", async t => {
+  const { base, process } = await stationSetup(t, { env: { FILE_STORAGE_LIMIT_MB: "1" } });
+  const job = await process({ operation: "extract", text: "Small working draft" });
+  const response = await fetch(`${base}/jobs/${job.id}/save`, stationPost({ approved: true, title: "Too large", text: "漢".repeat(359_000) }));
+  assert.equal(response.status, 507);
+  assert.equal((await response.json()).code, "STORAGE_FULL");
+  assert.equal((await pool.query("SELECT COUNT(*)::int AS n FROM uploaded_files")).rows[0].n, 0);
 });

@@ -7,7 +7,7 @@ import express from "express";
 import { getPool } from "../config/database.js";
 import { verifyFirebaseToken } from "../middleware/verifyFirebaseToken.js";
 import { requireAdmin } from "../middleware/requireAdmin.js";
-import { aiConfig } from "../services/ai/providers.js";
+import { describeAdminProviders } from "../services/documents/adminProviders.js";
 import { sniffType } from "../services/documents/extract.js";
 import { createDocumentImporter } from "../services/documents/importer.js";
 
@@ -73,7 +73,7 @@ export function createAdminDocumentsRouter({
       const { used, files } = await usedBytes(poolProvider());
       res.json({ data: {
         used_bytes: used, budget_bytes: budgetBytes, files, max_file_bytes: maxFileBytes,
-        ocr: { ai: aiConfig(env).configured, ocr_space: Boolean(String(env.OCR_SPACE_API_KEY || "").trim()) },
+        ocr: { ai: describeAdminProviders(env).gemini.configured, admin_only: true, ocr_space: Boolean(String(env.OCR_SPACE_API_KEY || "").trim()) },
         queue: jobs.queued?.() || 0
       } });
     } catch (error) { handle(res, error); }
