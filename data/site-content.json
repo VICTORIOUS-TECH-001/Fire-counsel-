@@ -18,7 +18,7 @@
         "eyebrow": "",
         "title": "Fire Counsel",
         "accent": "Ignite your legal intelligence",
-        "body": "",
+        "body": "Fire Counsel is more than a place to learn the law. It is the intelligence behind your success, empowering you to master the law, unlock your potential and become one of tomorrow's great legal minds.",
         "image": "./assets/images/fire-counsel-flame.png",
         "imageAlt": "",
         "imageCredit": "",
@@ -29,11 +29,7 @@
       }
     ]
   },
-  "quickFacts": [
-    {"number": "01", "label": "Stay focused", "detail": "A calm, organised study space"},
-    {"number": "02", "label": "Recall more", "detail": "Personal flashcards saved locally"},
-    {"number": "03", "label": "Practise well", "detail": "Past-question practice tools"}
-  ],
+  "quickFacts": [],
   "learning": {
     "eyebrow": "YOUR STUDY, BETTER ORGANISED",
     "title": "Tools for the work",

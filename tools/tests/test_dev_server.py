@@ -78,7 +78,7 @@ class PreviewTests(unittest.TestCase):
             connection.close()
 
     def test_homepage_and_all_integration_assets_are_served(self):
-        for path in ["/", "/home-hero.css", "/home-hero.mjs", "/study.html", "/admin.html", "/auth.html", "/student.html", "/integrations.css", "/branding.css", "/request-scope.mjs", "/student-profile.mjs", "/student-page.mjs", "/student-page-view.mjs", "/installation.mjs", "/auth-gate.mjs", "/admin-database.mjs", "/admin-network.mjs", "/firebase/auth-client.mjs", "/firebase/auth-errors.mjs", "/firebase/client.mjs", "/firebase/firestore-client.mjs", "/firebase/content-schema.mjs", "/firebase/firebase-config.mjs"]:
+        for path in ["/", "/home-hero.css", "/home-learning.css", "/home-hero.mjs", "/study.html", "/admin.html", "/auth.html", "/student.html", "/integrations.css", "/branding.css", "/request-scope.mjs", "/student-profile.mjs", "/student-page.mjs", "/student-page-view.mjs", "/installation.mjs", "/auth-gate.mjs", "/admin-database.mjs", "/admin-network.mjs", "/firebase/auth-client.mjs", "/firebase/auth-errors.mjs", "/firebase/client.mjs", "/firebase/firestore-client.mjs", "/firebase/content-schema.mjs", "/firebase/firebase-config.mjs"]:
             with self.subTest(path=path):
                 status, headers, body = self.request(path)
                 self.assertEqual(status, 200)

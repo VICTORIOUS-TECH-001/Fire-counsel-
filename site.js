@@ -91,16 +91,83 @@
     $("#brand-name").textContent = data.brand?.name || "FIRE COUNSEL";
     $("#brand-tagline").textContent = data.brand?.tagline || "Ignite your legal intelligence";
   }
-  function renderQuickFacts(data) {
-    $("#quickfacts-grid").innerHTML = (data.quickFacts || []).map(item => `<article><span>${esc(item.number)}</span><strong>${esc(item.label)}</strong><small>${esc(item.detail)}</small></article>`).join("");
+  function learningArtwork(index) {
+    // These are labelled illustrations, never student data or performance
+    // claims. No study files, records or authenticated services are read.
+    const check = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#2ee6a6"/><path d="m5.5 10.2 3 3 6-6.2" stroke="#06231a" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    const badges = ["Your study, better organised.", "Your notes, on this device.", "Build your own case cards.", "Practise at a steady pace."];
+    let art;
+    switch (index % 4) {
+      case 1:
+        art = '<div class="learning-files"><div class="learning-file"><i>▤</i><span>PDFs</span></div><div class="learning-file"><i>▤</i><span>Personal notes</span></div><div class="learning-file"><i>▤</i><span>Saved on this device</span></div></div>';
+        break;
+      case 2:
+        art = '<div class="learning-recall"><small>Case recall</small><span>Your own question</span><i></i><span>Your answer, ready to recall.</span></div>';
+        break;
+      case 3:
+        art = '<div class="learning-focus"><div class="learning-focus-ring">↗</div><div class="learning-focus-steps"><span>Focus timer</span><span>Revision</span><span>A steady pace</span></div></div>';
+        break;
+      default: {
+        const bars = [28, 40, 34, 46, 30, 36, 100, 52, 44, 60, 40, 34, 50, 38];
+        art = '<div class="learning-mini-table"><div class="learning-table-row"><span>Your study</span><span>Better organised</span></div><div class="learning-table-row"><span>Course choice</span><span>Selected course</span></div><div class="learning-table-row"><span>Subjects</span><span>One clear study space</span></div><div class="learning-table-row"><span>Personal notes</span><span>Keep organised</span></div><div class="learning-table-row"><span>Exam practice</span><span>A steady pace</span></div></div>'
+          + '<div class="learning-mini-bars">' + bars.map((height, i) => `<i class="${i === 6 ? "is-highlight" : ""}" style="--bar:${height}%;--bar-index:${i}"></i>`).join("") + '</div>';
+      }
+    }
+    return `<div class="learning-art" aria-hidden="true">${art}<div class="learning-badge">${check}${badges[index % 4]}</div></div>`;
   }
   function renderLearning(data) {
     const learning = data.learning || {};
     $("#learning-intro").textContent = learning.intro || "";
-    const heading = $("#learning");
-    $(".section-heading .eyebrow", heading).textContent = learning.eyebrow || "LEARNING";
-    $(".section-heading h2", heading).innerHTML = `${esc(learning.title || "Study tools")}<br><em>${esc(learning.accent || "")}</em>`;
-    $("#learning-cards").innerHTML = (learning.cards || []).map(item => `<a class="feature-card tone-${esc(item.tone)}" href="${href(item.href)}"><div class="feature-top"><span class="feature-icon">${esc(item.icon)}</span><span class="feature-number">${esc(item.number)}</span></div><h3>${esc(item.title)}</h3><p>${esc(item.text)}</p><span class="feature-arrow" aria-hidden="true">↗</span></a>`).join("");
+    const section = $("#learning");
+    $(".section-heading .eyebrow", section).textContent = learning.eyebrow || "LEARNING";
+    $(".section-heading h2", section).innerHTML = `${esc(learning.title || "Study tools")}<br><em>${esc(learning.accent || "")}</em>`;
+    const holder = $("#learning-cards"), visual = $("#learning-visual");
+    const cards = Array.isArray(learning.cards) ? learning.cards.filter(item => item && typeof item === "object") : [];
+    visual.hidden = !cards.length;
+    if (!cards.length) {
+      holder.innerHTML = '<p class="learning-tools-empty">Study tools are being prepared.</p>';
+      holder.dataset.enhanced = "true";
+      return;
+    }
+    holder.setAttribute("role", "tablist");
+    holder.setAttribute("aria-label", "Study tools");
+    holder.setAttribute("aria-orientation", "vertical");
+    holder.innerHTML = cards.map((item, index) => `<button class="learning-tool ${index === 0 ? "is-active" : ""}" id="learning-tab-${index}" data-learning-tab="${index}" type="button" role="tab" aria-label="${esc(item.title)}" aria-controls="learning-pane-${index}" aria-selected="${index === 0}" tabindex="${index === 0 ? "0" : "-1"}"><span class="learning-tool-heading"><span class="learning-tool-title">${esc(item.title)}</span><span class="learning-tool-number" aria-hidden="true">${esc(item.number || String(index + 1).padStart(2, "0"))}</span></span><span class="learning-tool-body"><span>${esc(item.text)}</span></span><i class="learning-tool-progress" aria-hidden="true"></i></button>`).join("");
+    visual.innerHTML = cards.map((item, index) => `<section class="learning-pane" id="learning-pane-${index}" role="tabpanel" aria-labelledby="learning-tab-${index}" tabindex="0" ${index ? "hidden" : ""}><span class="learning-preview-kicker">FIRE COUNSEL · TOOL PREVIEW</span><h3>${esc(item.title)}</h3>${learningArtwork(index)}<a class="learning-open" href="${href(item.href)}">Open ${esc(item.title)} <span aria-hidden="true">↗</span></a></section>`).join("");
+    const tabs = $$('[role="tab"]', holder), panes = $$(".learning-pane", visual);
+    function select(index, focus = false) {
+      if (!Number.isInteger(index) || index < 0 || index >= tabs.length) return;
+      tabs.forEach((tab, i) => {
+        const active = i === index;
+        tab.classList.toggle("is-active", active);
+        tab.setAttribute("aria-selected", String(active));
+        tab.tabIndex = active ? 0 : -1;
+        panes[i].hidden = !active;
+      });
+      if (focus) tabs[index].focus();
+    }
+    holder.addEventListener("click", event => {
+      const tab = event.target.closest("[data-learning-tab]");
+      if (tab) select(Number(tab.dataset.learningTab));
+    });
+    holder.addEventListener("keydown", event => {
+      const tab = event.target.closest("[data-learning-tab]");
+      if (!tab) return;
+      const current = Number(tab.dataset.learningTab);
+      const next = {
+        ArrowDown: (current + 1) % tabs.length,
+        ArrowUp: (current - 1 + tabs.length) % tabs.length,
+        Home: 0, End: tabs.length - 1
+      }[event.key];
+      if (next === undefined) return;
+      event.preventDefault(); select(next, true);
+    });
+    // Match the reference's floating highlight only while its illustration
+    // is in view. Deliberately no text autoplay, timers or recurring JS loop.
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(([entry]) => visual.classList.toggle("is-in-view", entry.isIntersecting), { threshold: .1 }).observe(visual);
+    } else visual.classList.add("is-in-view");
+    holder.dataset.enhanced = "true";
   }
   function renderCaseNotes(data) {
     const item = data.caseNotes || {};
@@ -180,7 +247,7 @@
       siteData = await loadContent();
       // The single branded hero is static HTML. Legacy CMS slides must not
       // restore the retired carousel, photos, paragraphs or secondary CTA.
-      renderNavigation(siteData); renderQuickFacts(siteData);
+      renderNavigation(siteData);
       renderLearning(siteData); renderCaseNotes(siteData); renderArticles(siteData); renderResources(siteData); renderFooter(siteData);
       initArticleDialog(siteData);
     } catch (error) {

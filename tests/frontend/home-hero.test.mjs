@@ -155,13 +155,13 @@ test("canvas caps device pixels, resizes without duplicate loops and degrades sa
 
 test("hero files are served and cached explicitly without changing private data stores or other page styles", () => {
   const read = path => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
-  for (const path of ["home-hero.css", "home-hero.mjs"]) {
+  for (const path of ["home-hero.css", "home-hero.mjs", "home-learning.css"]) {
     for (const file of ["index.html", "sw.js", "backend/src/website.js", "tools/dev_server.py"]) {
       assert.ok(read(file).includes(path), `${file} explicitly includes ${path}`);
     }
   }
   assert.match(read("index.html"), /<body class="home-streams">/);
-  for (const path of ["home-hero.css", "home-hero.mjs"]) {
+  for (const path of ["home-hero.css", "home-hero.mjs", "home-learning.css"]) {
     assert.doesNotMatch(read(path), /fetch\(|localStorage|sessionStorage|indexedDB|firebase|api\/v1|Projexion|construction data|\.ws-|\.admin-/i);
   }
 });
@@ -170,7 +170,7 @@ test("homepage has one fixed branded introduction, not a carousel or legacy slid
   const read = path => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
   const hero = read("index.html").match(/<section class="hero-section"[\s\S]*?<\/section>/)[0];
   const text = hero.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-  assert.equal(text, "Fire Counsel Ignite your legal intelligence Sign up");
+  assert.equal(text, "Fire Counsel Ignite your legal intelligence Fire Counsel is more than a place to learn the law. It is the intelligence behind your success, empowering you to master the law, unlock your potential and become one of tomorrow's great legal minds. Sign up");
   assert.equal((hero.match(/<a\s/g) || []).length, 1);
   assert.match(hero, /class="button button-light hero-signup" href="\.\/auth\.html"/);
   assert.doesNotMatch(hero, /<img|hero-slides?|hero-controls|hero-dots|slide-prev|slide-next|carousel|Explore study space|Organise notes/);
@@ -178,4 +178,18 @@ test("homepage has one fixed branded introduction, not a carousel or legacy slid
   assert.doesNotMatch(read("home-hero.css"), /hero-slide|hero-secondary|hero-controls/);
   assert.doesNotMatch(read("data/site-content.json"), /Organise notes, build personal case cards|pexels-law-student|Explore learning tools|See the study tools/);
   assert.doesNotMatch(read("sw.js"), /pexels-law-student/);
+});
+
+
+test("the dark learning section replaces the old principles without reintroducing a hero carousel", () => {
+  const read = path => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
+  const html = read("index.html");
+  assert.doesNotMatch(html, /class="quickfacts|id="quickfacts-grid"/);
+  assert.doesNotMatch(read("site.js"), /renderQuickFacts|#quickfacts-grid/);
+  assert.deepEqual(JSON.parse(read("data/site-content.json")).quickFacts, []);
+  const css = read("home-learning.css");
+  assert.match(css, /grid-template-columns: 1fr 1fr/);
+  assert.match(css, /rgba\(40, 190, 140, \.85\)/);
+  assert.match(css, /prefers-reduced-motion/);
+  assert.doesNotMatch(css, /\.ws-|\.admin-|Projexion|construction/i);
 });
