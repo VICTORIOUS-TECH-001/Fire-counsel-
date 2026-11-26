@@ -109,3 +109,18 @@ test("Oracle settings keep new admin AI resources independent from the student k
   assert.equal(parsed.ADMIN_GEMINI_MODEL, "admin-model");
   assert.throws(() => parseSecrets("ADMIN_CLOUDFLARE_API_TOKEN=bad value"), /spaces/);
 });
+
+test("Oracle accepts its current multi-provider template and requires a student writer independently of admin keys", () => {
+  for (const name of ["GROQ_API_KEY", "DEEPSEEK_API_KEY", "DEEPSEEK_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY"]) {
+    const secrets = parseSecrets(`ADMIN_EMAILS=me@example.com\nDATABASE_URL=postgresql://u:p@h.neon.tech/db\n${name}=synthetic-writer\nTAVILY_API_KEY=synthetic-search\nBRAVE_SEARCH_API_KEY=synthetic-brave\nSERPAPI_API_KEY=synthetic-serpapi\nDEEPSEEK_MODELS=deepseek-flash\nAI_WRITER_PROVIDER_ORDER=groq,deepseek,gemini,openrouter\nWEB_SEARCH_PROVIDER_ORDER=tavily,brave,serpapi,gemini\nAI_TIMEOUT_MS=240000\nAI_WRITER_PROVIDER_TIMEOUT_MS=60000\nAI_RESEARCH_CACHE_MINUTES=0\n`);
+    const { settings, missing } = buildEnv({ secrets, firebase: firebaseJson(JSON.stringify(key)), host: "study.example.com" });
+    assert.deepEqual(missing, []);
+    assert.equal(settings[name], "synthetic-writer");
+    assert.equal(settings.TAVILY_API_KEY, "synthetic-search");
+    assert.equal(settings.AI_RESEARCH_CACHE_MINUTES, "0");
+    if (name !== "GEMINI_API_KEY") assert.equal(settings.GEMINI_API_KEY, undefined);
+  }
+  const { missing } = buildEnv({ secrets: { ADMIN_GEMINI_API_KEY: "admin-only", ADMIN_CLOUDFLARE_API_TOKEN: "admin-cf-only" }, host: "study.example.com" });
+  assert.ok(missing.some(value => value.startsWith("AI writer key")), "admin document keys cannot configure student AI");
+  assert.throws(() => parseSecrets("GROQ_API_KEY=bad value"), /spaces/);
+});

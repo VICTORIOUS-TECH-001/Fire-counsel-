@@ -118,6 +118,7 @@
       const selected = panel.id === `panel-${target}`;
       panel.hidden = !selected; panel.classList.toggle("is-visible", selected);
     });
+    document.dispatchEvent(new CustomEvent("fire-counsel:admin-panel", { detail: { panel: target } }));
   }));
   $$("[data-switch]").forEach(button => button.addEventListener("click", () => {
     const target = button.dataset.switch;
@@ -126,6 +127,7 @@
       const selected = panel.id === `panel-${target}`;
       panel.hidden = !selected; panel.classList.toggle("is-visible", selected);
     });
+    document.dispatchEvent(new CustomEvent("fire-counsel:admin-panel", { detail: { panel: target } }));
     window.scrollTo({top:0, behavior:"smooth"});
   }));
 

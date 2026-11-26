@@ -2,8 +2,9 @@ import express from "express";
 import { getPool } from "../config/database.js";
 import { verifyFirebaseToken } from "../middleware/verifyFirebaseToken.js";
 import { requireAdmin } from "../middleware/requireAdmin.js";
+import { createAdminProviderTestGate, createAdminRequestGate } from "../middleware/adminRateLimit.js";
 import { AiError } from "../services/ai/providers.js";
-import { describeAdminProviders } from "../services/documents/adminProviders.js";
+import { describeAdminProviders, testAdminProvider } from "../services/documents/adminProviders.js";
 import { createWorkstation, STATION_LIMITS } from "../services/documents/workstation.js";
 import { createDocumentImporter } from "../services/documents/importer.js";
 
@@ -43,11 +44,11 @@ function approval(body) {
 }
 
 export function createAdminWorkstationRouter({ env = process.env, poolProvider = getPool, verifyToken = verifyFirebaseToken,
-  adminGate = requireAdmin, configured = () => Boolean(env.DATABASE_URL), workstation, importer, fetchImpl = fetch } = {}) {
+  adminGate = requireAdmin, requestGate = createAdminRequestGate(), configured = () => Boolean(env.DATABASE_URL), workstation, importer, fetchImpl = fetch } = {}) {
   const router = express.Router();
   const station = workstation || createWorkstation({ env, fetchImpl });
   const library = importer || createDocumentImporter({ env, poolProvider, fetchImpl });
-  router.use(verifyToken, adminGate);
+  router.use(verifyToken, adminGate, requestGate);
   router.use((_req, res, next) => { res.set("Cache-Control", "no-store"); next(); });
 
   router.get("/status", async (_req, res) => {
@@ -60,6 +61,12 @@ export function createAdminWorkstationRouter({ env = process.env, poolProvider =
     }
     res.json({ data: { providers: describeAdminProviders(env), limits: STATION_LIMITS, database,
       persistence: "Drafts are temporary server memory, expire after one hour and are lost on restart. Nothing enters Neon until explicit approval. Download important drafts." } });
+  });
+  router.post("/providers/test", createAdminProviderTestGate(), async (req, res) => {
+    try {
+      if (!req.body || Array.isArray(req.body) || Object.keys(req.body).some(key => key !== "provider")) throw new AiError(400, "Send only the admin provider to test. Do not send keys or documents.", "VALIDATION_ERROR");
+      res.json({ data: await testAdminProvider(req.body.provider, { env, fetchImpl }) });
+    } catch (error) { handle(res, error); }
   });
   router.post("/jobs", (req, res) => {
     try { res.status(202).json({ data: station.start(req.user.uid, req.body) }); }

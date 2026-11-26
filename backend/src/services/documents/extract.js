@@ -263,6 +263,7 @@ export async function extractDocument({ buffer, mimeType, name = "document" }, {
         if (read.truncated) warnings.push("The photo transcription may be cut short (the AI reply hit its length limit).");
         return finish(read.pages, 1, `ai_ocr:${read.provider}`);
       } catch (error) {
+        if (!ocrKey && error.code?.startsWith("ADMIN_")) throw error;
         if (!ocrKey) throw new DocumentError(502, `The AI could not read this photo right now (${error.message}). Try again later.`, "OCR_FAILED");
         warnings.push(`AI reading failed (${error.code || "error"}); OCR.space was used instead, so check the text.`);
       }
@@ -299,6 +300,7 @@ export async function extractDocument({ buffer, mimeType, name = "document" }, {
     }
     const groups = groupRuns(toRead, batchPages);
     let done = 0;
+    let lastAdminError;
     for (const group of groups) {
       onProgress(`Reading scanned pages ${group[0]}–${group.at(-1)} of ${pageCount} with AI…`);
       try {
@@ -312,6 +314,7 @@ export async function extractDocument({ buffer, mimeType, name = "document" }, {
         }
         done += group.length;
       } catch (error) {
+        if (error.code?.startsWith("ADMIN_")) lastAdminError = error;
         if (error instanceof AiError && error.code === "AI_NOT_CONFIGURED") throw notConfigured();
         warnings.push(`Pages ${group[0]}–${group.at(-1)} could not be read by the AI (${error.code || "error"}). Retry later to fill them in.`);
       }
@@ -321,6 +324,7 @@ export async function extractDocument({ buffer, mimeType, name = "document" }, {
         warnings.push("The AI could not read this scan, so OCR.space was used instead; check the text.");
         return finish(await ocrSpace({ data: buffer, mimeType: "application/pdf", name }, { key: ocrKey, fetchImpl }), pageCount, "ocr_space");
       }
+      if (lastAdminError) throw lastAdminError;
       throw new DocumentError(502, "The AI could not read this scanned PDF right now (free quota or a busy service). Tap Retry in a few minutes.", "OCR_FAILED");
     }
     return finish(pages, pageCount, allScanned ? `ai_ocr:${provider}` : `pdf_text+ai_ocr:${provider}`);

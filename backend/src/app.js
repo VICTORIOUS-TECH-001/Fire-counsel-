@@ -5,6 +5,7 @@ import { rateLimit } from "express-rate-limit";
 import { checkDatabase, databaseErrorCode } from "./config/database.js";
 import { verifyFirebaseToken } from "./middleware/verifyFirebaseToken.js";
 import { requireAdmin } from "./middleware/requireAdmin.js";
+import { createAdminAbuseGate, createAdminRequestGate, isAdminApi, rateLimitReply } from "./middleware/adminRateLimit.js";
 import { createAdminDatabaseRouter } from "./routes/adminDatabase.js";
 import { createCoursesRouter } from "./routes/courses.js";
 import { createStudentMaterialsRouter } from "./routes/studentMaterials.js";
@@ -88,27 +89,31 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
   app.use(["/api/v1/ai/messages", "/api/v1/admin/ai/extract", "/api/v1/admin/workstation/jobs"], express.json({ limit: "26mb" }));
   app.use(["/api/v1/admin/ai/prompts", "/api/v1/admin/ai/instructions"], express.json({ limit: "1mb" }));
   app.use(express.json({ limit: "2mb" }));
-  // AI, presence and admin routes poll often (job status, heartbeats, upload
-  // progress), so they get a looser per-visitor limit. Admin routes still need
-  // a verified Firebase admin token.
-  const pollingPaths = (req) => /^\/api\/v1\/(ai|presence|admin)(\/|$)/.test(req.path);
+  // Admin polling has a shared verified-UID allowance across routers, separate
+  // from admin writes and the existing student AI/presence IP allowance. Keep a
+  // pre-auth IP guard for denied/unknown requests; no caller-supplied UID counts.
+  app.use(createAdminAbuseGate());
+  const adminRequestGate = createAdminRequestGate();
+  const pollingPaths = (req) => /^\/api\/v1\/(ai|presence)(\/|$)/.test(req.path);
   app.use(rateLimit({
-    skip: (req) => !pollingPaths(req),
+    skip: (req) => isAdminApi(req) || !pollingPaths(req),
     windowMs: 15 * 60 * 1000,
     limit: 1500,
     standardHeaders: "draft-8",
     legacyHeaders: false,
-    validate: { xForwardedForHeader: false }
+    validate: { xForwardedForHeader: false },
+    handler: rateLimitReply("API_RATE_LIMIT", "API requests are temporarily limited. Wait for Retry-After; this is not a provider quota test.")
   }));
   app.use(rateLimit({
-    skip: pollingPaths,
+    skip: (req) => isAdminApi(req) || pollingPaths(req),
     windowMs: 15 * 60 * 1000,
     limit: 100,
     standardHeaders: "draft-8",
     legacyHeaders: false,
     // Empty proxy trust deliberately ignores forwarded IPs even when an ingress
     // sends them. Only the explicit IP/CIDR list above can affect req.ip.
-    validate: { xForwardedForHeader: false }
+    validate: { xForwardedForHeader: false },
+    handler: rateLimitReply("API_RATE_LIMIT", "API requests are temporarily limited. Wait for Retry-After; this is not a provider quota test.")
   }));
 
   // Render's liveness probe must not require a live database or Firebase project.
@@ -210,13 +215,18 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
   app.get("/api/v1/admin/me", verifyFirebaseToken, (req, res, next) => {
     if (claimable(req.user)) return res.status(403).json({ error: "Administrator permission required.", code: "ADMIN_CLAIM_AVAILABLE" });
     return next();
-  }, requireAdmin, (req, res) => {
+  }, requireAdmin, adminRequestGate, (req, res) => {
     res.json({ user: { uid: req.user.uid, email: req.user.email, role: "admin" } });
   });
 
-  app.post("/api/v1/admin/claim", verifyFirebaseToken, async (req, res) => {
+  // Bootstrap is the deliberate exception to requireAdmin: eligibility is
+  // derived from the verified Google email plus this service's allowlist, before
+  // granting this UID any request allowance. No role/email in the body is used.
+  app.post("/api/v1/admin/claim", verifyFirebaseToken, (req, res, next) => {
+    if (req.user.admin || claimable(req.user)) return next();
+    return res.status(403).json({ error: "This account is not on the server's ADMIN_EMAILS list, or its email is not verified.", code: "ADMIN_CLAIM_DENIED" });
+  }, adminRequestGate, async (req, res) => {
     if (req.user.admin) return res.json({ data: { admin: true } });
-    if (!claimable(req.user)) return res.status(403).json({ error: "This account is not on the server's ADMIN_EMAILS list, or its email is not verified.", code: "ADMIN_CLAIM_DENIED" });
     try {
       const auth = getFirebaseAuth();
       const record = await auth.getUser(req.user.uid);
@@ -232,17 +242,17 @@ export function createApp({ env = process.env, databaseCheck = checkDatabase } =
   app.use("/api/v1/courses", createCoursesRouter({ configured: databaseConfigured }));
   app.use("/api/v1/presence", createPresenceRouter({ configured: () => Boolean(env.DATABASE_URL) }));
   app.use("/api/v1/ai", createAiRouter({ env, configured: () => Boolean(env.DATABASE_URL) }));
-  app.use("/api/v1/admin/ai", createAdminAiRouter({ env, configured: () => Boolean(env.DATABASE_URL) }));
-  app.use("/api/v1/admin/workstation", createAdminWorkstationRouter({ env, configured: databaseConfigured }));
-  app.use("/api/v1/admin/documents", createAdminDocumentsRouter({ env, configured: databaseConfigured }));
-  app.use("/api/v1/admin/site", createAdminSiteRouter({ configured: databaseConfigured, onPublish: site.invalidate }));
+  app.use("/api/v1/admin/ai", createAdminAiRouter({ env, requestGate: adminRequestGate, configured: () => Boolean(env.DATABASE_URL) }));
+  app.use("/api/v1/admin/workstation", createAdminWorkstationRouter({ env, requestGate: adminRequestGate, configured: databaseConfigured }));
+  app.use("/api/v1/admin/documents", createAdminDocumentsRouter({ env, requestGate: adminRequestGate, configured: databaseConfigured }));
+  app.use("/api/v1/admin/site", createAdminSiteRouter({ requestGate: adminRequestGate, configured: databaseConfigured, onPublish: site.invalidate }));
 
   const studentSetup = {
     configured: () => Boolean(env.DATABASE_URL),
     enabled: () => env.STUDENT_PROFILES_ENABLED === "true"
   };
   // Strictly allowlisted CRUD for administrator-managed Neon content.
-  app.use("/api/v1/admin/database", createAdminDatabaseRouter({ configured: studentSetup.configured }));
+  app.use("/api/v1/admin/database", createAdminDatabaseRouter({ requestGate: adminRequestGate, configured: studentSetup.configured }));
   app.use("/api/v1/profile", createStudentProfileRouter(studentSetup));
   app.use("/api/v1/materials", createStudentMaterialsRouter(studentSetup));
   app.use("/api/v1/research", createResearchSearchRouter(studentSetup));

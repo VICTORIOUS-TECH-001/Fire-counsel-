@@ -3,6 +3,7 @@ import { getPool } from "../config/database.js";
 import { getFirebaseAuth } from "../config/firebaseAdmin.js";
 import { verifyFirebaseToken } from "../middleware/verifyFirebaseToken.js";
 import { requireAdmin } from "../middleware/requireAdmin.js";
+import { createAdminRequestGate } from "../middleware/adminRateLimit.js";
 import { AiError, aiConfig, describeProviders, generate as defaultGenerate, providerHealth, testModels } from "../services/ai/providers.js";
 import { createStudio } from "../services/ai/studio.js";
 import { BUILT_IN_PROMPTS, PROMPT_KINDS, clearPromptCache } from "../services/ai/prompts.js";
@@ -19,6 +20,7 @@ const LIMIT_COLUMNS = Object.fromEntries(Object.entries(FEATURES).map(([key, fea
 export function createAdminAiRouter({
   poolProvider = getPool,
   verifyToken = verifyFirebaseToken,
+  requestGate = createAdminRequestGate(),
   authProvider = getFirebaseAuth,
   env = process.env,
   generate = defaultGenerate,
@@ -27,7 +29,7 @@ export function createAdminAiRouter({
   configured = () => Boolean(env.DATABASE_URL)
 } = {}) {
   const router = express.Router();
-  router.use(verifyToken, requireAdmin);
+  router.use(verifyToken, requireAdmin, requestGate);
   const onlineSeconds = Math.min(Math.max(Number(env.PRESENCE_ONLINE_SECONDS) || 150, 30), 3600);
 
   router.get("/status", async (req, res) => {

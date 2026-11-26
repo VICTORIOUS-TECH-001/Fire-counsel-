@@ -208,6 +208,9 @@ test("Counsel Working Station is mounted next to the preserved uploader, uses sa
     for (const server of ["backend/src/website.js", "tools/dev_server.py"]) assert.ok(read(server).includes(`"${file}"`));
   }
   for (const id of ["station-form", "station-output", "station-save-form", "station-approval", "station-incomplete", "classic-upload-panel", "upload-form", "upload-rows", "upload-viewer"]) assert.ok(html.includes(`id="${id}"`));
+  for (const server of ["backend/src/website.js", "tools/dev_server.py"]) assert.ok(read(server).includes('"admin-network.mjs"'));
+  assert.ok(source.includes('"./admin-network.mjs"'));
+  assert.ok(read("admin-uploads.mjs").includes('"./admin-network.mjs"'));
   assert.match(source, /\/api\/v1\/admin\/workstation/);
   assert.doesNotMatch(source, /generativelanguage\.googleapis|api\.cloudflare\.com|localStorage|sessionStorage|indexedDB|localhost|127\.0\.0\.1/);
   assert.doesNotMatch(source, /innerHTML|insertAdjacentHTML/);

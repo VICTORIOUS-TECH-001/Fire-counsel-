@@ -2,6 +2,8 @@
 // library (course materials, case judgments, past-question papers). The file
 // is sent as-is; the server reads it in the background (pdf.js for digital
 // PDFs, AI OCR for scans) and this page shows the progress.
+import { adminResponse, statusRetryDelay } from "./admin-network.mjs";
+
 const $ = (selector) => document.querySelector(selector);
 const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[ch]);
 const PURPOSE_LABEL = { material: "Course material", case: "Case judgment", past_questions: "Past-question paper", material_version: "New version" };
@@ -15,6 +17,12 @@ let rows = [];
 let pollTimer = null;
 let usage = null;
 let viewing = null;
+let refreshPending = null;
+let refreshFailures = 0;
+let refreshNotBefore = 0;
+let refreshNotice = false;
+let refreshExhausted = false;
+let uploadPending = null;
 
 function setText(selector, text, kind = "") {
   const node = $(selector);
@@ -26,25 +34,17 @@ const size = (bytes) => (bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB`
 const method = (value) => (!value ? "" : METHOD_LABEL[value] || value.replace(/^pdf_text\+/, "PDF text + ").replace(/ai_ocr:(\w+)/, "AI reading ($1)"));
 
 async function api(path, options = {}) {
-  let response;
-  for (let attempt = 0; ; attempt++) {
-    response = await authClient.apiRequest(path, options);
-    const waking = [502, 503, 504].includes(response.status) && !(response.headers.get("content-type") || "").includes("json");
-    if (!waking || attempt >= 2 || (options.method && options.method !== "GET")) break;
-    setText("#upload-status", "The server is waking up… retrying");
-    await new Promise((resolve) => setTimeout(resolve, 4000 * (attempt + 1)));
-  }
-  let body = {};
-  try { body = await response.json(); } catch { body = {}; }
-  if (!response.ok) {
-    const waking = [502, 503, 504].includes(response.status) && !body.code;
-    const error = new Error(body.error || (waking ? "The server is waking up or restarting (Render free plan). Wait about a minute, then try again." : `Request failed (${response.status}).`));
-    error.status = response.status;
-    error.code = body.code;
-    error.data = body.data;
-    throw error;
-  }
-  return body;
+  const read = !options.method || ["GET", "HEAD"].includes(options.method);
+  const request = read && !options.signal && globalThis.AbortSignal?.timeout ? { ...options, signal: AbortSignal.timeout(30_000) } : options;
+  // Mutations, including raw-file POSTs and approvals, are never replayed.
+  return adminResponse(await authClient.apiRequest(path, request));
+}
+function canPoll() {
+  return verified && !document.hidden && !$("#panel-uploads").hidden && !$("#classic-upload-panel").hidden;
+}
+function scheduleRefresh(mySession, delay) {
+  clearTimeout(pollTimer);
+  if (canPoll()) pollTimer = setTimeout(() => refresh(mySession), delay);
 }
 
 function setEnabled(on) {
@@ -95,6 +95,7 @@ async function loadOptions(resource, select, firstLabel, mySession) {
 }
 
 async function loadUsage(mySession = session) {
+  if (!verified || mySession !== session || refreshExhausted || Date.now() < refreshNotBefore) return;
   try {
     const { data } = await api("/api/v1/admin/documents/usage");
     if (mySession !== session) return;
@@ -110,7 +111,8 @@ $("#upload-purpose")?.addEventListener("change", updateFields);
 
 $("#upload-form")?.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!verified) return;
+  if (!verified || uploadPending) return;
+  const mySession = session;
   const files = [...($("#upload-files").files || [])];
   if (!files.length) { setText("#upload-status", "Choose at least one file.", "error"); return; }
   const purpose = $("#upload-purpose").value;
@@ -130,10 +132,12 @@ $("#upload-form")?.addEventListener("submit", async (event) => {
   if ($("#upload-review").checked) params.set("auto_save", "0");
   const title = $("#upload-title").value.trim();
   const button = $("#upload-submit");
+  const uploadToken = {}; uploadPending = uploadToken;
   button.disabled = true;
   const done = [];
   const problems = [];
   for (const [index, file] of files.entries()) {
+    if (!verified || mySession !== session) return;
     if (usage && file.size > usage.max_file_bytes) { problems.push(`${file.name}: larger than ${size(usage.max_file_bytes)}`); continue; }
     const one = new URLSearchParams(params);
     one.set("name", file.name);
@@ -141,11 +145,15 @@ $("#upload-form")?.addEventListener("submit", async (event) => {
     setText("#upload-status", `Uploading ${file.name} (${size(file.size)})${files.length > 1 ? ` — ${index + 1} of ${files.length}` : ""}…`);
     try {
       await api(`/api/v1/admin/documents?${one}`, { method: "POST", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file });
+      if (!verified || mySession !== session) return;
       done.push(file.name);
     } catch (error) {
+      if (!verified || mySession !== session) return;
       problems.push(error.code === "DUPLICATE_FILE" ? `${file.name}: already uploaded (see the list below)` : `${file.name}: ${error.message}`);
     }
   }
+  if (uploadPending === uploadToken) uploadPending = null;
+  if (!verified || mySession !== session) return;
   button.disabled = !verified;
   if (done.length) { $("#upload-files").value = ""; $("#upload-title").value = ""; }
   setText("#upload-status", [done.length ? `${done.length} file${done.length === 1 ? "" : "s"} uploaded — reading now. You can leave this page; it continues on the server.` : "", ...problems].filter(Boolean).join(" · "), problems.length ? "error" : "ok");
@@ -191,27 +199,49 @@ function renderRows() {
 
 async function refresh(mySession = session) {
   clearTimeout(pollTimer);
-  if (!verified) return;
-  try {
-    const { data } = await api("/api/v1/admin/documents?limit=40");
-    if (mySession !== session) return;
-    rows = data;
-    renderRows();
-    if (rows.some((row) => row.status === "uploaded" || row.status === "processing")) {
-      pollTimer = setTimeout(() => refresh(mySession), document.hidden ? 15000 : 3000);
-    } else {
-      loadUsage(mySession);
-    }
-  } catch (error) {
-    if (mySession !== session) return;
-    setText("#upload-status", error.message, "error");
-    if (error.code === "UPLOADS_SCHEMA_NOT_READY") {
-      $("#upload-rows").innerHTML = `<tr><td colspan="4">${escapeHTML(error.message)}</td></tr>`;
-    }
+  if (!verified || mySession !== session) return;
+  if (refreshPending?.session === mySession) return refreshPending.promise;
+  if (refreshExhausted) return;
+  if (Date.now() < refreshNotBefore) {
+    const left = refreshNotBefore - Date.now();
+    if (left <= 15 * 60_000) scheduleRefresh(mySession, left);
+    else setText("#upload-status", "The server requested a longer wait. Refresh after its Retry-After period to check existing uploads; do not upload another copy.", "error");
+    return;
   }
+  const token = { session: mySession };
+  refreshPending = token;
+  token.promise = (async () => {
+    try {
+      const { data } = await api("/api/v1/admin/documents?limit=40");
+      if (mySession !== session || !verified) return;
+      rows = data;
+      renderRows();
+      refreshFailures = 0; refreshNotBefore = 0; refreshExhausted = false;
+      if (refreshNotice) { setText("#upload-status", "Connection restored. Existing uploads are shown below; no file was automatically uploaded again.", "ok"); refreshNotice = false; }
+      if (rows.some((row) => row.status === "uploaded" || row.status === "processing")) scheduleRefresh(mySession, 5000);
+      else loadUsage(mySession);
+    } catch (error) {
+      if (mySession !== session || !verified) return;
+      const delay = statusRetryDelay(error, ++refreshFailures);
+      refreshNotBefore = Date.now() + (delay ?? error.retryAfterMs ?? 0);
+      refreshNotice = true;
+      setText("#upload-status", delay !== null
+        ? `${error.message} Checking the existing upload list again in ${Math.ceil(delay / 1000)} seconds (${refreshFailures}/5). Do not upload another copy.`
+        : `${error.message} Automatic checks are paused; Refresh checks existing uploads without uploading again.`, "error");
+      if (delay !== null) scheduleRefresh(mySession, delay);
+      else refreshExhausted = true;
+      if (error.code === "UPLOADS_SCHEMA_NOT_READY") $("#upload-rows").innerHTML = `<tr><td colspan="4">${escapeHTML(error.message)}</td></tr>`;
+    } finally { if (refreshPending === token) refreshPending = null; }
+  })();
+  return token.promise;
 }
 
-$("#upload-refresh")?.addEventListener("click", () => { refresh(); loadUsage(); });
+$("#upload-refresh")?.addEventListener("click", () => { refreshFailures = 0; refreshExhausted = false; refresh(); loadUsage(); });
+function resumeRefresh() {
+  clearTimeout(pollTimer);
+  if (canPoll()) { refresh(); loadUsage(); }
+}
+for (const event of ["visibilitychange", "fire-counsel:admin-panel", "fire-counsel:upload-mode"]) document.addEventListener(event, resumeRefresh);
 
 async function download(id) {
   const row = rows.find((item) => item.id === id);
@@ -297,6 +327,7 @@ $("#upload-save-text")?.addEventListener("click", async () => {
 function onAdminState(state) {
   session += 1;
   verified = state === "verified" && Boolean(authClient);
+  clearTimeout(pollTimer); refreshPending = null; refreshFailures = 0; refreshNotBefore = 0; refreshNotice = false; refreshExhausted = false; uploadPending = null;
   setEnabled(verified);
   if (!verified) return;
   const mySession = session;
@@ -310,7 +341,6 @@ function onAdminState(state) {
 updateFields();
 document.addEventListener("fire-counsel:admin-state", (event) => onAdminState(event.detail?.state));
 document.addEventListener("fire-counsel:uploads-changed", () => { if (verified) { refresh(); loadUsage(); } });
-document.addEventListener("visibilitychange", () => { if (!document.hidden && verified && rows.some((row) => row.status === "processing" || row.status === "uploaded")) refresh(); });
 try {
   authClient = await import("./firebase/auth-client.mjs");
   onAdminState($("#admin-auth-status")?.dataset.state);

@@ -6,8 +6,12 @@
 //   node make-env.mjs --secrets FILE [--firebase FILE] [--previous FILE] --host HOST --out FILE
 import { readFileSync, writeFileSync, existsSync, renameSync, chmodSync } from "node:fs";
 
-const REQUIRED = ["DATABASE_URL", "GEMINI_API_KEY", "ADMIN_EMAILS"];
-const OPTIONAL = ["ADMIN_GEMINI_API_KEY", "ADMIN_GEMINI_MODEL", "ADMIN_CLOUDFLARE_ACCOUNT_ID", "ADMIN_CLOUDFLARE_API_TOKEN", "ADMIN_CLOUDFLARE_MODEL", "ADMIN_AI_TIMEOUT_MS", "OPENROUTER_API_KEY", "FC_DOMAIN", "GEMINI_MODELS", "GEMINI_SEARCH_MODELS", "OPENROUTER_MODELS", "AI_TIMEZONE", "AI_MAX_CONCURRENT_JOBS"];
+const REQUIRED = ["DATABASE_URL", "ADMIN_EMAILS"];
+const WRITER_KEYS = ["GROQ_API_KEY", "DEEPSEEK_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY"];
+const OPTIONAL = [...WRITER_KEYS, "DEEPSEEK_KEY", "GROQ_MODELS", "DEEPSEEK_MODELS", "TAVILY_API_KEY", "BRAVE_SEARCH_API_KEY", "SERPAPI_API_KEY",
+  "AI_TIMEOUT_MS", "AI_WRITER_PROVIDER_TIMEOUT_MS", "AI_WRITER_PROVIDER_ORDER", "WEB_SEARCH_PROVIDER_ORDER", "AI_RESEARCH_CACHE_MINUTES",
+  "ADMIN_GEMINI_API_KEY", "ADMIN_GEMINI_MODEL", "ADMIN_CLOUDFLARE_ACCOUNT_ID", "ADMIN_CLOUDFLARE_API_TOKEN", "ADMIN_CLOUDFLARE_MODEL", "ADMIN_AI_TIMEOUT_MS",
+  "FC_DOMAIN", "GEMINI_MODELS", "GEMINI_SEARCH_MODELS", "OPENROUTER_MODELS", "AI_TIMEZONE", "AI_MAX_CONCURRENT_JOBS"];
 const ALLOWED = new Set([...REQUIRED, ...OPTIONAL, "FIREBASE_SERVICE_ACCOUNT_JSON"]);
 
 export function cleanValue(key, raw) {
@@ -30,7 +34,7 @@ export function cleanValue(key, raw) {
     value = emails.join(",");
   }
   if (key === "FC_DOMAIN" && !/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(value)) throw new Error("FC_DOMAIN must be a plain domain name such as study.example.com.");
-  if (/^(?:ADMIN_GEMINI_API_KEY|ADMIN_CLOUDFLARE_API_TOKEN|GEMINI_API_KEY|OPENROUTER_API_KEY)$/.test(key) && /\s/.test(value)) throw new Error(`${key} must not contain spaces.`);
+  if ((/_API_(?:KEY|TOKEN)$/.test(key) || key === "DEEPSEEK_KEY") && /\s/.test(value)) throw new Error(`${key} must not contain spaces.`);
   return value;
 }
 
