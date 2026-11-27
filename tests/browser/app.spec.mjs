@@ -14,13 +14,15 @@ async function finishReply(page, response) {
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
-test("public homepage renders its single hero, JSON articles and mobile navigation", async ({ page }) => {
+test("public homepage renders its single hero, case desk action and mobile navigation", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("#home h1")).toHaveText("Fire Counsel");
   await expect(page.locator("#home a")).toHaveCount(1);
   await expect(page.locator("#hero-slides, #hero-count, #slide-next")).toHaveCount(0);
   await expect(page.locator("#learning-cards > *")).toHaveCount(4);
-  await expect(page.locator("#article-grid > *")).not.toHaveCount(0);
+  await expect(page.locator("#case-cta")).toHaveText("Open case desk ↗");
+  await expect(page.locator("#case-cta")).toHaveAttribute("href", "./ai.html?mode=case");
+  await expect(page.locator("#articles, #resources, #privacy-note")).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator("#nav-toggle").click();
   await expect(page.locator("#nav-toggle")).toHaveAttribute("aria-expanded", "true");

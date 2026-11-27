@@ -45,8 +45,9 @@ test("single hero shows bold Fire Counsel, its tagline and only Sign up", async 
   await expect(page.locator("#brand-name")).toHaveText("FIRE COUNSEL");
   await expect(page.locator("#brand-image")).toHaveAttribute("src", "./assets/images/fire-counsel-flame.png");
   await expect(page.locator("#case-image")).toHaveAttribute("src", bundled.caseNotes.image);
-  await expect(page.locator("#case-intro")).toHaveText(bundled.caseNotes.intro);
-  await expect(page.locator("#article-grid > *")).toHaveCount(bundled.articles.items.length);
+  await expect(page.locator("#case-status")).toHaveText(bundled.caseNotes.status);
+  await expect(page.locator("#case-cta")).toHaveAttribute("href", "./ai.html?mode=case");
+  await expect(page.locator("#case-intro, #articles, #resources, #privacy-note")).toHaveCount(0);
   await expect(page.locator("#footer-disclaimer")).toHaveText(bundled.footer.disclaimer);
 });
 

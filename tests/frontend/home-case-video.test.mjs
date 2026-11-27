@@ -138,6 +138,26 @@ test("the video stays decorative, unfocusable and controller-free, even during a
   control.destroy();
 });
 
+test("the video and fixed Open case desk action join directly to the ending, without the retired homepage blocks", () => {
+  const html = read("index.html");
+  const sections = [...html.matchAll(/<section\b[^>]*\bid="([^"]+)"/g)].map(match => match[1]);
+  assert.deepEqual(sections, ["home", "learning", "home-ai", "cases", "exam-ready"]);
+  assert.doesNotMatch(html, /case-copy|case-points|case-disclaimer|article-dialog|article-grid/);
+  const section = html.match(/<section[^>]+id="cases"[\s\S]*?<\/section>/)[0];
+  assert.match(section, /<a\b[^>]+id="case-cta"[^>]+href="\.\/ai\.html\?mode=case">Open case desk <span aria-hidden="true">↗<\/span><\/a>/);
+  assert.ok(section.indexOf('id="case-cta"') > section.indexOf("</video>"), "the action follows the video, never overlays it");
+  assert.doesNotMatch(section, /data-ai-entry/, "the orbit's fixed chat handler must not discard the case query");
+  assert.doesNotMatch(read("site.js"), /cta\.href\s*=|cta\.innerHTML\s*=/, "legacy case JSON cannot restore exam practice over the fixed desk link");
+});
+
+test("the static navigation/footer have no links to retired sections and legacy content still validates without migration", () => {
+  assert.doesNotMatch(read("index.html"), /href="(?:\.\/index\.html)?#(?:articles|resources|privacy-note)"/);
+  assert.equal(validateSiteContent(bundled).ok, true);
+  assert.ok(bundled.articles.items.length, "archived article content is preserved, not erased from the data contract");
+  assert.equal(bundled.caseNotes.ctaLabel, "Open exam practice", "old content remains readable without writes");
+  assert.equal(bundled.caseNotes.videoUrl, DEFAULT_CASE_VIDEO_URL);
+});
+
 test("case video assets are explicitly served and cached as code, never as a downloaded R2 media file", () => {
   for (const asset of ["home-case-video.css", "home-case-video.mjs", "homepage-media.mjs"]) {
     for (const server of ["backend/src/website.js", "tools/dev_server.py", "sw.js"]) assert.ok(read(server).includes(asset), `${server}: ${asset}`);

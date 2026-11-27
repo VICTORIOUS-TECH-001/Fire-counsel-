@@ -153,9 +153,12 @@ test("real matrix, burning flame, growing rotating light and upright 80-second o
     expect(rotation.b).toBeCloseTo(0, 5); expect(rotation.c).toBeCloseTo(0, 5);
   }
   await expect(page.locator("#home-ai button")).toHaveCount(0);
-  // Leave below the section so this test exercises the orb's offscreen stop
-  // without also warming the unrelated hero canvas on a virtual frame clock.
-  await page.locator("#resources").evaluate(section => section.scrollIntoView({ block: "start", behavior: "instant" }));
+  // Leave the orb fully offscreen without warming either unrelated stream
+  // canvas on this virtual frame clock. The old directory target was removed;
+  // the media panel now sits between the orb and the ending's canvas.
+  await page.locator("#cases").evaluate(section => section.scrollIntoView({ block: "start", behavior: "instant" }));
+  await expect(scene).not.toBeInViewport();
+  await expect(page.locator("#exam-ready-streams")).not.toHaveAttribute("data-motion", "running");
   await expect(scene).toHaveAttribute("data-motion", "paused");
   const paused = await matrix.evaluate(canvas => canvas.toDataURL());
   await page.clock.runFor(600);
