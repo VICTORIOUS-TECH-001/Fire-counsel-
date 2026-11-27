@@ -142,3 +142,12 @@ test("the layer is scoped to learning, safe without scripts, and only its code i
   assert.match(css, /mix-blend-mode:\s*screen/); assert.match(css, /::-webkit-media-controls/);
   assert.match(css, /pointer-events:\s*none/);
 });
+
+test("learning footage stays at full opacity with only a light overall wash and local readability protection", () => {
+  const css = read("home-learning.css");
+  assert.match(css, /\[data-video-visible="true"\] \.learning-background-video\s*\{\s*opacity:\s*1;\s*\}/);
+  assert.match(css, /\.learning-video-shade\s*\{[^}]*rgba\(10, 8, 32, \.14\)/);
+  assert.match(css, /\.section-heading::before/);
+  assert.match(css, /\.learning-pane::before/);
+  assert.match(css, /linear-gradient\(180deg, transparent 1%, #000 6%, #000 94%, transparent 99%\)/);
+});
