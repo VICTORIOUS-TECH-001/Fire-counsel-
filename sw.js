@@ -1,4 +1,4 @@
-const CACHE_NAME = "fire-counsel-shell-v41";
+const CACHE_NAME = "fire-counsel-shell-v42";
 const APP_CACHE_PREFIX = "fire-counsel-shell-";
 const APP_SHELL = [
   "./", "./index.html", "./study.html", "./ai.html",

@@ -50,7 +50,10 @@ test("the closing note and footer use only Fire Counsel words, original links, l
     title: column.querySelector("h3").textContent,
     items: [...column.querySelectorAll("a")].map(link => ({ label: link.textContent, href: link.getAttribute("href") }))
   })));
-  expect(links).toEqual(bundled.footer.columns);
+  expect(links).toEqual([
+    { title: bundled.footer.columns[0].title, items: bundled.footer.columns[0].items.slice(0, 2) },
+    bundled.footer.columns[1]
+  ]); // Only links to the explicitly removed homepage blocks are omitted.
   await expect(page.locator(".ending-footer-card")).toHaveCount(1);
   await expect(page.locator("body")).not.toContainText(/Projexion|Construction Management|Set up a Demo|Solutions by Customer/);
   await expect(page.locator("#home h1")).toHaveText("Fire Counsel");

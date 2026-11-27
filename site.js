@@ -84,9 +84,23 @@
     if (!response.ok) throw new Error(`Content request failed: ${response.status}`);
     return response.json();
   }
+  // Older publishes retain these retired blocks in their JSON. Omit only
+  // links to those removed homepage targets; do not rewrite published content
+  // or drop matching fragments on an external site / another local page.
+  const retiredHomeSections = new Set(["#articles", "#resources", "#privacy-note"]);
+  function homepageLinks(items) {
+    return (items || []).filter(item => {
+      try {
+        const link = new URL(item.href, location.href);
+        const homePath = path => path.replace(/\/index\.html$/, "/");
+        return !(retiredHomeSections.has(decodeURIComponent(link.hash)) && link.origin === location.origin
+          && homePath(link.pathname) === homePath(location.pathname));
+      } catch { return true; } // The existing href sanitizer handles bad URLs.
+    });
+  }
   function renderNavigation(data) {
     const nav = $("#main-nav-links");
-    nav.innerHTML = (data.navigation || []).map((item, index) => `<a class="${index === 0 ? "active" : ""}" href="${href(item.href)}">${esc(item.label)}</a>`).join("");
+    nav.innerHTML = homepageLinks(data.navigation).map((item, index) => `<a class="${index === 0 ? "active" : ""}" href="${href(item.href)}">${esc(item.label)}</a>`).join("");
     const logo = $("#brand-image");
     if (logo) { logo.src = photo(data.brand?.markImage); logo.alt = esc(data.brand?.markAlt || ""); }
     $("#brand-name").textContent = data.brand?.name || "FIRE COUNSEL";
@@ -218,59 +232,27 @@
     // its fixed, authenticated AI destination or execute markup.
     $("#home-ai").dataset.content = "ready";
   }
-  function renderCaseNotes(data) {
+  function renderCaseMedia(data) {
     const item = data.caseNotes || {};
-    $("#case-eyebrow").textContent = item.eyebrow || "CASE NOTES";
-    $("#case-title").innerHTML = `${esc(item.title || "Case notes")}<br><em>${esc(item.accent || "")}</em>`;
-    $("#case-intro").textContent = item.intro || "";
     $("#case-status").textContent = item.status || "CURATION PENDING";
-    $("#case-points").innerHTML = (item.points || []).map(point => `<li>${esc(point)}</li>`).join("");
     const image = $("#case-image"); image.src = photo(item.image); image.alt = esc(item.imageAlt || "Legal study");
+    // Open case desk is a fixed application link, not the retired editable
+    // exam-practice CTA. Legacy copy remains in JSON for compatible publishing.
     // Optional enhancement only: failed scripts/media leave the original photo.
     // The browser reads this public R2 URL directly, never through the API.
     import("./home-case-video.mjs").then(({ mountCaseVideo }) => {
       mountCaseVideo($("#cases .case-image"), { content: data });
     }).catch(() => { /* the still image and all case links remain usable */ });
-    const cta = $("#case-cta"); cta.href = href(item.ctaHref); cta.innerHTML = `${esc(item.ctaLabel || "Explore case notes")} <span>↗</span>`;
-  }
-  function renderArticles(data) {
-    const articles = data.articles || {};
-    $("#articles-intro").textContent = articles.intro || "";
-    const section = $("#articles");
-    $(".section-heading .eyebrow", section).textContent = articles.eyebrow || "ARTICLES";
-    $(".section-heading h2", section).innerHTML = `${esc(articles.title || "Articles")}<br><em>${esc(articles.accent || "")}</em>`;
-    $("#article-grid").innerHTML = (articles.items || []).map((item, index) => `<article class="article-card"><div class="article-meta"><span class="article-category">${esc(item.category)}</span><span>${esc(item.readTime)}</span></div><h3>${esc(item.title)}</h3><p>${esc(item.excerpt)}</p><button class="article-read" type="button" data-article-index="${index}">Read note <span>→</span></button></article>`).join("");
-  }
-  function renderResources(data) {
-    const resources = data.resources || {};
-    $("#resources-title").innerHTML = `${esc(resources.title || "Legal websites")}<br><em>${esc(resources.accent || "")}</em>`;
-    $("#resources-intro").textContent = resources.intro || "";
-    const list = $("#resource-list");
-    if (!resources.items?.length) {
-      list.innerHTML = `<div class="resource-empty"><span class="resource-symbol">§</span><strong>Approved links are being prepared</strong><p>No school-domain allowlist has been connected. The live web fallback is off.</p></div>`;
-      return;
-    }
-    list.innerHTML = resources.items.map(item => `<article class="resource-card"><span class="resource-symbol">↗</span><div><a href="${href(item.href)}" target="_blank" rel="noopener noreferrer">${esc(item.title)}</a><p>${esc(item.description)}${item.domain ? ` · ${esc(item.domain)}` : ""}</p></div></article>`).join("");
   }
   function renderFooter(data) {
     const footer = data.footer || {};
     const brand = data.brand || {};
     const inner = $("#footer-main");
-    inner.innerHTML = `<div class="footer-brand"><a class="site-brand footer-mark fc-brand-lockup" href="#home"><span class="brand-image-wrap fc-brand-emblem"><img src="${photo(brand.markImage)}" alt="" width="72" height="72" loading="lazy"></span><span class="brand-copy fc-brand-copy"><strong>${esc(brand.name || "FIRE COUNSEL")}</strong><small>${esc(brand.tagline || "")}</small></span></a><p>${esc(footer.summary || "")}</p></div>${(footer.columns || []).map(column => `<div class="footer-column"><h3>${esc(column.title)}</h3>${(column.items || []).map(link => `<a href="${href(link.href)}">${esc(link.label)}</a>`).join("")}</div>`).join("")}`;
+    const columns = (footer.columns || []).map(column => ({ ...column, items: homepageLinks(column.items) }))
+      .filter(column => column.items.length);
+    inner.innerHTML = `<div class="footer-brand"><a class="site-brand footer-mark fc-brand-lockup" href="#home"><span class="brand-image-wrap fc-brand-emblem"><img src="${photo(brand.markImage)}" alt="" width="72" height="72" loading="lazy"></span><span class="brand-copy fc-brand-copy"><strong>${esc(brand.name || "FIRE COUNSEL")}</strong><small>${esc(brand.tagline || "")}</small></span></a><p>${esc(footer.summary || "")}</p></div>${columns.map(column => `<div class="footer-column"><h3>${esc(column.title)}</h3>${column.items.map(link => `<a href="${href(link.href)}">${esc(link.label)}</a>`).join("")}</div>`).join("")}`;
     $("#footer-disclaimer").textContent = footer.disclaimer || "";
     $("#copyright-text").textContent = footer.copyright || "";
-  }
-  function initArticleDialog(data) {
-    const dialog = $("#article-dialog");
-    $("#article-grid").addEventListener("click", event => {
-      const button = event.target.closest("[data-article-index]"); if (!button) return;
-      const article = data.articles?.items?.[Number(button.dataset.articleIndex)]; if (!article) return;
-      $("#dialog-category").textContent = article.category || "STUDY NOTE";
-      $("#dialog-title").textContent = article.title || "Study note";
-      $("#dialog-body").textContent = article.body || article.excerpt || "";
-      if (dialog?.showModal) dialog.showModal(); else toast(article.excerpt || "");
-    });
-    $("#dialog-done").addEventListener("click", () => dialog.close());
   }
   function initNavigation() {
     const button = $("#nav-toggle"), nav = $("#primary-nav");
@@ -286,7 +268,7 @@
       button.setAttribute("aria-expanded", String(open)); button.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
     });
     nav.addEventListener("click", event => { if (event.target.closest("a")) close(); });
-    document.addEventListener("keydown", event => { if (event.key === "Escape") { close(); $("#article-dialog")?.close?.(); } });
+    document.addEventListener("keydown", event => { if (event.key === "Escape") close(); });
   }
   function initReveal() {
     const nodes = $$(".reveal");
@@ -301,8 +283,7 @@
       [siteData, copyHelpers] = await Promise.all([loadContent(), import("./homepage-copy.mjs")]);
       // Editable single-introduction copy, independent of legacy slide data.
       renderNavigation(siteData); renderHeroCopy(siteData);
-      renderLearning(siteData); renderAI(siteData); renderCaseNotes(siteData); renderArticles(siteData); renderResources(siteData); renderFooter(siteData);
-      initArticleDialog(siteData);
+      renderLearning(siteData); renderAI(siteData); renderCaseMedia(siteData); renderFooter(siteData);
     } catch (error) {
       console.error("FIRE COUNSEL website content could not be loaded.", error);
       toast("Some page content could not be loaded. Please try refreshing.");

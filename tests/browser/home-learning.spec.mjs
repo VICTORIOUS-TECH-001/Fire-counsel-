@@ -34,7 +34,8 @@ test("the learning section joins the hero directly, keeps our words and replaces
   }
   await expect(page.locator("#case-image")).toHaveAttribute("src", bundled.caseNotes.image);
   await expect(page.locator("#brand-image")).toHaveAttribute("src", bundled.brand.markImage);
-  await expect(page.locator("#case-intro")).toHaveText(bundled.caseNotes.intro);
+  await expect(page.locator("#case-status")).toHaveText(bundled.caseNotes.status);
+  await expect(page.locator("#case-cta")).toHaveAttribute("href", "./ai.html?mode=case");
   await expect(page.locator("#footer-disclaimer")).toHaveText(bundled.footer.disclaimer);
 });
 
@@ -66,11 +67,11 @@ test("learning controls support keyboard selection and reduced motion without mo
 });
 
 test("the wider title and reference-style learning split fit four viewports with a seamless join", async ({ page }) => {
-  await page.clock.install();
+  // This is a layout test, not an animation sampler: native frames must be
+  // free to deliver viewport-unit styles after each real resize.
   await readyLearning(page);
-  // Drive the real first-visit preloader's 1100ms minimum + 650ms removal.
-  // Native headless timers can stop; do not hide it or sleep for screenshots.
-  await page.clock.runFor(1800);
+  await page.bringToFront();
+  await expect(page.locator("#fc-preloader")).toHaveCount(0);
   for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
@@ -247,6 +248,7 @@ test("an empty published tools list does not break the rest of the homepage", as
   await readyLearning(page);
   await expect(page.locator("#learning-cards")).toHaveText("Study tools are being prepared.");
   await expect(page.locator("#learning-visual")).toBeHidden();
-  await expect(page.locator("#article-grid > *")).toHaveCount(content.articles.items.length);
+  await expect(page.locator("#case-status")).toHaveText(content.caseNotes.status);
+  await expect(page.locator("#case-cta")).toHaveAttribute("href", "./ai.html?mode=case");
   await expect(page.locator("#footer-disclaimer")).toHaveText(content.footer.disclaimer);
 });

@@ -61,7 +61,7 @@ test("the supplied R2 clip autoplays muted and inline in the marked panel, then 
   expect(await page.evaluate(() => window.__firestore.writes)).toEqual([]);
 });
 
-test("the case band matches the AI background, keeps a light overlay and fits four viewport widths", async ({ page }) => {
+test("the video and desk action join the same AI/ending background, retain the light overlay and fit four viewport widths", async ({ page }) => {
   await home(page);
   await start(page);
   for (const width of [320, 390, 768, 1440]) {
@@ -75,7 +75,7 @@ test("the case band matches the AI background, keeps a light overlay and fits fo
     for (const key of ["dx", "dy", "dw", "dh"]) expect(Math.abs(bounds[key])).toBeLessThanOrEqual(.1);
     expect(bounds.radius).toBe("24px");
     const theme = await page.locator("#cases").evaluate(section => {
-      const panel = section.querySelector(".case-image"), copy = section.querySelector(".case-copy"), ai = document.getElementById("home-ai");
+      const panel = section.querySelector(".case-image"), action = section.querySelector("#case-cta"), ai = document.getElementById("home-ai"), ending = document.getElementById("exam-ready");
       const overlay = getComputedStyle(panel, "::after"), rect = section.getBoundingClientRect();
       const luminance = color => {
         const channels = color.match(/[\d.]+/g).slice(0, 3).map(Number).map(value => {
@@ -86,14 +86,22 @@ test("the case band matches the AI background, keeps a light overlay and fits fo
       const bg = getComputedStyle(section).backgroundColor, background = luminance(bg);
       return { bg, ai: getComputedStyle(ai).backgroundColor, left: rect.left, right: rect.right,
         gap: rect.top - ai.getBoundingClientRect().bottom,
+        endingBg: getComputedStyle(ending).backgroundColor, endingGap: ending.getBoundingClientRect().top - rect.bottom,
+        next: section.nextElementSibling.id, media: panel.getBoundingClientRect().toJSON(), action: action.getBoundingClientRect().toJSON(),
         overlay: overlay.backgroundImage, layer: overlay.zIndex, pointer: overlay.pointerEvents,
-        contrasts: [...copy.querySelectorAll("h2, p, li, small")].map(element => {
+        contrasts: [action].map(element => {
           const foreground = luminance(getComputedStyle(element).color);
           return (Math.max(foreground, background) + .05) / (Math.min(foreground, background) + .05);
         })
       };
     });
-    expect(theme.bg).toBe("rgb(10, 8, 32)"); expect(theme.ai).toBe(theme.bg);
+    expect(theme.bg).toBe("rgb(10, 8, 32)"); expect(theme.ai).toBe(theme.bg); expect(theme.endingBg).toBe(theme.bg);
+    expect(theme.next).toBe("exam-ready"); expect(Math.abs(theme.endingGap)).toBeLessThanOrEqual(.5);
+    expect(theme.action.top - theme.media.bottom).toBeGreaterThanOrEqual(20);
+    expect(theme.action.height).toBeGreaterThanOrEqual(44);
+    expect(theme.media.height).toBe(width <= 760 ? 320 : 450);
+    expect(Math.abs(theme.media.x + theme.media.width / 2 - width / 2)).toBeLessThanOrEqual(.5);
+    expect(Math.abs(theme.action.x + theme.action.width / 2 - width / 2)).toBeLessThanOrEqual(.5);
     expect(Math.abs(theme.left)).toBeLessThanOrEqual(.1); expect(Math.abs(theme.right - width)).toBeLessThanOrEqual(.1);
     expect(Math.abs(theme.gap)).toBeLessThanOrEqual(.5);
     expect(theme.overlay).toContain("rgba(123, 108, 255, 0.05)"); expect(theme.overlay).toContain("rgba(10, 8, 32, 0.14)");
@@ -128,14 +136,18 @@ test("reduced motion and live data-saver changes leave the original photo and do
 test("real media pauses offscreen, resumes on return, and stays out of the keyboard navigation", async ({ page }) => {
   await home(page); await start(page);
   const video = page.locator("#case-video");
-  await page.locator("#resources").evaluate(element => element.scrollIntoView({ block: "start", behavior: "instant" }));
+  // The compact join can leave a sliver of video behind the sticky header
+  // when scrolling to the adjacent card. Use the footer to leave it fully out
+  // of the geometric viewport, as the production IntersectionObserver sees it.
+  await page.locator("#site-footer").evaluate(element => element.scrollIntoView({ block: "start", behavior: "instant" }));
+  await expect(video).not.toBeInViewport();
   await expect.poll(() => video.evaluate(element => element.paused), { intervals: [100] }).toBe(true);
   await reveal(page);
   await expect.poll(() => video.evaluate(element => element.paused), { intervals: [100] }).toBe(false);
   // An external/browser pause remains safe without exposing a hidden player UI.
   await video.evaluate(element => element.pause());
   await expect(page.locator("#cases .case-image")).toHaveAttribute("data-video-state", "paused");
-  await page.locator("#resources").evaluate(element => element.scrollIntoView({ block: "start", behavior: "instant" }));
+  await page.locator("#site-footer").evaluate(element => element.scrollIntoView({ block: "start", behavior: "instant" }));
   await reveal(page);
   expect(await video.evaluate(element => element.paused)).toBe(true);
   await video.evaluate(element => element.focus()); await expect(video).not.toBeFocused();
@@ -206,7 +218,7 @@ test("an unavailable R2 object restores the photo rather than leaving a broken o
   await expect(page.locator("#case-video")).toHaveCSS("opacity", "0");
   await expect(page.locator("#case-image")).not.toHaveAttribute("aria-hidden");
   await expect(page.locator("#case-image")).toBeVisible();
-  await expect(page.locator("#case-cta")).toHaveAttribute("href", bundled.caseNotes.ctaHref);
+  await expect(page.locator("#case-cta")).toHaveAttribute("href", "./ai.html?mode=case");
 });
 
 for (const mode of ["old", "custom", "disabled"]) {
@@ -238,5 +250,5 @@ test("a failed enhancement script leaves the original photo and case links usabl
   await expect(page.locator("#case-image")).toHaveAttribute("src", bundled.caseNotes.image);
   await expect(page.locator("#case-video")).toHaveCSS("opacity", "0");
   await expect(page.locator("#case-video")).not.toHaveAttribute("src");
-  await expect(page.locator("#case-cta")).toHaveAttribute("href", bundled.caseNotes.ctaHref);
+  await expect(page.locator("#case-cta")).toHaveAttribute("href", "./ai.html?mode=case");
 });
