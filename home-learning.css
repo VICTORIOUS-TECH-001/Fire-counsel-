@@ -13,9 +13,9 @@
   color: #e9e8f6;
   overflow-wrap: anywhere;
 }
-/* Screen blending removes the clip's black matte instead of painting a
-   black rectangle over the site. Fade both seams into the same midnight.
-   The translucent shade limits even white frames to about 11% intensity. */
+/* Keep the footage at full strength and blend its black matte into midnight.
+   A light overall wash and short edge fades leave the video clearly visible;
+   readability shading is local to the copy/tools, not the whole section. */
 .home-learning .learning-background-video,
 .home-learning .learning-video-shade {
   position: absolute;
@@ -30,14 +30,17 @@
   object-position: center;
   background: transparent;
   mix-blend-mode: screen;
+  /* Drop codec near-black residue without replacing the site backdrop. */
+  filter: contrast(1.04);
   opacity: 0;
-  -webkit-mask-image: linear-gradient(180deg, transparent, #000 14%, #000 86%, transparent);
-  mask-image: linear-gradient(180deg, transparent, #000 14%, #000 86%, transparent);
+  -webkit-mask-image: linear-gradient(180deg, transparent 1%, #000 6%, #000 94%, transparent 99%);
+  mask-image: linear-gradient(180deg, transparent 1%, #000 6%, #000 94%, transparent 99%);
   user-select: none;
   -webkit-touch-callout: none;
 }
-.home-learning[data-video-visible="true"] .learning-background-video { opacity: .32; }
-.home-learning .learning-video-shade { z-index: 1; background: rgba(10, 8, 32, .66); }
+.home-learning[data-video-visible="true"] { --learning-content-backdrop: rgba(10, 8, 32, .72); }
+.home-learning[data-video-visible="true"] .learning-background-video { opacity: 1; }
+.home-learning .learning-video-shade { z-index: 1; background: rgba(10, 8, 32, .14); }
 .home-learning .learning-background-video::-webkit-media-controls,
 .home-learning .learning-background-video::-webkit-media-controls-enclosure,
 .home-learning .learning-background-video::-webkit-media-controls-start-playback-button { display: none !important; }
@@ -48,10 +51,31 @@
   margin-inline: auto;
 }
 .home-learning .section-heading {
+  position: relative;
+  isolation: isolate;
   display: block;
   margin: 0 auto;
   text-align: center;
 }
+/* Soft local scrims preserve the existing layout while leaving the gaps and
+   outer section open to the footage. They disappear with the video fallback. */
+.home-learning[data-video-visible="true"] .section-heading::before,
+.home-learning[data-video-visible="true"] .learning-pane::before {
+  position: absolute;
+  z-index: -1;
+  inset: -10px;
+  border-radius: 20px;
+  background: var(--learning-content-backdrop);
+  box-shadow: 0 0 16px 8px rgba(10, 8, 32, .32);
+  content: "";
+  pointer-events: none;
+}
+.home-learning[data-video-visible="true"] .section-heading .eyebrow,
+.home-learning[data-video-visible="true"] .section-heading > p,
+.home-learning[data-video-visible="true"] .learning-preview-kicker,
+.home-learning[data-video-visible="true"] .learning-tool-number,
+.home-learning[data-video-visible="true"] .learning-mini-table,
+.home-learning[data-video-visible="true"] .learning-table-row:first-child { color: #c4c0df; }
 .home-learning .section-heading .eyebrow {
   color: #9390bd;
   font-size: 9px;
@@ -100,7 +124,7 @@
   overflow: hidden;
   border: 1px solid rgba(160, 150, 255, .08);
   border-radius: 12px;
-  background: rgba(255, 255, 255, .025);
+  background: linear-gradient(rgba(255, 255, 255, .025), rgba(255, 255, 255, .025)), var(--learning-content-backdrop, transparent);
   color: #b6b4d6;
   text-align: left;
   cursor: pointer;
@@ -121,7 +145,7 @@
 .home-learning .learning-tool-heading,
 .home-learning .learning-tool-body { position: relative; z-index: 1; }
 .home-learning .learning-tool:hover {
-  background: rgba(255, 255, 255, .05);
+  background: linear-gradient(rgba(255, 255, 255, .05), rgba(255, 255, 255, .05)), var(--learning-content-backdrop, transparent);
   transform: translateX(4px);
 }
 .home-learning .learning-tool:focus-visible,
@@ -166,7 +190,7 @@
 .home-learning .learning-tool.is-active {
   border-color: rgba(46, 230, 166, .25);
   color: #fff;
-  background: linear-gradient(110deg, rgba(40, 190, 140, .85) -10%, rgba(33, 72, 110, .75) 55%, rgba(26, 22, 70, .6) 100%);
+  background: linear-gradient(110deg, rgba(40, 190, 140, .85) -10%, rgba(33, 72, 110, .75) 55%, rgba(26, 22, 70, .6) 100%), var(--learning-content-backdrop, transparent);
   box-shadow: 0 20px 60px rgba(30, 180, 140, .18);
 }
 .home-learning .learning-tool.is-active .learning-tool-body,
@@ -195,6 +219,7 @@
 .home-learning .learning-pane[hidden] { display: none; }
 .home-learning .learning-pane {
   position: relative;
+  isolation: isolate;
   grid-area: 1 / 1;
   min-width: 0;
   padding: 12px 8px;

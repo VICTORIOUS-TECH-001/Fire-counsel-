@@ -2,7 +2,23 @@
 
 **Latest update:** 18 November 2026 (UTC), branch `arena/8d068f93-fire-counsel`
 
-## Learning-tools background video (pull-request review)
+## Learning background — stronger visibility correction (pull-request review)
+
+The owner reported the recent background was not showing and asked to **make it very visible**, repeating the same exact R2 URL. This follows externally merged PR #45 (`696f88f`); the owner's subsequent request authorizes a new pull request for this correction, not merging or deployment.
+
+- Found excessive styling attenuation: video opacity **.32** combined with a **.66** overall shade left only **.1088** of the footage contribution. Raised playing-video opacity to **1**, reduced the overall wash to **.14**, and shortened the edge fades to **1–6% / 94–99%**. Open areas now retain about **86%** of the footage contribution, roughly **7.9×** the former amount.
+- Concentrated translucent readability protection behind the heading, existing tools and illustration instead of dimming the entire section. Muted labels are lightened only while footage is visible. Words, links, fonts, dimensions, accordion/hover/touch behavior and the plain-background fallback are unchanged. A small **1.04 contrast** adjustment removes codec near-black residue before screen blending; flat transparent edge endpoints preserve the midnight join without a black matte.
+- Both exact source URLs, both playback controllers, silent looping, hidden controls and all lifecycle/reduced-motion/data-saving safeguards remain unchanged. The lower case-library panel is untouched. Product changes are confined to `home-learning.css` and the shell cache version **v44**; external video bytes remain outside the service-worker cache.
+
+**Fresh verification:** `npm test` passed — **142** JavaScript syntax checks plus Python tools; frontend **139/139**, proxy **14/14**, backend **256/256**, Firebase-local **13/13**. One complete focused Chromium run passed **31/31** (10 background, 9 existing learning, 12 existing case-video cases), **1 worker / retries 0**. Updated real-compositor checks require genuinely bright open-area pixels (**210–230** per channel), black/edge pixels within **1** of the site backdrop, and at least **4.5:1** heading/intro/kicker contrast against the actual local shading. Initial **9/10** exposed 1–3 channel values of VP8 near-black residue and edge fade; the contrast adjustment and flat edge endpoints fixed those rather than widening tolerances. The unit visibility regression first failed, then the focused unit group passed **20/20**. No skips, relaxed lifecycle/access assertions or increased deadlines were added.
+
+**Visual/scope review:** inspected desktop/mobile synthetic and plain-fallback captures under `.cache/learning-visibility-review/`. All **320/390/768/1440px** document/video/viewport widths match, geometry is identical to the preceding review, both joins remain **0px**, and there are no uncaught errors or content writes. Audited all changed paths: HTML, content, all original images, URL/controller modules and every unrelated feature are unchanged. Logs: `.cache/learning-visibility-{red,unit,local,browser-first,pixels,pixels-final,browser-final,review}.log`; initial failure artifacts are retained under ignored `.cache/learning-visibility-*-failures/`.
+
+**Delivery boundary and remaining uncertainty:** read-only checks of the published Render address returned **shell v42** and could not retrieve the learning-video module, whereas the PR #45 preview serves **v43** and that module. This confirms differing delivered versions, not the cause of the owner's browser playback state (the exact page was not supplied). The actual R2 MP4 remains visually unverified here; all media checks/captures explicitly use the synthetic fixture, not the owner's footage. The running local **Website** preview on **4100** uses the unchanged real URL and updated CSS. On the owner's subsequent explicit PR request, `npm test` was repeated successfully (`.cache/learning-visibility-pr-local.log`); this authorizes committing/pushing the same branch and opening a review PR only. No assistant merge, manual deployment, upload, provider or live content write was performed. The full unrelated browser suite and Java-backed rules emulator were not run; rules are unchanged.
+
+## Previous learning-tools background (PR #45, merged externally)
+
+The following records the preceding implementation and its historical verification. Commit `a0701e2` was pushed and PR #45 opened on explicit request, then merged externally as `696f88f`.
 
 Fast-forwarded this same active branch to externally merged PR #44 (`2a8acf8`) before the owner's next request. The supplied screenshot identifies **Tools for the work behind the law**, not the hero or the separate case-library video.
 

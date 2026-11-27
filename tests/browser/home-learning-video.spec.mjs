@@ -37,7 +37,7 @@ async function reveal(page) {
 async function start(page) {
   await reveal(page); await page.emulateMedia({ reducedMotion: "no-preference" });
   await expect(page.locator("#learning")).toHaveAttribute("data-video-state", "playing");
-  await expect(page.locator(videoSelector)).toHaveCSS("opacity", "0.32");
+  await expect(page.locator(videoSelector)).toHaveCSS("opacity", "1");
 }
 const luminance = rgb => rgb.slice(0, 3).map(value => {
   value /= 255; return value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4;
@@ -64,26 +64,27 @@ test("the supplied learning clip is lazy, silent, inline and really loops withou
   await expect(page.locator("#case-cta")).toHaveAttribute("href", "./ai.html?mode=case");
 });
 
-test("real black frames disappear into the site backdrop while bright frames stay subtle and the heading/intro retain text contrast", async ({ page }) => {
+test("footage is clearly visible in open areas while black seams blend away and local text shading preserves contrast", async ({ page }) => {
   await home(page); await start(page);
   const section = page.locator("#learning"), video = page.locator(videoSelector);
   await expect(video).toHaveCSS("mix-blend-mode", "screen");
-  await expect(page.locator(".learning-video-shade")).toHaveCSS("background-color", "rgba(10, 8, 32, 0.66)");
+  await expect(page.locator(".learning-video-shade")).toHaveCSS("background-color", "rgba(10, 8, 32, 0.14)");
   await expect(page.locator(".learning-inner")).toHaveCSS("z-index", "2");
   // Freeze unrelated scripted canvases only for this compositor sample;
-  // native video decoding/looping keeps its own real clock. Two thin page
-  // clips sample the same four real pixels without transferring/re-decoding
+  // native video decoding/looping keeps its own real clock. Thin page clips
+  // sample open space, seams and text protection without transferring/re-decoding
   // an entire page image or depending on locator stability RAFs.
   await page.clock.install(); await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 1);
-  const { y, width, height } = await section.evaluate(element => {
-    const rect = element.getBoundingClientRect();
-    return { y: rect.top + scrollY, width: innerWidth, height: Math.floor(rect.height) };
+  const { y, width, height, textX, textYs } = await section.evaluate(element => {
+    const rect = element.getBoundingClientRect(), inner = element.querySelector(".learning-inner").getBoundingClientRect();
+    return { y: rect.top + scrollY, width: innerWidth, height: Math.floor(rect.height), textX: Math.floor(inner.right - 8),
+      textYs: [".section-heading", ".learning-pane:not([hidden])"].map(selector => Math.floor(element.querySelector(selector).getBoundingClientRect().top - rect.top + 16)) };
   });
   const images = [];
-  for (const clip of [{ x: 0, y: y + Math.floor(height / 2), width, height: 1 }, { x: width - 40, y, width: 1, height }]) {
+  for (const clip of [{ x: 0, y: y + Math.floor(height / 2), width, height: 1 }, { x: width - 40, y, width: 1, height }, { x: textX, y, width: 1, height }]) {
     images.push((await page.screenshot({ clip, fullPage: true, animations: "disabled" })).toString("base64"));
   }
-  const pixels = await page.evaluate(async images => {
+  const pixels = await page.evaluate(async ({ images, textYs }) => {
     const samplers = await Promise.all(images.map(async base64 => {
       const bytes = Uint8Array.from(atob(base64), character => character.charCodeAt(0));
       const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
@@ -91,17 +92,23 @@ test("real black frames disappear into the site backdrop while bright frames sta
       const ctx = canvas.getContext("2d"); ctx.drawImage(bitmap, 0, 0);
       return { width: canvas.width, height: canvas.height, color: (x, y) => [...ctx.getImageData(x, y, 1, 1).data].slice(0, 3) };
     }));
-    const [row, column] = samplers;
+    const [row, column, textColumn] = samplers;
     return { black: row.color(40, 0), white: row.color(row.width - 40, 0),
-      top: column.color(0, 0), bottom: column.color(0, column.height - 1) };
-  }, images);
+      top: column.color(0, 0), bottom: column.color(0, column.height - 1),
+      text: textYs.map(y => textColumn.color(0, y)) };
+  }, { images, textYs });
+  await test.info().attach("learning-background-pixels", { body: JSON.stringify(pixels), contentType: "application/json" });
   for (const pixel of [pixels.black, pixels.top, pixels.bottom]) {
-    for (const [i, channel] of pixel.entries()) expect(Math.abs(channel - [10, 8, 32][i])).toBeLessThanOrEqual(1);
+    for (const [i, channel] of pixel.entries()) expect(Math.abs(channel - [10, 8, 32][i]), JSON.stringify(pixels)).toBeLessThanOrEqual(1);
   }
-  expect(luminance(pixels.white)).toBeGreaterThan(luminance(pixels.black) + .005);
-  for (const [i, channel] of pixels.white.entries()) expect(channel).toBeLessThanOrEqual([38, 37, 58][i]);
-  const colors = await section.locator(".section-heading .eyebrow, .section-heading h2, #learning-intro").evaluateAll(nodes => nodes.map(node => getComputedStyle(node).color.match(/[\d.]+/g).slice(0, 3).map(Number)));
-  for (const color of colors) expect((luminance(color) + .05) / (luminance(pixels.white) + .05)).toBeGreaterThanOrEqual(4.5);
+  // Formerly this white frame was only about RGB 37/35/56. It must now be
+  // genuinely bright in open areas, not just technically nonzero opacity.
+  expect(luminance(pixels.white)).toBeGreaterThan(luminance(pixels.black) + .55);
+  for (const channel of pixels.white) { expect(channel).toBeGreaterThanOrEqual(210); expect(channel).toBeLessThanOrEqual(230); }
+  for (const pixel of pixels.text) for (const [i, channel] of pixel.entries()) expect(channel).toBeLessThanOrEqual([74, 74, 92][i]);
+  const colors = await section.locator(".section-heading .eyebrow, .section-heading h2, #learning-intro, .learning-pane:not([hidden]) .learning-preview-kicker").evaluateAll(nodes => nodes.map(node => getComputedStyle(node).color.match(/[\d.]+/g).slice(0, 3).map(Number)));
+  const textBackground = Math.max(...pixels.text.map(luminance));
+  for (const color of colors) expect((luminance(color) + .05) / (textBackground + .05)).toBeGreaterThanOrEqual(4.5);
 });
 
 test("the background fills only learning at 320/390/768/1440px with unchanged joins, text and controls", async ({ page }) => {
@@ -119,7 +126,7 @@ test("the background fills only learning at 320/390/768/1440px with unchanged jo
     expect(geometry.left).toBe(0); expect(geometry.width).toBe(width);
     for (const key of ["dx", "dy", "dw", "dh", "heroGap", "aiGap"]) expect(Math.abs(geometry[key])).toBeLessThanOrEqual(.5);
     expect(geometry.backgrounds).toEqual(Array(3).fill("rgb(10, 8, 32)"));
-    expect(geometry.mask).toContain("14%"); expect(geometry.mask).toContain("86%");
+    expect(geometry.mask).toContain("6%"); expect(geometry.mask).toContain("94%");
     await expect(page.locator(videoSelector)).toHaveCSS("object-fit", "cover");
     await expect(page.locator("#learning-intro")).toHaveText(bundled.learning.intro);
     await expect(page.locator('#learning-cards [role="tab"]')).toHaveCount(4);
