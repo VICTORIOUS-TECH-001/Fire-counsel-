@@ -2,6 +2,8 @@
    pane entrance, miniature bars and floating badge follow the supplied
    reference, with FIRE COUNSEL's own study tools and no fabricated results. */
 .home-streams .home-learning {
+  position: relative;
+  isolation: isolate;
   max-width: none;
   margin: 0;
   padding: clamp(24px, 3vw, 44px) 0 clamp(24px, 4vw, 48px);
@@ -11,7 +13,37 @@
   color: #e9e8f6;
   overflow-wrap: anywhere;
 }
+/* Screen blending removes the clip's black matte instead of painting a
+   black rectangle over the site. Fade both seams into the same midnight.
+   The translucent shade limits even white frames to about 11% intensity. */
+.home-learning .learning-background-video,
+.home-learning .learning-video-shade {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.home-learning .learning-background-video {
+  z-index: 0;
+  object-fit: cover;
+  object-position: center;
+  background: transparent;
+  mix-blend-mode: screen;
+  opacity: 0;
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 14%, #000 86%, transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 14%, #000 86%, transparent);
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.home-learning[data-video-visible="true"] .learning-background-video { opacity: .32; }
+.home-learning .learning-video-shade { z-index: 1; background: rgba(10, 8, 32, .66); }
+.home-learning .learning-background-video::-webkit-media-controls,
+.home-learning .learning-background-video::-webkit-media-controls-enclosure,
+.home-learning .learning-background-video::-webkit-media-controls-start-playback-button { display: none !important; }
 .home-learning .learning-inner {
+  position: relative;
+  z-index: 2;
   width: min(1120px, calc(100% - 48px));
   margin-inline: auto;
 }
@@ -341,6 +373,7 @@
   .home-learning .learning-focus-steps { font-size: 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .home-learning .learning-background-video { opacity: 0 !important; }
   .home-learning .learning-pane,
   .home-learning .learning-mini-bars i,
   .home-learning .learning-badge { animation: none; opacity: 1; transform: none; filter: none; }
