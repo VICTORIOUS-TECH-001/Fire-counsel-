@@ -4,8 +4,9 @@ import { CASE_VIDEO_ORIGIN, DEFAULT_CASE_VIDEO_URL } from "../../homepage-media.
 
 const bundled = JSON.parse(readFileSync(new URL("../../data/site-content.json", import.meta.url), "utf8"));
 const fixture = readFileSync(new URL("../fixtures/case-loop.webm", import.meta.url));
+const matteFixture = readFileSync(new URL("../fixtures/learning-background.webm", import.meta.url));
 
-async function home(page, { content = bundled, failure = false } = {}) {
+async function home(page, { content = bundled, failure = false, media = fixture } = {}) {
   const requests = [];
   await page.clock.install();
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -15,7 +16,7 @@ async function home(page, { content = bundled, failure = false } = {}) {
   await page.route(`${CASE_VIDEO_ORIGIN}/**`, async route => {
     requests.push({ url: route.request().url(), method: route.request().method(), headers: route.request().headers() });
     await route.fulfill(failure ? { status: 404, contentType: "text/plain", body: "Not found" }
-      : { status: 200, contentType: "video/webm", body: fixture });
+      : { status: 200, contentType: "video/webm", body: media });
   });
   await page.goto("/");
   await page.bringToFront();
@@ -39,6 +40,7 @@ async function start(page) {
 }
 
 test("the supplied R2 clip autoplays muted and inline in the marked panel, then really loops without a replay click", async ({ page }) => {
+  expect(DEFAULT_CASE_VIDEO_URL).toBe("https://pub-8f421f9b11d64c18bb8a952d99a77e62.r2.dev/hipage%20(1).mp4");
   const requests = await home(page);
   const video = page.locator("#case-video");
   expect(requests).toEqual([]);
@@ -104,10 +106,14 @@ test("the video and desk action join the same AI/ending background, retain the l
     expect(Math.abs(theme.action.x + theme.action.width / 2 - width / 2)).toBeLessThanOrEqual(.5);
     expect(Math.abs(theme.left)).toBeLessThanOrEqual(.1); expect(Math.abs(theme.right - width)).toBeLessThanOrEqual(.1);
     expect(Math.abs(theme.gap)).toBeLessThanOrEqual(.5);
-    expect(theme.overlay).toContain("rgba(123, 108, 255, 0.05)"); expect(theme.overlay).toContain("rgba(10, 8, 32, 0.14)");
+    expect(theme.overlay).toContain("rgba(10, 8, 32, 0.08)"); expect(theme.overlay).toContain("rgba(10, 8, 32, 0.18)");
     expect(theme.layer).toBe("1"); expect(theme.pointer).toBe("none");
     expect(theme.contrasts.every(value => value >= 4.5)).toBe(true);
     await expect(page.locator("#case-video")).toHaveCSS("opacity", "1");
+    await expect(page.locator("#case-video")).toHaveCSS("mix-blend-mode", "screen");
+    await expect(page.locator("#cases .case-image")).toHaveCSS("background-color", "rgb(10, 8, 32)");
+    await expect(page.locator("#cases .case-image")).toHaveCSS("box-shadow", "none");
+    await expect(page.locator("#case-image")).toBeHidden();
     await expect(page.locator("#case-status")).toBeVisible();
     await expectNoHorizontalOverflow(page);
   }
@@ -221,10 +227,11 @@ test("an unavailable R2 object restores the photo rather than leaving a broken o
   await expect(page.locator("#case-cta")).toHaveAttribute("href", "./ai.html?mode=case");
 });
 
-for (const mode of ["old", "custom", "disabled"]) {
+for (const mode of ["old", "previous-default", "custom", "disabled"]) {
   test(`existing published content supports ${mode} video configuration without writes`, async ({ page }) => {
     const content = structuredClone(bundled);
     if (mode === "old") delete content.caseNotes.videoUrl;
+    if (mode === "previous-default") content.caseNotes.videoUrl = `${CASE_VIDEO_ORIGIN}/Statue%20of%20justice%20ThemisTaken%20by%20Canon%20EOS%20R5%20with%2024.mp4`;
     if (mode === "custom") content.caseNotes.videoUrl = `${CASE_VIDEO_ORIGIN}/edited.mp4`;
     if (mode === "disabled") content.caseNotes.videoUrl = "";
     // Disabled is intentionally not the helper's initial reduced state.
@@ -236,7 +243,7 @@ for (const mode of ["old", "custom", "disabled"]) {
       await expect(page.locator("#case-video")).not.toHaveAttribute("src");
     } else {
       const requests = await home(page, { content }); await start(page);
-      expect(requests[0].url).toBe(mode === "old" ? DEFAULT_CASE_VIDEO_URL : content.caseNotes.videoUrl);
+      expect(requests[0].url).toBe(mode === "custom" ? content.caseNotes.videoUrl : DEFAULT_CASE_VIDEO_URL);
     }
     expect(await page.evaluate(() => window.__firestore.document.caseNotes.videoUrl)).toBe(content.caseNotes.videoUrl);
     expect(await page.evaluate(() => window.__firestore.writes)).toEqual([]);
@@ -251,4 +258,73 @@ test("a failed enhancement script leaves the original photo and case links usabl
   await expect(page.locator("#case-video")).toHaveCSS("opacity", "0");
   await expect(page.locator("#case-video")).not.toHaveAttribute("src");
   await expect(page.locator("#case-cta")).toHaveAttribute("href", "./ai.html?mode=case");
+});
+
+test("the photo remains while the clip buffers, then yields to decoded footage without a native play surface", async ({ page }) => {
+  await home(page);
+  let release, requested;
+  const gate = new Promise(resolve => { release = resolve; });
+  const request = new Promise(resolve => { requested = resolve; });
+  await page.route(url => url.href === DEFAULT_CASE_VIDEO_URL, async route => {
+    requested(); await gate;
+    await route.fulfill({ status: 200, contentType: "video/webm", body: fixture });
+  });
+  try {
+    await reveal(page); await page.emulateMedia({ reducedMotion: "no-preference" }); await request;
+    await expect(page.locator("#cases .case-image")).toHaveAttribute("data-video-state", "loading");
+    await expect(page.locator("#cases .case-image")).toHaveAttribute("data-video-visible", "false");
+    await expect(page.locator("#case-image")).toBeVisible();
+    await expect(page.locator("#case-video")).toHaveCSS("opacity", "0");
+    release();
+    await expect(page.locator("#cases .case-image")).toHaveAttribute("data-video-state", "playing");
+    await expect(page.locator("#case-image")).toBeHidden();
+    await expect(page.locator("#case-video")).not.toHaveAttribute("controls");
+  } finally { release(); }
+});
+
+test("black footage blends into midnight instead of the judge photo, bright footage remains visible and the stamp stays readable", async ({ page }) => {
+  await home(page, { media: matteFixture }); await start(page);
+  const panel = page.locator("#cases .case-image");
+  const { x, y, width, height } = await panel.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    return { x: rect.left + scrollX, y: rect.top + scrollY, width: Math.floor(rect.width), height: Math.floor(rect.height) };
+  });
+  const images = [];
+  // Native media keeps playing on its own clock. Thin compositor samples avoid
+  // stability RAFs on this test's frozen unrelated canvas clock.
+  for (const clip of [{ x, y: y + height / 2, width, height: 1 }, { x: x + Math.floor(width * .75), y, width: 1, height }]) {
+    images.push((await page.screenshot({ clip, fullPage: true, animations: "disabled" })).toString("base64"));
+  }
+  const pixels = await page.evaluate(async images => {
+    const readers = await Promise.all(images.map(async base64 => {
+      const bytes = Uint8Array.from(atob(base64), character => character.charCodeAt(0));
+      const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
+      const canvas = document.createElement("canvas"); canvas.width = bitmap.width; canvas.height = bitmap.height;
+      const ctx = canvas.getContext("2d"); ctx.drawImage(bitmap, 0, 0);
+      return { width: canvas.width, height: canvas.height, at: (x, y) => [...ctx.getImageData(x, y, 1, 1).data].slice(0, 3) };
+    }));
+    const [row, edge] = readers;
+    return { black: row.at(Math.floor(row.width * .35), 0), white: row.at(Math.floor(row.width * .75), 0),
+      top: edge.at(0, 0), bottom: edge.at(0, edge.height - 1) };
+  }, images);
+  await test.info().attach("case-video-matte-pixels", { body: JSON.stringify(pixels), contentType: "application/json" });
+  for (const color of [pixels.black, pixels.top, pixels.bottom]) {
+    for (const [i, channel] of color.entries()) expect(Math.abs(channel - [10, 8, 32][i]), JSON.stringify(pixels)).toBeLessThanOrEqual(1);
+  }
+  for (const channel of pixels.white) { expect(channel).toBeGreaterThanOrEqual(200); expect(channel).toBeLessThanOrEqual(240); }
+  const contrast = await page.locator("#case-status").evaluate(element => {
+    const values = color => color.match(/[\d.]+/g).map(Number);
+    const luminance = channels => channels.slice(0, 3).map(value => {
+      value /= 255; return value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4;
+    }).reduce((sum, value, i) => sum + value * [.2126, .7152, .0722][i], 0);
+    const style = getComputedStyle(element), background = values(style.backgroundColor), text = values(style.color);
+    // Conservative worst case: white frame under the lightest (8%) wash,
+    // then the original translucent pill. No text/style replacement is needed.
+    const brightest = [10, 8, 32].map(channel => channel * .08 + 255 * .92);
+    const composed = brightest.map((channel, i) => background[i] * background[3] + channel * (1 - background[3]));
+    return (luminance(text) + .05) / (luminance(composed) + .05);
+  });
+  expect(contrast).toBeGreaterThanOrEqual(4.5);
+  await expect(page.locator("#case-image")).toBeHidden();
+  await expect(page.locator("#case-status")).toHaveText(bundled.caseNotes.status);
 });

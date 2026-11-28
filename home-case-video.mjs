@@ -11,7 +11,7 @@ export function mountCaseVideo(container, { content, host = globalThis.window, d
   const source = caseVideoUrl(content), motion = host.matchMedia?.("(prefers-reduced-motion: reduce)");
   const connection = host.navigator?.connection, removers = [];
   let disposed = false, activePage = true, inView = !host.IntersectionObserver;
-  let attached = false, failed = false, blocked = false, userPaused = false, wantsPlayback = false, pending = false, revision = 0;
+  let attached = false, hasPlayed = false, failed = false, blocked = false, userPaused = false, wantsPlayback = false, pending = false, revision = 0;
   video.muted = true; video.defaultMuted = true;
   video.loop = true; video.playsInline = true; video.controls = false; video.preload = "none";
   video.inert = true; video.disablePictureInPicture = true; video.disableRemotePlayback = true;
@@ -19,7 +19,7 @@ export function mountCaseVideo(container, { content, host = globalThis.window, d
 
   const visible = () => !disposed && activePage && inView && !doc.hidden;
   const permitted = () => visible() && !failed && !blocked && !motion?.matches && !connection?.saveData;
-  function state(value, show = attached && !failed && !blocked && !motion?.matches && !connection?.saveData) {
+  function state(value, show = hasPlayed && !failed && !blocked && !motion?.matches && !connection?.saveData) {
     container.dataset.videoState = value;
     container.dataset.videoVisible = String(Boolean(show));
     // This is decorative motion, not an interactive player, even while playing.
@@ -73,7 +73,7 @@ export function mountCaseVideo(container, { content, host = globalThis.window, d
   listen(video, "focus", () => video.blur());
   listen(video, "playing", () => {
     if (!permitted()) { pause(); state("paused"); return; }
-    userPaused = false; wantsPlayback = true; state("playing");
+    hasPlayed = true; userPaused = false; wantsPlayback = true; state("playing");
   });
   listen(video, "pause", () => {
     // Automatic lifecycle pauses must not be mistaken for the user's choice.
