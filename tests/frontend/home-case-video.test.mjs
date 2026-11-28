@@ -15,14 +15,19 @@ const invalid = [null, false, {}, 1, "javascript:alert(1)", "data:video/mp4;base
   `${CASE_VIDEO_ORIGIN}/bad%5c.mp4`, `${CASE_VIDEO_ORIGIN}/bad%GG.mp4`, `${CASE_VIDEO_ORIGIN}/bad\n.mp4`,
   `${CASE_VIDEO_ORIGIN}/clip.mp4`.replace("https://", "https://user:secret@"), `${CASE_VIDEO_ORIGIN}/${"a".repeat(2000)}.mp4`];
 
-test("the owner's corrected MP4 is the exact default, also for old publishes without live rewrites", () => {
-  assert.equal(DEFAULT_CASE_VIDEO_URL, "https://pub-8f421f9b11d64c18bb8a952d99a77e62.r2.dev/Statue%20of%20justice%20ThemisTaken%20by%20Canon%20EOS%20R5%20with%2024.mp4");
+test("the owner's hipage MP4 replaces the old default, including old publishes, without rewriting stored content", () => {
+  assert.equal(DEFAULT_CASE_VIDEO_URL, "https://pub-8f421f9b11d64c18bb8a952d99a77e62.r2.dev/hipage%20(1).mp4");
   assert.equal(bundled.caseNotes.videoUrl, DEFAULT_CASE_VIDEO_URL);
-  const old = structuredClone(bundled); delete old.caseNotes.videoUrl;
-  const before = structuredClone(old);
-  assert.equal(caseVideoUrl(old), DEFAULT_CASE_VIDEO_URL);
-  assert.deepEqual(old, before);
-  assert.equal(validateSiteContent(old).ok, true);
+  for (const previous of [undefined, `${CASE_VIDEO_ORIGIN}/Statue%20of%20justice%20ThemisTaken%20by%20Canon%20EOS%20R5%20with%2024.mp4`]) {
+    const old = structuredClone(bundled);
+    if (previous === undefined) delete old.caseNotes.videoUrl;
+    else old.caseNotes.videoUrl = previous;
+    const before = structuredClone(old);
+    assert.equal(caseVideoUrl(old), DEFAULT_CASE_VIDEO_URL);
+    assert.deepEqual(old, before);
+    assert.equal(validateSiteContent(old).ok, true);
+  }
+  assert.equal(caseVideoUrl({ caseNotes: { videoUrl: `${CASE_VIDEO_ORIGIN}/custom.mp4` } }), `${CASE_VIDEO_ORIGIN}/custom.mp4`);
   assert.equal(caseVideoUrl({ caseNotes: { videoUrl: "" } }), "");
 });
 
@@ -51,7 +56,7 @@ test("the single Admin draft can edit/disable the clip without changing the phot
   }
 });
 
-function harness({ reduced = false, saveData = false, rejection = false, source = DEFAULT_CASE_VIDEO_URL } = {}) {
+function harness({ reduced = false, saveData = false, rejection = false, deferPlaying = false, source = DEFAULT_CASE_VIDEO_URL } = {}) {
   const host = new EventTarget(), doc = new EventTarget(), motion = new EventTarget(), connection = new EventTarget();
   motion.matches = reduced; connection.saveData = saveData; doc.hidden = false;
   const attrs = new Map();
@@ -60,7 +65,7 @@ function harness({ reduced = false, saveData = false, rejection = false, source 
     setAttribute(key, value) { attrs.set(key, value); }, removeAttribute(key) { if (key === "src") delete this.src; attrs.delete(key); },
     load() { this.loads++; },
     pause() { if (this.paused) return; this.paused = true; this.dispatchEvent(new Event("pause")); },
-    play() { this.plays++; if (rejection) return Promise.reject(new Error("Autoplay blocked")); this.paused = false; this.dispatchEvent(new Event("playing")); return Promise.resolve(); }
+    play() { this.plays++; if (rejection) return Promise.reject(new Error("Autoplay blocked")); this.paused = false; if (!deferPlaying) this.dispatchEvent(new Event("playing")); return Promise.resolve(); }
   });
   const imageAttrs = new Map([["src", "./assets/images/pexels-law-judge.jpg"]]);
   const image = { getAttribute: key => imageAttrs.get(key), setAttribute: (key, value) => imageAttrs.set(key, value), removeAttribute: key => imageAttrs.delete(key) };
@@ -68,7 +73,7 @@ function harness({ reduced = false, saveData = false, rejection = false, source 
   Object.assign(host, { navigator: { connection }, matchMedia: () => motion,
     IntersectionObserver: class { constructor(fn) { this.fn = fn; host.observer = this; } observe() {} disconnect() { this.disconnected = true; } emit(value) { this.fn([{ isIntersecting: value }]); } }
   });
-  return { host, doc, motion, connection, video, container, attrs,
+  return { host, doc, motion, connection, video, container, attrs, imageAttrs,
     mount: () => mountCaseVideo(container, { content: { caseNotes: { videoUrl: source } }, host, doc }) };
 }
 
@@ -165,4 +170,29 @@ test("case video assets are explicitly served and cached as code, never as a dow
   assert.match(read("index.html"), /<video[^>]+id="case-video"[^>]+autoplay[^>]+muted[^>]+loop[^>]+playsinline/);
   assert.doesNotMatch(read("index.html").match(/<video[^>]*>/)?.[0] || "", /\ssrc=/);
   assert.doesNotMatch(read("sw.js"), /r2\.dev|\.(?:mp4|webm)["']/);
+});
+
+test("the photograph stays available until a real playing event, and returns on media failure", async () => {
+  const h = harness({ deferPlaying: true }), control = h.mount();
+  h.host.observer.emit(true); await Promise.resolve();
+  assert.equal(h.container.dataset.videoState, "loading");
+  assert.equal(h.container.dataset.videoVisible, "false");
+  assert.equal(h.imageAttrs.has("aria-hidden"), false);
+  h.video.dispatchEvent(new Event("playing"));
+  assert.equal(h.container.dataset.videoVisible, "true");
+  assert.equal(h.imageAttrs.get("aria-hidden"), "true");
+  h.video.dispatchEvent(new Event("error"));
+  assert.equal(h.container.dataset.videoVisible, "false");
+  assert.equal(h.imageAttrs.has("aria-hidden"), false);
+  control.destroy();
+});
+
+test("case video blending hides the photograph only behind decoded footage and retains a light, pointer-transparent overlay", () => {
+  const css = read("home-case-video.css");
+  assert.match(css, /mix-blend-mode:\s*screen/);
+  assert.match(css, /\[data-video-visible="true"\]\s+img\s*\{\s*visibility:\s*hidden/);
+  assert.match(css, /background:\s*#0a0820/);
+  assert.match(css, /rgba\(10, 8, 32, \.08\)/);
+  assert.match(css, /rgba\(10, 8, 32, \.18\)/);
+  assert.doesNotMatch(css, /pointer-events:\s*auto/);
 });
